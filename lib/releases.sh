@@ -185,7 +185,7 @@ select_version() {
         # Keep the list visible: ask() opens a new page that redraws this panel.
         while :; do
             ui_panel "$(t version_list_title "$major")" "$(release_versions "$major" | tr '\n' ' ')"
-            ask requested exact_version || die cancelled
+            ask requested exact_version || exit 10
             jq -e --arg v "$requested" 'any(.[]; .version==$v)' "$STATE/cache/releases.json" >/dev/null && break
             say invalid "$requested"
         done

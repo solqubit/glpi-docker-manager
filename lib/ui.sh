@@ -274,7 +274,7 @@ ui_field() {
     if ui_interactive; then
         ui_question "$(t "$ui_key")"
         if [[ -n $ui_default ]]; then printf '      ' >&2; ui_color 2; printf '%s' "$(t ui_default_value "$ui_default")" >&2; ui_color 0; printf '\n' >&2; fi
-        printf '\n' >&2
+        printf '      ' >&2; ui_color 2; printf '%s' "$(t ui_field_keys)" >&2; ui_color 0; printf '\n\n' >&2
         if [[ ${3:-input} == input ]]; then printf '  ' >&2; ui_color '1;36'; printf '> ' >&2; ui_color 0; fi
     else
         t "$ui_key" >&2
@@ -284,6 +284,61 @@ ui_field() {
 }
 
 # ---------------------------------------------------------------- input
+# Raw single-line editor for every Bash text prompt. No readline: Tab never
+# lists files and Esc always cancels (returns 1), like every other screen.
+# Keys: ←/→, Home/End, Backspace/Delete, Ctrl+A/E/U; Enter accepts.
+ui_read_line() {
+    local ui_out=$1 ui_prefix=${2:-'> '} ui_tone=${3:-'1;36'} ui_text='' ui_char ui_next ui_seq
+    local ui_pos=0 ui_start=0 ui_room ui_shown ui_cursor
+    UI_TTY_STATE=$(stty -g)
+    stty -echo -icanon min 1 time 0
+    UI_ACTIVE=true
+    while :; do
+        ui_dimensions
+        ui_room=$((UI_COLS-${#ui_prefix}-6)); ((ui_room >= 4)) || ui_room=4
+        ((ui_pos >= ui_start)) || ui_start=$ui_pos
+        ((ui_pos < ui_start+ui_room)) || ui_start=$((ui_pos-ui_room+1))
+        ui_shown=${ui_text:ui_start:ui_room}
+        printf '\r\033[2K  ' >&2; ui_color "$ui_tone"; printf '%s' "$ui_prefix" >&2; ui_color 0
+        printf '%s' "$ui_shown" >&2
+        ui_cursor=$((${#ui_shown}-(ui_pos-ui_start)))
+        ((ui_cursor <= 0)) || printf '\033[%sD' "$ui_cursor" >&2
+        if ! IFS= read -rsn 1 ui_char; then ui_restore; return 1; fi
+        case $ui_char in
+            '')
+                ui_restore; printf '\n' >&2
+                printf -v "$ui_out" '%s' "$ui_text"
+                return 0;;
+            $'\004') ui_restore; printf '\n' >&2; return 1;;
+            $'\t') ;;
+            $'\177'|$'\b')
+                if ((ui_pos > 0)); then ui_text=${ui_text:0:ui_pos-1}${ui_text:ui_pos}; ((ui_pos-=1)) || true; fi;;
+            $'\025') ui_text=''; ui_pos=0; ui_start=0;;
+            $'\001') ui_pos=0;;
+            $'\005') ui_pos=${#ui_text};;
+            $'\e')
+                # A lone Esc (nothing follows quickly) cancels the prompt.
+                if ! IFS= read -rsn 1 -t 0.1 ui_next; then ui_restore; printf '\n' >&2; return 1; fi
+                [[ $ui_next == '[' || $ui_next == O ]] || continue
+                IFS= read -rsn 1 -t 0.1 ui_seq || continue
+                case $ui_seq in
+                    D) if ((ui_pos > 0)); then ((ui_pos-=1)) || true; fi;;
+                    C) ((ui_pos >= ${#ui_text})) || ((ui_pos+=1));;
+                    H) ui_pos=0;; F) ui_pos=${#ui_text};;
+                    1|3|4|7|8)
+                        IFS= read -rsn 1 -t 0.1 ui_next || continue
+                        [[ $ui_next == '~' ]] || continue
+                        case $ui_seq in
+                            1|7) ui_pos=0;; 4|8) ui_pos=${#ui_text};;
+                            3) ui_text=${ui_text:0:ui_pos}${ui_text:ui_pos+1};;
+                        esac;;
+                esac;;
+            *)
+                [[ $ui_char != *[$'\001'-$'\037'$'\177']* ]] || continue
+                ui_text=${ui_text:0:ui_pos}$ui_char${ui_text:ui_pos}; ((ui_pos+=1));;
+        esac
+    done
+}
 # Keep password editing in Bash: Tab changes visibility without losing input.
 # The line is erased on submission and secrets are never put in UI_CONTEXT.
 ui_secret_read() {
@@ -667,8 +722,18 @@ ui_pause() {
     local ui_pause_input
     [[ -t 0 ]] || return 0
     printf '\n  ' >&2; ui_color 2; printf '%s' "$(t "${1:-ui_continue}")" >&2; ui_color 0
-    # Silent: arrow keys pressed here must not print escape sequences.
-    IFS= read -rs ui_pause_input || true
+    if ui_interactive; then
+        # Enter or Esc continue; arrow keys are swallowed silently.
+        UI_TTY_STATE=$(stty -g)
+        stty -echo -icanon min 1 time 0
+        while IFS= read -rsn 1 ui_pause_input; do
+            [[ -n $ui_pause_input && $ui_pause_input != $'\e' ]] || break
+        done
+        if [[ $ui_pause_input == $'\e' ]]; then IFS= read -rsn 8 -t 0.05 ui_pause_input || true; fi
+        ui_restore
+    else
+        IFS= read -rs ui_pause_input || true
+    fi
     printf '\n' >&2
 }
 ui_progress_note() {

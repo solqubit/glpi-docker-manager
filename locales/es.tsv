@@ -700,3 +700,5 @@ logs_saved	✓ Rotación de registros guardada
 restore_file	Archivo
 restore_folder	Carpeta
 restore_section_plan	Qué va a pasar
+ui_field_keys	Enter aceptar · Esc volver · ←/→ editar · Ctrl+U borrar
+ui_typed_keys	Escribe la palabra exacta y pulsa Enter · Esc cancela

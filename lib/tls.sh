@@ -69,8 +69,8 @@ tls_wizard() {
     case $mode in off|self-signed|acme|custom) ;; *) die invalid tls;; esac
     if [[ $mode == acme ]]; then
         ui_panel "$(t ui_letsencrypt_title)" "$(t ui_letsencrypt_body)" "$(t ui_letsencrypt_ports)"
-        ask_value host hostname_prompt '' hostname
-    else ask_value host hostname_prompt "$(jq -r .hostname "$input")" hostname; fi
+        ask_value host hostname_prompt '' hostname || exit 10
+    else ask_value host hostname_prompt "$(jq -r .hostname "$input")" hostname || exit 10; fi
     [[ $mode != custom ]] || say cert_instructions "$CERT_ROOT/custom/fullchain.pem" "$CERT_ROOT/custom/privkey.pem"
     [[ $mode != acme ]] || say acme_requirements "$host"
     jq --arg mode "$mode" --arg host "$host" --arg cert_dir "$CERT_ROOT" \

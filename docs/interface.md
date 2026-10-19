@@ -10,6 +10,11 @@ capable terminal, the same operations offer numbered choices.
 * Up/Down or Tab moves between options; Enter accepts the highlighted option.
   The dashboard also supports Left/Right across two columns.
 * Home/End selects first/last; PageUp/PageDown scrolls long selectors.
+* Escape returns from every selector and text field, Bash and curses alike.
+  Bash text prompts use their own line editor (not readline): Tab never lists
+  files, Esc goes back, ←/→ Home/End Backspace/Delete and Ctrl+A/E/U edit. Typed
+  confirmations (`RESTORE`, `DELETE`…) are cancelled with Esc, and "Press Enter"
+  pauses also accept Esc.
 * Escape returns from a field without changing it. From the form it opens a
   cancellation choice. Ctrl+C interrupts and restores terminal settings.
 * Select a field to edit it, then return to the same highlighted row. Defaults,

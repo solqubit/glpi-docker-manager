@@ -55,8 +55,14 @@ ask() {
     local var=$1 key=$2 default=${3:-} prompt_input
     [[ -t 0 ]] || die interactive_required
     ui_page
-    ui_field "$key" "$default"
-    IFS= read -er prompt_input || return 1
+    if ui_interactive; then
+        # Own editor (no readline): Esc returns 1 so callers can go back.
+        ui_field "$key" "$default" title
+        ui_read_line prompt_input || return 1
+    else
+        ui_field "$key" "$default"
+        IFS= read -r prompt_input || return 1
+    fi
     printf -v "$var" '%s' "${prompt_input:-$default}"
 }
 confirm() {
@@ -76,8 +82,13 @@ typed_confirm() {
     local answer
     say destructive "$1"
     [[ -t 0 ]] || die interactive_required
-    printf '  ' >&2; ui_color '1;31'; printf '> ' >&2; ui_color 0
-    IFS= read -r answer || die cancelled
+    if ui_interactive; then
+        printf '  ' >&2; ui_color 2; printf '%s' "$(t ui_typed_keys)" >&2; ui_color 0; printf '\n' >&2
+        ui_read_line answer '> ' '1;31' || die cancelled
+    else
+        printf '  > ' >&2
+        IFS= read -r answer || die cancelled
+    fi
     [[ $answer == "$1" ]] || die cancelled
 }
 secret_prompt() {
