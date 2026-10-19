@@ -711,3 +711,5 @@ ca_path	En el servidor
 ca_expiry	CA válida hasta
 ca_fingerprint	SHA-256 de la CA
 ca_agent_help	Agente GLPI: copia gdm-ca.pem en cada equipo (por ejemplo C:\CA-GLPI\gdm-ca.pem) y pon esa ruta en "CA Certificate File"; deja "Fingerprint" vacío. Navegadores: importa gdm-ca.pem como entidad raíz de confianza.
+legacy_branch_label	GLPI 10 · rama sin soporte
+opt_legacy_branch	Solo para plugins que aún no son compatibles o para ensayar una migración. GLPI 10 ya no recibe parches de seguridad.

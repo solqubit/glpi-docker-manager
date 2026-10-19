@@ -70,8 +70,9 @@ service_start() {
     ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")" "$(t ui_next_steps)"
 }
 select_major() {
-    # MINIMUM excludes branches at or below it: 10 for new installations (GLPI 10
-    # is end of life; it stays restorable and reachable with "install 10.x.y").
+    # MINIMUM excludes branches at or below it: 10 for new installations. GLPI 10
+    # is end of life, so it is offered last, as a marked risk, for plugins not yet
+    # compatible or migration rehearsals; it also stays reachable via "install 10.x.y".
     local major_output=$1 major_default=$2 major_minimum=${3:-10} major_mode=${5:-install} major_value major_first=true
     local -a major_options=()
     while IFS= read -r major_value; do
@@ -85,6 +86,10 @@ select_major() {
         fi
         major_first=false
     done < <(jq -r '[.[].version|split(".")[0]|tonumber]|unique|sort|reverse|.[]|select(.>=10)' "$STATE/cache/releases.json")
+    if [[ $major_mode == install ]] && (( major_minimum >= 10 )) &&
+        jq -e 'any(.[]; (.version|split(".")[0]) == "10")' "$STATE/cache/releases.json" >/dev/null 2>&1; then
+        major_options+=(10 "$(ui_opt warn "$(t legacy_branch_label)" "$(t opt_legacy_branch)")")
+    fi
     (( ${#major_options[@]} > 0 )) || die image_missing "$major_default"
     [[ ${4:-false} != true ]] || major_options+=(back "$(ui_opt back "$(t setup_return_edit)")")
     if ! choose "$major_output" major_prompt "$major_default" "${major_options[@]}"; then

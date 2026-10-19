@@ -38,8 +38,9 @@ versiones instalables más recientes por rama; también admite una versión exac
 Las comprobaciones oficiales de requisitos deben pasar para instalar o migrar.
 
 Antes de confirmar verás las notas oficiales y avisos de seguridad. El selector de
-instalación nueva excluye GLPI 10; sigue disponible mediante `install 10.x.y` o
-restaurando un respaldo, con advertencia de soporte y confirmación adicional.
+instalación nueva muestra GLPI 10 al final, marcado como rama sin soporte (para
+plugins aún no compatibles o ensayos de migración); también funcionan
+`install 10.x.y` y restaurar un respaldo, siempre con advertencia y confirmación.
 Volver a ejecutar el gestor
 abre el menú y conserva los datos y contraseñas existentes.
 

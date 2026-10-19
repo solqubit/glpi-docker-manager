@@ -48,3 +48,36 @@ build_update_choices 12.0.0 12
 [[ ! -s $UPDATE_CHOICES_FILE ]]
 select_update_target 12.0.0 12
 [[ -z $SELECTED_UPDATE ]]
+
+# New installs offer the unsupported branch last; migrations never offer it.
+(
+    printf '%s\n' '[{"version":"11.0.11"},{"version":"10.0.28"},{"version":"12.0.0"},{"version":"10.0.27"}]' > "$STATE/cache/releases.json"
+    declare -a major_captured=()
+    major_selected=''
+    choose() {
+        local output=$1
+        [[ $2 == major_prompt && $3 == 12 ]]
+        shift 3
+        major_captured=("$@")
+        printf -v "$output" '%s' "$major_pick"
+    }
+    for LANGUAGE in en es; do
+        tr_load
+        major_pick=12
+        select_major major_selected 12 10 false install
+        [[ $major_selected == 12 && ${#major_captured[@]} == 6 ]]
+        [[ ${major_captured[0]} == 12 && ${major_captured[2]} == 11 && ${major_captured[4]} == 10 ]]
+        [[ ${major_captured[1]} == "$(ui_opt primary "GLPI 12 · $(t opt_recommended)" "$(t opt_major_latest)")" ]]
+        [[ ${major_captured[3]} == "$(ui_opt '' 'GLPI 11' "$(t opt_major_older)")" ]]
+        [[ ${major_captured[5]} == "$(ui_opt warn "$(t legacy_branch_label)" "$(t opt_legacy_branch)")" ]]
+
+        major_pick=10
+        select_major major_selected 12 10 false install
+        [[ $major_selected == 10 ]]
+
+        major_pick=12
+        select_major major_selected 12 11 false migrate
+        [[ $major_selected == 12 && ${#major_captured[@]} == 2 && ${major_captured[0]} == 12 ]]
+        [[ ${major_captured[1]} == "$(ui_opt warn 'GLPI 12' "$(t opt_update_major 11 12)")" ]]
+    done
+)

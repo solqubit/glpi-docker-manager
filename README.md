@@ -79,8 +79,9 @@ keyboard controls, monochrome and plain-terminal modes.
   exact-version installation (`sudo ./start.sh install 11.0.11`). Future stable majors
   are discovered too; image/GLPI requirements still have to pass.
 * Display full upstream release notes and security notices. The new-installation
-  selector excludes GLPI 10; explicit `install 10.x.y` and restoring existing
-  backups remain available, with a separate support warning and confirmation.
+  selector lists GLPI 10 last, marked as an unsupported branch (for plugins not
+  yet compatible or migration rehearsals); `install 10.x.y` and restoring existing
+  backups also work, always with a support warning and confirmation.
 * Pin GLPI, MySQL and Caddy to exact versions and immutable registry digests.
 * Publish MySQL with exactly `3306:3306`, or leave it unpublished. Change this
   choice from the menu later. Publishing makes the database reachable on host

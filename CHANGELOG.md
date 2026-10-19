@@ -46,5 +46,6 @@ history retention) stay in GLPI; the manager handles the host and containers.
   `www-data` (fixes the CSRF "action not allowed" error after login).
 * Container logs limited to 3 × 10 MiB; parallel registry lookups; cached release
   list (15 min); Docker Hub rate limits reported.
-* New installations no longer offer GLPI 10 (end of life); it remains restorable
+* GLPI 10 (end of life) is listed last for new installations as a marked unsupported
+  branch, with a warning and confirmation; it remains restorable
   and reachable with `install 10.x.y`.
