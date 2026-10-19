@@ -67,7 +67,7 @@ ui_level_of() {
         host_storage_steps|acme_requirements|cert_instructions|releases_stale|install_exists|admin_command|registry_rate_limited|\
         docker_context_help|maint_no_scheduler|maint_skipped|maint_services_stopped|backups_prune_skipped|\
         cert_expiring|cert_custom_expiring|cert_acme_expiring|cert_auto_renewing|firewall_docker|\
-        self_update_git|self_update_unavailable)
+        self_update_git|self_update_unavailable|self_update_git_dirty|self_update_git_noupstream)
             UI_LEVEL=warning;;
         ready|updated|detected|*_done|*_ok|*_ready|*_saved|*_cached|self_signed)
             UI_LEVEL=success;;
@@ -596,7 +596,9 @@ ui_pause() {
     local ui_pause_input
     [[ -t 0 ]] || return 0
     printf '\n  ' >&2; ui_color 2; printf '%s' "$(t "${1:-ui_continue}")" >&2; ui_color 0
-    IFS= read -r ui_pause_input || true
+    # Silent: arrow keys pressed here must not print escape sequences.
+    IFS= read -rs ui_pause_input || true
+    printf '\n' >&2
 }
 ui_progress_note() {
     say "$@"

@@ -536,3 +536,7 @@ setup_timezone_server	Server time zone: %s
 setup_field_values	Current: %s · Default: %s
 setup_password_generated	%s: a random 48-character password was generated. View it later in View database credentials.
 setup_staging	Validating and preparing the configuration
+self_update_git_dirty	%s has local changes. Commit or discard them, then use Update this manager again.
+self_update_git_noupstream	The Git branch in %s has no remote branch to update from; run git pull there manually.
+self_update_git_none	The Git checkout is up to date (branch %s).
+self_update_git_behind	%s new commits available on branch %s

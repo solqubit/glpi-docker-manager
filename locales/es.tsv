@@ -536,3 +536,7 @@ setup_timezone_server	Zona horaria del servidor: %s
 setup_field_values	Actual: %s · Predeterminado: %s
 setup_password_generated	%s: se generó una contraseña aleatoria de 48 caracteres. Puedes verla después en Ver credenciales de la base.
 setup_staging	Validando y preparando la configuración
+self_update_git_dirty	%s tiene cambios locales. Confírmalos o descártalos y vuelve a usar Actualizar este gestor.
+self_update_git_noupstream	La rama de Git en %s no tiene una rama remota de la que actualizar; ejecuta git pull ahí manualmente.
+self_update_git_none	El repositorio Git está actualizado (rama %s).
+self_update_git_behind	%s commits nuevos disponibles en la rama %s

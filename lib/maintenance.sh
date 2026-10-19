@@ -332,6 +332,39 @@ manager_latest_release() {
     [[ $tag =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
     MANAGER_TAG=$tag MANAGER_LATEST=${tag#v}
 }
+# Git checkouts are updated with git itself, as the checkout's owner: running
+# git as root would leave root-owned files in a user's clone and trip Git's
+# "dubious ownership" protection.
+git_as_owner() {
+    local owner
+    owner=$(stat -c %U -- "$GDM_ROOT")
+    if [[ $owner == root || $owner == "$(id -un)" ]]; then git -C "$GDM_ROOT" "$@"
+    else runuser -u "$owner" -- git -C "$GDM_ROOT" "$@"; fi
+}
+manager_git_fetch() { git_as_owner fetch --quiet || GIT_BEHIND=error; }
+manager_git_pull() { git_as_owner pull --ff-only --quiet; }
+manager_git_update() {
+    local branch GIT_BEHIND=''
+    command -v git >/dev/null || { say self_update_git "$GDM_ROOT"; return 0; }
+    if [[ -n $(git_as_owner status --porcelain --untracked-files=no 2>/dev/null) ]]; then
+        say self_update_git_dirty "$GDM_ROOT"; return 0
+    fi
+    if ! git_as_owner rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+        say self_update_git_noupstream "$GDM_ROOT"; return 0
+    fi
+    ui_task self_update_checking manager_git_fetch
+    [[ $GIT_BEHIND != error ]] || { say self_update_unavailable; return 0; }
+    GIT_BEHIND=$(git_as_owner rev-list --count 'HEAD..@{u}')
+    branch=$(git_as_owner rev-parse --abbrev-ref HEAD)
+    if [[ $GIT_BEHIND == 0 ]]; then say self_update_git_none "$branch"; return 0; fi
+    ui_panel "$(t self_update_title)" "$(t self_update_git_behind "$GIT_BEHIND" "$branch")" \
+        "$GDM_ROOT" "$(t self_update_help)"
+    confirm self_update_confirm || exit 10
+    ui_task self_update_downloading manager_git_pull
+    bash -n "$GDM_ROOT/start.sh" || die self_update_invalid
+    printf '%s\n' "$GDM_ROOT" > "$STATE/cache/manager-update.pending"
+    say self_update_restart
+}
 manager_latest_lookup() { manager_latest_release || MANAGER_LATEST=''; }
 manager_download() {
     local work archive
@@ -345,7 +378,7 @@ manager_download() {
 }
 manager_self_update() {
     local file version
-    if [[ -d $GDM_ROOT/.git ]]; then say self_update_git "$GDM_ROOT"; return 0; fi
+    if [[ -e $GDM_ROOT/.git ]]; then manager_git_update; return; fi
     MANAGER_LATEST=''
     ui_task self_update_checking manager_latest_lookup
     if [[ -z $MANAGER_LATEST ]]; then say self_update_unavailable; return 0; fi
@@ -365,7 +398,7 @@ manager_handover() {
     local source
     IFS= read -r source < "$STATE/cache/manager-update.pending" || return 0
     rm -f -- "$STATE/cache/manager-update.pending"
-    [[ $source == "$STATE"/cache/manager-update-*/src && -f $source/start.sh ]] || return 0
+    [[ ( $source == "$STATE"/cache/manager-update-*/src || $source == "$GDM_ROOT" ) && -f $source/start.sh ]] || return 0
     exec {GDM_LOCK_FD}>&-
     trap - EXIT ERR INT TERM
     ui_restore
