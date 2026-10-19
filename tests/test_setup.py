@@ -12,6 +12,7 @@ sys.path.insert(0, str(root / 'tools'))
 from setup import Setup, form_errors, port_errors, timezones, validate
 from service_view import access_url, records, state, status_rows
 from terminal_ui import Terminal, clean, translations
+from main_menu import status_line
 
 data = dict(hostname='192.168.0.33', http_port=80, https_port=443, timezone='UTC',
             tls='off', expose_db=False, db_name='glpi', db_user='glpi',
@@ -60,4 +61,15 @@ ui = Terminal(translations(root, 'es'))
 assert 'sha256' not in repr(status_rows(data, services, ui))
 assert 'abc' not in repr(status_rows(data, services, ui))
 assert clean('\x1b[31mtest\x1b[0m') == 'test'
+with tempfile.TemporaryDirectory() as directory:
+    folder = Path(directory)
+    (folder / 'backups').mkdir()
+    for language in ('en', 'es'):
+        ui = Terminal(translations(root, language))
+        for tag, origin in (('', 'manual'), ('auto-', 'auto'), ('pre-', 'pre')):
+            archive = folder / 'backups' / f'glpi-11.0.11-20261019T000000-{tag}abc123.tar.gz'
+            archive.touch()
+            line, _ = status_line(ui, data, folder)
+            assert '(' + ui.t('backup_origin_' + origin) + ')' in line, line
+            archive.unlink()
 print('PASS: editable settings validation, time zones, secret privacy, ports, URLs and service states')

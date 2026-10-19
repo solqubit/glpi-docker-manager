@@ -53,7 +53,13 @@ def status_line(ui, config, state_folder):
     parts.append(ui.t('dash_db_public' if config.get('expose_db') else 'dash_db_private'))
     backups = sorted((state_folder / 'backups').glob('glpi-*.tar.gz'), key=lambda p: p.stat().st_mtime)
     if backups:
-        kind = ui.t('backup_origin_auto' if '-auto-' in backups[-1].name else 'backup_origin_manual')
+        if '-auto-' in backups[-1].name:
+            origin = 'auto'
+        elif '-pre-' in backups[-1].name:
+            origin = 'pre'
+        else:
+            origin = 'manual'
+        kind = ui.t('backup_origin_' + origin)
         parts.append(ui.t('dash_backup', age(ui, backups[-1].stat().st_mtime), kind))
     else:
         parts.append(ui.t('dash_backup_none'))
