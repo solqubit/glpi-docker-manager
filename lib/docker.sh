@@ -55,9 +55,18 @@ wait_healthy() {
     say unhealthy "$service"
     return 1
 }
-console() { dc exec -T glpi php bin/console "$@" --no-interaction; }
+# The console always runs as Apache's user. Run as the image's default user
+# (root), it creates root-owned sessions/cache/config under /var/glpi; the web
+# server then cannot store sessions and every form fails GLPI's CSRF check
+# ("The action you have requested is not allowed").
+console() { dc exec -T --user www-data glpi php bin/console "$@" --no-interaction; }
 oneoff_console() {
-    dc run --rm --no-deps -T -e GLPI_CRONTAB_ENABLED=0 --entrypoint php glpi bin/console "$@" --no-interaction
+    dc run --rm --no-deps -T --user www-data -e GLPI_CRONTAB_ENABLED=0 --entrypoint php glpi bin/console "$@" --no-interaction
+}
+# Repairs installations whose application data was created by root.
+data_ownership_repair() {
+    dc run --rm --no-deps -T --user root --entrypoint sh glpi -c \
+      'chown -R www-data:www-data /var/glpi /var/www/glpi/plugins; if [ "$GLPI_MARKETPLACE_DIR" = /var/www/glpi/marketplace ]; then chown -R www-data:www-data /var/www/glpi/marketplace; fi'
 }
 command_select() {
     local action=$1 available=$2 candidate candidates
@@ -136,6 +145,8 @@ install_database() {
     # host arguments. Normal services permanently disable automatic installation.
     dc run --rm --no-deps -T -e GLPI_SKIP_AUTOINSTALL=false -e GLPI_SKIP_AUTOUPDATE=true \
         -e GLPI_CRONTAB_ENABLED=0 glpi php bin/console --version
+    # The entrypoint may run this initialization as root.
+    data_ownership_repair
 }
 initialize_plugin_volume() {
     # Named volumes hide image content at these paths. Empty custom plugin dirs

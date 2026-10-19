@@ -47,14 +47,15 @@ service_logs() {
     dc logs --no-color --tail 150 > "$log_file" 2>&1
     python3 "$GDM_ROOT/tools/service_view.py" "$CONFIG" "$log_file" "$LANGUAGE" logs "${GDM_IN_MENU:-false}"
 }
-service_start_action() { dc up -d; verify_services; }
+service_start_action() { data_ownership_repair; dc up -d; verify_services; }
+service_check_action() { data_ownership_repair; verify_services; }
 recover_services() { dc up -d; verify_services; config_set_status ready; journal_done; }
 service_start() {
     [[ $(cfg status) == ready && ! -f $STATE/operation.json ]] || die ui_pending_body
     service_snapshot
     local current
     current=$(python3 "$GDM_ROOT/tools/service_view.py" "$CONFIG" "$SERVICE_DATA" "$LANGUAGE" state false)
-    if [[ $current == running ]]; then ui_run 0 ui_service_checking verify_services
+    if [[ $current == running ]]; then ui_run 0 ui_service_checking service_check_action
     else ui_run 0 ui_service_starting service_start_action; fi
     ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")" "$(t ui_next_steps)"
 }

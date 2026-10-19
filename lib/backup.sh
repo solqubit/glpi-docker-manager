@@ -145,6 +145,7 @@ restore_selected_backup() {
     config_activate "$REVISION"
     journal_phase restoring
     restore_into_current "$EXTRACTED"
+    data_ownership_repair
     dc up -d
     verify_services
     config_set_status ready
