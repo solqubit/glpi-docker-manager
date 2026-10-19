@@ -37,13 +37,14 @@ pull_images() {
     storage_preflight "$image_need" "$data_need"
     for image in "${images[@]}"; do
         if docker image inspect "$image" >/dev/null 2>&1; then say storage_image_cached "${image%@*}"
-        else docker pull "$image"; fi
+        else ui_status "$(t status_pulling "${image%@*}")"; docker pull --quiet "$image"; fi
     done
 }
 wait_healthy() {
     local service=$1 timeout=${2:-300} elapsed=0 id status
     while (( elapsed < timeout )); do
         id=$(dc ps --all --quiet "$service")
+        ui_status "$(t status_waiting "$service" "${status:-...}" "$elapsed")"
         if [[ -n $id ]]; then
             status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id")
             [[ $status != healthy ]] || return 0
@@ -82,6 +83,7 @@ oneoff_action() {
         say invalid "unsupported GLPI CLI action: $action"
         return 1
     fi
+    ui_status "$(t status_console "$command")"
     oneoff_console "$command" "$@"
 }
 legacy_database_version() {
@@ -118,9 +120,12 @@ http_check() {
     [[ $code =~ ^(200|301|302|303)$ ]]
 }
 verify_services() {
-    wait_healthy db && database_check && wait_healthy glpi && schema_check || return 1
+    wait_healthy db && database_check && wait_healthy glpi || return 1
+    ui_status "$(t status_schema)"
+    schema_check || return 1
     local attempt
     for (( attempt=0; attempt<30; attempt++ )); do
+        ui_status "$(t status_http "$((attempt+1))")"
         if http_check; then return 0; fi
         sleep 2
     done

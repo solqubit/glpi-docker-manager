@@ -104,7 +104,6 @@ config_restored	Se restauró la configuración anterior al fallar la validación
 credentials_warning	Las credenciales de base están ocultas. ¿Mostrarlas en esta terminal? [s/N]
 credentials_note	Son credenciales de base de datos, distintas de las cuentas web GLPI. Editar .env no cambia las contraseñas existentes en MySQL.
 menu	\n  GLPI Docker Manager\n  1) Estado                 2) Iniciar              3) Detener\n  4) Registros              5) Buscar versiones     6) Actualizar GLPI\n  7) Respaldo               8) Restaurar            9) HTTPS\n 10) Publicación MySQL     11) Credenciales         12) Traslado\n 13) Migración principal   14) Parche MySQL         15) Idioma\n 16) Diagnóstico           17) Renovar imagen GLPI  18) Recuperación\n  0) Salir\n
-help	Uso: ./start.sh [--lang en|es] [--state-dir /ruta/absoluta] [comando] [argumento]\nComandos: install [versión], status, start, stop, logs, check-updates, update [versión], refresh-image, migrate [versión], backup, backups, restore [archivo], transfer, address, https, db-exposure, credentials, db-update, language, diagnose, recover, version, help.\nSin comando abre el menú interactivo. Instalar Docker, restaurar, migrar y cambiar opciones sensibles requiere confirmación.\nEstado predeterminado: /opt/glpi-docker-manager . TLS importado: /opt/glpi-docker-manager/certs/custom/{fullchain.pem,privkey.pem} .
 stop_confirm	¿Detener GLPI y MySQL? [s/N]
 diagnose_note	El diagnóstico no muestra contraseñas. Los registros originales de Docker/GLPI pueden contener datos sensibles; revísalos antes de compartirlos.
 recover_prompt	Se interrumpió una operación. Revisa operation.json y los registros. Restaura un respaldo válido o escribe RESUME para comprobar la imagen/esquema actuales y reintentar la verificación. No se intentará revertir automáticamente la base de datos.
@@ -377,3 +376,40 @@ backup_origin_refresh-image	Antes de renovar la imagen
 backup_origin_transfer	Traslado de servidor
 backup_origin_unknown	Sin registrar
 update_branch_available	También está disponible GLPI %s en la siguiente rama. Abre Actualizar GLPI / cambiar rama para revisarla con los avisos de migración.
+ui_interrupted	Saliendo... terminal restaurada.
+help_usage	Uso: ./start.sh [--lang en|es] [--state-dir /ruta/absoluta] [comando] [argumento]
+help_group_options	Opciones
+help_group_service	Servicio
+help_group_updates	Instalación y actualizaciones
+help_group_data	Datos y respaldos
+help_group_settings	Configuración
+help_group_support	Ayuda
+help_opt_lang	Idioma de la interfaz
+help_opt_state	Raíz de instalación (predeterminada: /opt/glpi-docker-manager)
+help_opt_help	Muestra esta ayuda
+help_opt_version	Muestra la versión del gestor
+help_cmd_install	Instalar GLPI (opcionalmente una versión exacta)
+help_cmd_migrate	Migrar a la siguiente rama de GLPI
+help_notes	Sin comando abre el menú interactivo. Instalar Docker, restaurar, migrar y cambiar opciones sensibles requiere confirmación.
+help_paths	TLS importado: /opt/glpi-docker-manager/certs/custom/{fullchain.pem,privkey.pem}
+docker_ready	Docker %s accesible
+releases_cached	Usando la lista de versiones de GLPI obtenida hace %s min
+releases_stale	GitHub no responde; se usa la lista de versiones de GLPI guardada.
+task_versions	Buscando imágenes de GLPI disponibles
+version_list_title	Versiones estables de GLPI %s
+db_update_versions	MySQL %s → %s
+status_pulling	descargando %s
+status_waiting	esperando a %s: %s (%ss)
+status_http	comprobación web, intento %s/30
+status_schema	comprobando SQL y el esquema de GLPI
+status_console	consola GLPI: %s
+status_measure	midiendo volúmenes y base de datos
+status_dump	volcando la base de datos MySQL
+status_snapshot	guardando el volumen %s
+status_restore_volume	restaurando el volumen %s
+status_import	importando el volcado MySQL
+status_archive	comprimiendo y verificando el archivo
+status_release_page	página %s de GitHub
+status_resolving	comprobando %s
+db_updated	Actualización de MySQL verificada. MySQL actual: %s.
+registry_rate_limited	Docker Hub rechazó algunas consultas por su límite de peticiones (HTTP 429). Espera unos minutos o ejecuta docker login y vuelve a intentarlo.

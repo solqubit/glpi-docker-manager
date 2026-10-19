@@ -147,7 +147,7 @@ class Setup:
             invalid = bool(validate(key, str(self.data[key]), self.data))
             default = not pending and not key.endswith('password') and self.data[key] == self.defaults[key]
             state = self.ui.t('setup_pending' if pending else 'setup_invalid' if invalid else 'setup_default' if default else 'setup_valid')
-            marker = '!' if pending or invalid else '✓'
+            marker = '[✗]' if invalid and not pending else '[!]' if pending else '[+]'
             value = self.display(key)
             # Keep the state before long values so it remains visible on narrow terminals.
             rows.append((key, f'{marker} {self.ui.t(label).split(" · ")[0]} [{state}]  {value}',

@@ -23,7 +23,9 @@ dc() {
 }
 docker() {
     if [[ $1 == info ]]; then printf '%s\n' "$STATE"
-    elif [[ $1 == run ]]; then printf '1048576 /data\n'
+    elif [[ $1 == run ]]; then
+        # One helper measures every volume: report each /data/<role> argument.
+        for arg; do [[ $arg != /data/* ]] || printf '1048576\t%s\n' "$arg"; done
     else return 1; fi
 }
 df() {

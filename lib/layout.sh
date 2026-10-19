@@ -12,7 +12,8 @@ layout_install_code() {
     for path in "$GDM_ROOT"/lib/*.sh "$GDM_ROOT"/locales/*.tsv "$GDM_ROOT"/templates/*.sh "$GDM_ROOT"/tools/*.py "$GDM_ROOT"/docs/*.md; do
         files+=("${path#"$GDM_ROOT"/}")
     done
-    checksum=$(for path in "${files[@]}"; do printf '%s\n' "$path"; sha256sum < "$GDM_ROOT/$path"; done | sha256sum | cut -c1-16)
+    # One sha256sum over all files: hashes and relative names identify the release.
+    checksum=$(cd -- "$GDM_ROOT" && sha256sum -- "${files[@]}" | sha256sum | cut -c1-16)
     destination="$STATE/manager-releases/$checksum"
     if [[ ! -d $destination ]]; then
         mkdir -p -- "$STATE/manager-releases"

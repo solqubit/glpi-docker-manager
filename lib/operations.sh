@@ -17,14 +17,14 @@ installation_ports_check() {
 }
 installation_finish() {
     storage_preflight 0 1024
-    ui_run 1 ui_step_volumes volumes_ensure
-    ui_run 2 ui_step_images pull_images 1024
-    ui_run 3 ui_step_plugins initialize_plugin_volume
-    ui_run 4 ui_step_database start_database
-    ui_run 5 ui_step_install install_database
-    ui_run 6 ui_step_requirements oneoff_action requirements
-    ui_run 7 ui_step_services dc up -d
-    ui_run 8 ui_step_verify verify_services
+    ui_run 1/8 ui_step_volumes volumes_ensure
+    ui_run 2/8 ui_step_images pull_images 1024
+    ui_run 3/8 ui_step_plugins initialize_plugin_volume
+    ui_run 4/8 ui_step_database start_database
+    ui_run 5/8 ui_step_install install_database
+    ui_run 6/8 ui_step_requirements oneoff_action requirements
+    ui_run 7/8 ui_step_services dc up -d
+    ui_run 8/8 ui_step_verify verify_services
     config_set_status ready
     journal_done
     ui_panel "$(t ui_install_success)" "$(t ready "$(installation_url)")" \
@@ -48,6 +48,7 @@ service_logs() {
     python3 "$GDM_ROOT/tools/service_view.py" "$CONFIG" "$log_file" "$LANGUAGE" logs "${GDM_IN_MENU:-false}"
 }
 service_start_action() { dc up -d; verify_services; }
+recover_services() { dc up -d; verify_services; config_set_status ready; journal_done; }
 service_start() {
     [[ $(cfg status) == ready && ! -f $STATE/operation.json ]] || die ui_pending_body
     service_snapshot
@@ -97,19 +98,14 @@ install_wizard() {
         return
     fi
     check_resources
-    say ui_releases_loading
-    release_fetch
+    ui_task ui_releases_loading release_fetch
     if [[ -n $requested ]]; then major=${requested%%.*}
     else
         select_major major "$(jq -r '[.[].version|split(".")[0]|tonumber]|max' "$STATE/cache/releases.json")"
     fi
     [[ $major =~ ^[1-9][0-9]{1,2}$ ]] || die invalid major
     select_version "$major" "$requested"
-    say setup_loading_images
-    mysql_version=$(official_tag_latest mysql 8.4) || die image_missing mysql
-    mysql_image=$(image_resolve mysql "$mysql_version") || die image_missing mysql
-    caddy_version=$(official_tag_latest caddy 2) || die image_missing caddy
-    caddy_image=$(image_resolve caddy "$caddy_version") || die image_missing caddy
+    ui_task setup_loading_images support_images_lookup
     id=$(openssl rand -hex 8)
     file=$(mktemp "$STATE/.install.XXXXXX"); clean_file=$(mktemp "$STATE/.validated.XXXXXX")
     CLEANUP_PATHS+=("$file" "$clean_file")
@@ -151,6 +147,25 @@ install_wizard() {
     journal_begin install
     installation_finish
 }
+# MySQL and Caddy lookups are independent registry round trips: run both at once.
+# Sets the caller's mysql_version/mysql_image/caddy_image (dynamic scope).
+support_images_lookup() {
+    local work mysql_pid caddy_pid
+    work=$(mktemp -d "$STATE/cache/.support-XXXXXX")
+    ui_status "$(t status_resolving 'mysql:8.4 · caddy:2')"
+    ( trap - ERR EXIT; official_image_lookup mysql 8.4 > "$work/mysql" 2> "$work/mysql.err" || rm -f -- "$work/mysql" ) &
+    mysql_pid=$!
+    ( trap - ERR EXIT; official_image_lookup caddy 2 > "$work/caddy" 2> "$work/caddy.err" || rm -f -- "$work/caddy" ) &
+    caddy_pid=$!
+    wait "$mysql_pid" || true
+    wait "$caddy_pid" || true
+    registry_limit_check "$work/mysql.err" "$work/caddy.err"
+    [[ -s $work/mysql ]] || { rm -rf -- "$work"; die image_missing mysql; }
+    [[ -s $work/caddy ]] || { rm -rf -- "$work"; die image_missing caddy; }
+    IFS=$'\t' read -r mysql_version mysql_image < "$work/mysql"
+    IFS=$'\t' read -r _ caddy_image < "$work/caddy"
+    rm -rf -- "$work"
+}
 draft_ports_check() {
     local input=$1 port
     while IFS= read -r port; do
@@ -161,14 +176,14 @@ draft_ports_check() {
     return 0
 }
 check_updates() {
-    release_fetch
+    ui_task ui_releases_loading release_fetch
     local newest current next_version
     newest=$(release_versions "$(cfg major)" | head -n 1); current=$(cfg glpi_version)
     [[ -n $newest ]] || die image_missing "$(cfg major)"
     ui_panel "$(t update_select_title)" "$(t update_latest "$current" "$newest")" "$(t update_select_help)"
     if version_gt "$newest" "$current"; then
         release_notice "$newest"
-        image_resolve glpi/glpi "$newest" >/dev/null
+        image_resolve glpi/glpi "$newest" >/dev/null || say update_images_unavailable
     else say update_none; fi
     next_version=$(release_versions "$(( $(cfg major)+1 ))" | head -n 1)
     [[ -z $next_version ]] || say update_branch_available "$next_version"
@@ -237,7 +252,7 @@ update_glpi() {
     local kind=${1:-update} requested=${2:-} target image current file old source_major
     assert_running
     current=$(cfg glpi_version); source_major=$(cfg major)
-    release_fetch
+    ui_task ui_releases_loading release_fetch
     if [[ $kind == update && -z $requested ]]; then
         select_update_target "$current" "$source_major"
         requested=$SELECTED_UPDATE
@@ -270,14 +285,14 @@ update_glpi() {
     fi
     say update_current "$current" "$target"
     confirm update_confirm || die cancelled
-    ui_run 0 update_step_backup backup_create true "$kind" "$target"
+    ui_run 1/3 update_step_backup backup_create true "$kind" "$target"
     printf '%s\n' "$LAST_BACKUP" > "$STATE/recovery-backup"
     backup_extract "$LAST_BACKUP"
     ui_panel "$(t backup_recovery_ready)" "$LAST_BACKUP" "$(t backup_recovery_help)"
     # Rehearse every application version change, including patch updates.
-    ui_run 0 update_step_rehearsal rehearse "$EXTRACTED" "$target" "$image"
+    ui_run 2/3 update_step_rehearsal rehearse "$EXTRACTED" "$target" "$image"
     [[ $kind != migrate ]] || typed_confirm "MIGRATE-$source_major-${target%%.*}"
-    ui_run 0 update_step_apply apply_glpi_update "$kind" "$target" "$image" "$source_major"
+    ui_run 3/3 update_step_apply apply_glpi_update "$kind" "$target" "$image" "$source_major"
     ui_panel "✓ $(t updated "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
 }
 apply_glpi_update() {
@@ -305,19 +320,23 @@ apply_glpi_update() {
     journal_done
 }
 build_update_choices() {
-    local current=$1 major=$2 version image branch
-    UPDATE_CANDIDATES=0
-    : > "$UPDATE_CHOICES_FILE"
-    while IFS= read -r version; do
-        version_gt "$version" "$current" || continue
-        branch=${version%%.*}
-        (( branch == major || branch == major+1 )) || continue
-        UPDATE_CANDIDATES=$((UPDATE_CANDIDATES+1))
-        if image=$(image_resolve glpi/glpi "$version" 2>/dev/null); then
-            printf '%s\t%s\t%s\n' "$version" "$branch" "$image" >> "$UPDATE_CHOICES_FILE"
-        fi
-    done < <(jq -r --argjson major "$major" '[.[]|.version | select((split(".")[0]|tonumber)==$major or (split(".")[0]|tonumber)==$major+1)] |
+    local current=$1 major=$2 version image resolved
+    local -a candidates=()
+    valid_version "$current" || die invalid version
+    # Later releases of this and the next branch (numeric array comparison in jq).
+    mapfile -t candidates < <(jq -r --argjson major "$major" --arg current "$current" '
+        ($current|split(".")|map(tonumber)) as $installed |
+        [.[]|.version | select((split(".")[0]|tonumber) as $branch | $branch==$major or $branch==$major+1) |
+         select((split(".")|map(tonumber)) > $installed)] |
         sort_by(split(".")|map(tonumber)) | .[]' "$STATE/cache/releases.json")
+    UPDATE_CANDIDATES=${#candidates[@]}
+    : > "$UPDATE_CHOICES_FILE"
+    (( UPDATE_CANDIDATES > 0 )) || return 0
+    resolved=$(mktemp "$STATE/cache/.updates.XXXXXX"); CLEANUP_PATHS+=("$resolved")
+    images_resolve glpi/glpi "$resolved" "${candidates[@]}"
+    while IFS=$'\t' read -r version image; do
+        printf '%s\t%s\t%s\n' "$version" "${version%%.*}" "$image"
+    done < "$resolved" > "$UPDATE_CHOICES_FILE"
 }
 select_update_target() {
     local current=$1 major=$2 version branch image choice default='' UPDATE_CHOICES_FILE UPDATE_CANDIDATES=0
@@ -342,17 +361,26 @@ select_update_target() {
     SELECTED_UPDATE=$choice
 }
 update_database() {
-    local target image file
+    local target image mysql_lookup
     assert_running
-    target=$(official_tag_latest mysql 8.4) || die image_missing mysql
+    mysql_lookup=$(mktemp "$STATE/.mysql-lookup.XXXXXX"); CLEANUP_PATHS+=("$mysql_lookup")
+    ui_task setup_loading_images mysql_target_lookup "$mysql_lookup"
+    IFS=$'\t' read -r target image < "$mysql_lookup" || die image_missing mysql
     version_gt "$target" "$(cfg mysql_version)" || { say update_none; return; }
-    image=$(image_resolve mysql "$target") || die image_missing mysql
     say db_update_warning
-    printf 'MySQL %s -> %s\n' "$(cfg mysql_version)" "$target"
+    ui_panel "$(t ui_db_update)" "$(t db_update_versions "$(cfg mysql_version)" "$target")"
     confirm db_update_confirm || die cancelled
-    backup_create true db-update "$target"; backup_extract "$LAST_BACKUP"
-    rehearse "$EXTRACTED" "$(cfg glpi_version)" "$(cfg glpi_image)" "$target" "$image"
+    ui_run 1/3 update_step_backup backup_create true db-update "$target"
+    backup_extract "$LAST_BACKUP"
+    ui_panel "$(t backup_recovery_ready)" "$LAST_BACKUP" "$(t backup_recovery_help)"
+    ui_run 2/3 update_step_rehearsal rehearse "$EXTRACTED" "$(cfg glpi_version)" "$(cfg glpi_image)" "$target" "$image"
     typed_confirm UPDATE-MYSQL
+    ui_run 3/3 update_step_apply apply_database_update "$target" "$image"
+    ui_panel "✓ $(t db_updated "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
+}
+mysql_target_lookup() { official_image_lookup mysql 8.4 > "$1" || die image_missing mysql; }
+apply_database_update() {
+    local target=$1 image=$2 file
     file=$(mktemp "$STATE/.mysql.XXXXXX"); CLEANUP_PATHS+=("$file")
     jq --arg version "$target" --arg image "$image" '.mysql_version=$version | .mysql_image=$image | .status="configured"' "$CONFIG" > "$file"
     config_stage "$file"
@@ -415,20 +443,30 @@ settings_command() {
     ui_run 0 settings_step_apply apply_settings "$file" true
     ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")"
 }
+diagnose_section() { printf '\n' >&2; ui_log info "$1"; }
 diagnose() {
     say diagnose_note
     os_detect /etc/os-release
-    printf '%s / %s\n' "$OS_NAME" "$ARCH"
+    diagnose_section "$OS_NAME / $ARCH"
     docker version --format 'Docker client {{.Client.Version}} / server {{.Server.Version}}'
     docker compose version
+    diagnose_section "df -h $STATE"
     df -h "$STATE"
     if [[ -L $STATE/current ]]; then
         config_load
+        diagnose_section "$CONFIG"
         jq '{format,project,status,major,glpi_version,mysql_version,http_port,https_port,expose_db,tls,hostname}' "$CONFIG"
+        diagnose_section "docker compose ps"
         dc ps --all
-        [[ ! -f $STATE/current/tls/fullchain.pem ]] || openssl x509 -in "$STATE/current/tls/fullchain.pem" -noout -subject -issuer -dates
+        if [[ -f $STATE/current/tls/fullchain.pem ]]; then
+            diagnose_section TLS
+            openssl x509 -in "$STATE/current/tls/fullchain.pem" -noout -subject -issuer -dates
+        fi
     fi
-    [[ ! -f $STATE/operation.json ]] || jq '{action,phase,started_at}' "$STATE/operation.json"
+    if [[ -f $STATE/operation.json ]]; then
+        diagnose_section "$STATE/operation.json"
+        jq '{action,phase,started_at}' "$STATE/operation.json"
+    fi
     return 0
 }
 dispatch() {
@@ -467,15 +505,21 @@ dispatch() {
                 https|db-exposure|address) settings_command "$command";;
                 credentials)
                     say credentials_note
-                    if confirm credentials_warning; then jq '{db_name,db_user,db_password,root_password}' "$CONFIG"; fi;;
+                    if confirm credentials_warning; then
+                        # Plain stdout lines: never truncated by a card and never kept
+                        # in UI_CONTEXT, so the values can be copied exactly.
+                        ui_log info "$(t menu_credentials)"
+                        jq -r '["GLPI_DB_NAME",.db_name],["GLPI_DB_USER",.db_user],["GLPI_DB_PASSWORD",.db_password],
+                               ["MYSQL_ROOT_PASSWORD",.root_password] | "      \(.[0])\t\(.[1])"' "$CONFIG"
+                    fi;;
                 language)
                     choose_language || die cancelled
                     tmp=$(mktemp "$STATE/.language.XXXXXX"); CLEANUP_PATHS+=("$tmp")
                     jq --arg language "$LANGUAGE" '.language=$language' "$CONFIG" > "$tmp"
-                    mv -- "$tmp" "$(readlink -f "$CONFIG")"; tr_load; say language_saved;;
+                    mv -- "$tmp" "$(readlink -f "$CONFIG")"; cfg_cache; tr_load; say language_saved;;
                 recover)
                     say recover_prompt; typed_confirm RESUME
-                    dc up -d; verify_services; config_set_status ready; journal_done; say recover_done;;
+                    ui_run 0 ui_service_starting recover_services; say recover_done;;
                 *) die unknown_command "$command";;
             esac;;
     esac
@@ -495,7 +539,8 @@ menu() {
             else
                 service_snapshot
                 action_file=$(mktemp "$STATE/.action.XXXXXX"); CLEANUP_PATHS+=("$action_file")
-                if ! python3 "$GDM_ROOT/tools/main_menu.py" "$CONFIG" "$SERVICE_DATA" "$LANGUAGE" "$action_file"; then return 0; fi
+                if python3 "$GDM_ROOT/tools/main_menu.py" "$CONFIG" "$SERVICE_DATA" "$LANGUAGE" "$action_file"; then :
+                else menu_result=$?; [[ $menu_result != 130 ]] || ui_interrupted; return 0; fi
                 IFS= read -r command < "$action_file"
             fi
         fi
@@ -544,7 +589,7 @@ main() {
         LANGUAGE=$(jq -r '.language // "en"' "$STATE/current/config.json" 2>/dev/null) || LANGUAGE=en
     fi
     tr_load
-    case ${1:-menu} in help) t help; return;; version) cat "$GDM_ROOT/VERSION"; return;; esac
+    case ${1:-menu} in help) ui_help; return;; version) printf '%s\n' "$GDM_VERSION"; return;; esac
     trap on_error ERR
     trap cleanup EXIT
     trap 'exit 130' INT
@@ -555,8 +600,8 @@ main() {
     # Used by require_admin in system.sh to display the exact resume command.
     # shellcheck disable=SC2034
     GDM_COMMAND_ARGS=("$@")
-    ui_panel "$(t welcome)" "$(t ui_subtitle)"
-    say ui_checking
+    ui_welcome
+    ui_log info "$(t ui_checking)"
     require_runtime
     init_state
     layout_install_code

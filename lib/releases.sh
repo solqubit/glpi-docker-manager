@@ -6,15 +6,35 @@ version_gt() {
     valid_version "$1" && valid_version "$2" || return 1
     [[ $1 != "$2" && $(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1) == "$1" ]]
 }
+# Seconds since the cached release list was written (fails when absent).
+release_cache_age() {
+    local now modified
+    [[ -s $STATE/cache/releases.json ]] || return 1
+    modified=$(stat -c %Y -- "$STATE/cache/releases.json" 2>/dev/null) || return 1
+    printf -v now '%(%s)T' -1
+    printf '%s\n' "$((now > modified ? now-modified : 0))"
+}
+# The full GitHub listing takes several paginated requests. Reuse it for
+# GDM_RELEASE_TTL seconds (default 15 min) and fall back to the saved list when
+# GitHub is unreachable. GDM_RELEASE_REFRESH=1 forces a new download.
 release_fetch() {
-    local page=1 part tmp aggregate
+    local page=1 part tmp aggregate age
+    if [[ ${GDM_RELEASE_REFRESH:-} != 1 ]] && age=$(release_cache_age) && (( age < ${GDM_RELEASE_TTL:-900} )); then
+        say releases_cached "$((age/60))"
+        return 0
+    fi
     aggregate=$(mktemp "$STATE/cache/.releases.XXXXXX")
     CLEANUP_PATHS+=("$aggregate")
     printf '[]\n' > "$aggregate"
     # Follow all pages; older branches can be beyond GitHub's first 100 entries.
     while :; do
-        part=$(http_get "https://api.github.com/repos/glpi-project/glpi/releases?per_page=100&page=$page") || return 1
-        jq -e 'type=="array"' <<< "$part" >/dev/null || return 1
+        ui_status "$(t status_release_page "$page")"
+        if ! part=$(http_get "https://api.github.com/repos/glpi-project/glpi/releases?per_page=100&page=$page") ||
+           ! jq -e 'type=="array"' <<< "$part" >/dev/null 2>&1; then
+            release_cache_age >/dev/null || return 1
+            say releases_stale
+            return 0
+        fi
         [[ $(jq length <<< "$part") != 0 ]] || break
         tmp=$(mktemp "$STATE/cache/.page.XXXXXX"); CLEANUP_PATHS+=("$tmp")
         jq -s '.[0]+.[1]' "$aggregate" <(printf '%s' "$part") > "$tmp"
@@ -44,6 +64,38 @@ image_resolve() {
     [[ $digest =~ ^sha256:[a-f0-9]{64}$ ]] || return 1
     printf '%s:%s@%s\n' "$repository" "$version" "$digest"
 }
+# Docker Hub answers anonymous bursts with HTTP 429. Without this, rate-limited
+# tags would silently look like releases without an image.
+registry_limit_check() {
+    if grep -qsiE '429|toomanyrequests|too many requests' -- "$@"; then say registry_rate_limited; fi
+}
+# Registry lookups dominate wall-clock time, so several tags are resolved at
+# once. Writes "version<TAB>reference" lines in the given order and omits
+# versions without an image for this architecture. Jobs are awaited by PID so
+# a running spinner (also a child of this shell) is never waited for.
+images_resolve() {
+    local repository=$1 output=$2 work index jobs=${GDM_RESOLVE_JOBS:-6}
+    shift 2
+    local -a versions=("$@") pids=()
+    work=$(mktemp -d "$STATE/cache/.resolve-XXXXXX")
+    for index in "${!versions[@]}"; do
+        ui_status "$(t status_resolving "$repository:${versions[index]}")"
+        (
+            trap - ERR EXIT
+            image_resolve "$repository" "${versions[index]}" > "$work/$index" 2> "$work/$index.err" || rm -f -- "$work/$index"
+        ) &
+        pids+=("$!")
+        if (( ${#pids[@]} >= jobs )); then wait "${pids[0]}" || true; pids=("${pids[@]:1}"); fi
+    done
+    for index in "${pids[@]}"; do wait "$index" || true; done
+    registry_limit_check "$work"/*.err
+    : > "$output"
+    for index in "${!versions[@]}"; do
+        [[ -s $work/$index ]] || continue
+        printf '%s\t%s\n' "${versions[index]}" "$(< "$work/$index")" >> "$output"
+    done
+    rm -rf -- "$work"
+}
 official_tag_latest() {
     local repo=$1 series=$2 page url version
     url="https://hub.docker.com/v2/repositories/library/$repo/tags?page_size=100&name=$series."
@@ -52,6 +104,13 @@ official_tag_latest() {
         select(startswith($series+"."))] | sort_by(split(".")|map(tonumber)) | last // empty' <<< "$page")
     valid_version "$version" || return 1
     printf '%s\n' "$version"
+}
+# Latest patch of an official series with its pinned digest: "version<TAB>reference".
+official_image_lookup() {
+    local version reference
+    version=$(official_tag_latest "$1" "$2") || return 1
+    reference=$(image_resolve "$1" "$version") || return 1
+    printf '%s\t%s\n' "$version" "$reference"
 }
 release_notice() {
     local version=$1 major=${1%%.*} body url note_action
@@ -80,6 +139,22 @@ release_notice() {
         fi
     fi
 }
+# Fills the caller's versions/refs arrays (Bash dynamic scope) with the newest
+# installable releases, checking candidates in parallel batches.
+select_version_candidates() {
+    local major=$1 limit=$2 start=0 batch=6 version reference resolved
+    local -a candidates=()
+    mapfile -t candidates < <(release_versions "$major")
+    resolved=$(mktemp "$STATE/cache/.resolved.XXXXXX"); CLEANUP_PATHS+=("$resolved")
+    while (( ${#versions[@]} < limit && start < ${#candidates[@]} )); do
+        images_resolve glpi/glpi "$resolved" "${candidates[@]:start:batch}"
+        while IFS=$'\t' read -r version reference; do
+            (( ${#versions[@]} < limit )) || break
+            versions+=("$version"); refs+=("$reference")
+        done < "$resolved"
+        start=$((start+batch))
+    done
+}
 select_version() {
     local major=$1 requested=${2:-} version reference choice limit=3 allow_back=${3:-false}
     local -a versions=() refs=() version_options=()
@@ -91,12 +166,7 @@ select_version() {
         release_notice "$requested"
         return
     fi
-    while IFS= read -r version; do
-        if reference=$(image_resolve glpi/glpi "$version" 2>/dev/null); then
-            versions+=("$version"); refs+=("$reference")
-            (( ${#versions[@]} >= limit )) && break
-        fi
-    done < <(release_versions "$major")
+    ui_task task_versions select_version_candidates "$major" "$limit"
     (( ${#versions[@]} > 0 )) || die image_missing "$major"
     local i
     for i in "${!versions[@]}"; do version_options+=("${versions[i]}" "GLPI ${versions[i]}"); done
@@ -108,8 +178,13 @@ select_version() {
     fi
     [[ $choice != back ]] || return 10
     if [[ $choice == other ]]; then
-        release_versions "$major" >&2
-        ask requested exact_version
+        # Keep the list visible: ask() opens a new page that redraws this panel.
+        while :; do
+            ui_panel "$(t version_list_title "$major")" "$(release_versions "$major" | tr '\n' ' ')"
+            ask requested exact_version || die cancelled
+            jq -e --arg v "$requested" 'any(.[]; .version==$v)' "$STATE/cache/releases.json" >/dev/null && break
+            say invalid "$requested"
+        done
         select_version "$major" "$requested"
         return
     fi

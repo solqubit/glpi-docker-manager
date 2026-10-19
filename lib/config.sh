@@ -1,5 +1,28 @@
 #!/usr/bin/env bash
-cfg() { jq -er ".$1" "$CONFIG"; }
+# Every dc/volume call needs configuration values; reading them used to start
+# one jq process each. Validated top-level scalars are cached once per active
+# revision. A different revision behind $CONFIG (-ef) falls back to jq, and the
+# writers below (config_activate, config_set_status, language) refresh it.
+declare -A CFG_CACHE=()
+CFG_CACHE_SOURCE=''
+cfg_cache() {
+    local key value
+    CFG_CACHE=() CFG_CACHE_SOURCE=''
+    [[ -r ${CONFIG:-} ]] || return 0
+    while IFS=$'\t' read -r key value; do CFG_CACHE[$key]=$value; done < <(
+        jq -r 'to_entries[] | select(.value|type!="object" and type!="array") |
+               select(.value|tostring|test("[\t\n\r]")|not) | "\(.key)\t\(.value|tostring)"' "$CONFIG")
+    CFG_CACHE_SOURCE=$(readlink -f -- "$CONFIG")
+}
+cfg() {
+    if [[ -n $CFG_CACHE_SOURCE && -n ${CFG_CACHE[$1]+set} && ${CONFIG:-} -ef $CFG_CACHE_SOURCE ]]; then
+        printf '%s\n' "${CFG_CACHE[$1]}"
+        # Same exit status as jq -e: false and null are failures.
+        [[ ${CFG_CACHE[$1]} != false && ${CFG_CACHE[$1]} != null ]]
+        return
+    fi
+    jq -er ".$1" "$CONFIG"
+}
 config_validate() {
     jq -e '
       .format==1 and (.id|test("^[a-f0-9]{16}$")) and
@@ -40,6 +63,7 @@ config_load() {
     [[ -L $STATE/current && -r $STATE/current/config.json ]] || die not_installed
     CONFIG="$STATE/current/config.json"
     config_validate "$CONFIG"
+    cfg_cache
     LANGUAGE=${LANGUAGE_OVERRIDE:-$(cfg language)}; tr_load
 }
 dotenv_line() {
@@ -147,10 +171,12 @@ config_activate() {
     ln -s "revisions/$(basename "$revision")" "$STATE/.current.new"
     mv -Tf -- "$STATE/.current.new" "$STATE/current"
     CONFIG="$STATE/current/config.json"
+    cfg_cache
 }
 config_set_status() {
     local tmp
     tmp=$(mktemp "$STATE/.config.XXXXXX"); CLEANUP_PATHS+=("$tmp")
     jq --arg status "$1" '.status=$status' "$CONFIG" > "$tmp"
     mv -- "$tmp" "$(readlink -f "$CONFIG")"
+    cfg_cache
 }

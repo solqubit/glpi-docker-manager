@@ -11,6 +11,8 @@ declare -a CLEANUP_PATHS=()
 declare -a CLEANUP_DIRECTORIES=()
 declare -a GDM_COMMAND_ARGS=()
 GDM_STORAGE_FAILURE=false
+GDM_VERSION=dev
+if [[ -r $GDM_ROOT/VERSION ]]; then IFS= read -r GDM_VERSION < "$GDM_ROOT/VERSION" || :; fi
 
 tr_load() {
     [[ $LANGUAGE == en || $LANGUAGE == es ]] || LANGUAGE=en
@@ -27,19 +29,24 @@ t() {
     printf "${MSG[$key]:-$key}\n" "$@"
 }
 say() {
-    ui_notice "$(t "$@")"
-    if [[ -t 2 && ${TERM:-dumb} != dumb && -z ${NO_COLOR+x} ]]; then
-        case $1 in *warning*|*unknown*|*notice*|*failed*|*invalid*|*required*) printf '\033[33m' >&2;; *) printf '\033[36m' >&2;; esac
-        t "$@" >&2
-        printf '\033[0m' >&2
-    else t "$@" >&2; fi
+    ui_level_of "$1"
+    say_as "$UI_LEVEL" "$@"
+}
+say_as() {
+    local level=$1; shift
+    ui_notice "$(t "$@")" "$level"
+    ui_say "$level" "$@"
 }
 die() {
     if [[ -n $UI_PROGRESS_FD ]]; then
         exec 2>&"$UI_PROGRESS_FD"
         ui_restore
     fi
-    say "$@"
+    if [[ $1 == cancelled ]]; then say_as warning "$@"
+    else
+        [[ -z $UI_CURRENT_STEP ]] || ui_log error "$UI_CURRENT_STEP"
+        say_as error "$@"
+    fi
     [[ -z $UI_LAST_LOG ]] || say ui_error_log "$UI_LAST_LOG"
     if storage_failure_report "$UI_LAST_LOG"; then GDM_STORAGE_FAILURE=true; exit 74; fi
     exit 1
@@ -63,8 +70,8 @@ typed_confirm() {
     local answer
     say destructive "$1"
     [[ -t 0 ]] || die interactive_required
-    printf '> ' >&2
-    IFS= read -r answer
+    printf '  ' >&2; ui_color '1;31'; printf '> ' >&2; ui_color 0
+    IFS= read -r answer || die cancelled
     [[ $answer == "$1" ]] || die cancelled
 }
 secret_prompt() {
@@ -80,7 +87,7 @@ secret_prompt() {
         fi
         break
     done
-    ui_color 32; printf '  ✓ %s\n' "$(t ui_password_saved)" >&2; ui_color 0
+    ui_log success "$(t ui_password_saved)"
     printf -v "$var" '%s' "$answer"
 }
 init_state() {
@@ -121,6 +128,7 @@ cleanup() {
             rm -rf --one-file-system -- "$path" 2>/dev/null || say cleanup_deferred "$STATE"
         fi
     done
+    if [[ $rc == 130 ]]; then ui_interrupted; fi
     if [[ -f ${STATE:-/nonexistent}/operation.json ]]; then
         say recovery_notice "$STATE/operation.json" >&2
     fi
@@ -130,6 +138,7 @@ on_error() {
     local rc=$?
     [[ -z $UI_PROGRESS_FD ]] || exec 2>&"$UI_PROGRESS_FD"
     ui_restore
+    [[ -z $UI_CURRENT_STEP ]] || ui_log error "$UI_CURRENT_STEP"
     say failed "${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]}" >&2
     [[ -z $UI_LAST_LOG ]] || say ui_error_log "$UI_LAST_LOG"
     if storage_failure_report "$UI_LAST_LOG"; then GDM_STORAGE_FAILURE=true; exit 74; fi

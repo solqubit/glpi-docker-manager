@@ -53,6 +53,13 @@ Después aparecen ocho etapas con su avance y el mensaje verde **GLPI instalado 
 verificado**, la URL y los datos del primer acceso. El éxito se muestra después de
 comprobar servicios, SQL, esquema y HTTP/HTTPS.
 
+Los mensajes comparten un mismo estilo de marcadores: `[+]` éxito, `[*]`
+información, `[!]` aviso, `[✗]` error y `[?]` pregunta. Las etapas largas muestran
+un indicador animado con el tiempo transcurrido y el detalle actual (imagen que se
+descarga, salud de un servicio, intento de comprobación web). La lista de
+versiones de GLPI se guarda 15 minutos y las imágenes se consultan en paralelo, de
+modo que las pantallas de versiones y actualización abren mucho más rápido.
+
 Las notas completas de una versión pueden abrirse desde el selector; los avisos
 de seguridad y soporte se muestran siempre. El detalle de instalación se guarda
 en registros privados y se indica su ruta si una etapa falla. Hay un modo sencillo

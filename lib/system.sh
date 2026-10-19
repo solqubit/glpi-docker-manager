@@ -123,7 +123,7 @@ docker_require_access() {
     endpoint=$(docker_endpoint)
     socket=${endpoint#unix://}
     while :; do
-        if docker info >/dev/null 2>&1; then return 0; fi
+        if DOCKER_SERVER_VERSION=$(docker info --format '{{.ServerVersion}}' 2>/dev/null); then return 0; fi
         # Custom sockets can belong to rootless/Desktop engines. Never start a
         # different rootful engine in their place.
         if [[ $socket != /var/run/docker.sock && $socket != /run/docker.sock ]]; then
@@ -238,6 +238,7 @@ require_runtime() {
     bootstrap_dependencies
     bootstrap_docker
     say detected "$OS_NAME" "$ARCH"
+    [[ -z ${DOCKER_SERVER_VERSION:-} ]] || say docker_ready "$DOCKER_SERVER_VERSION"
 }
 check_resources() {
     local available memory resource_action

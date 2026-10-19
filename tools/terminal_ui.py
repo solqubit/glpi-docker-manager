@@ -2,6 +2,7 @@
 """Small terminal widgets using Python's optional standard-library curses module."""
 import os
 import getpass
+from pathlib import Path
 import re
 import sys
 import textwrap
@@ -12,9 +13,19 @@ except ImportError:
     curses = None
 
 
+MARKERS = {'ok': '[+]', 'warning': '[!]', 'error': '[✗]', 'accent': '[*]'}
+
+
 def translations(root, language):
     return dict(line.split('\t', 1) for line in
-                (root / 'locales' / (language + '.tsv')).read_text().splitlines())
+                (root / 'locales' / (language + '.tsv')).read_text(encoding='utf-8').splitlines())
+
+
+def version(root):
+    try:
+        return (root / 'VERSION').read_text(encoding='utf-8').strip()
+    except OSError:
+        return 'dev'
 
 
 def clean(value):
@@ -28,6 +39,7 @@ class Terminal:
         self.context = context
         self.screen = None
         self.styles = {}
+        self.version = version(Path(__file__).resolve().parents[1])
 
     def t(self, key, *values):
         value = self.msg.get(key, key)
@@ -56,15 +68,20 @@ class Terminal:
                     background = -1
                 except curses.error:
                     background = curses.COLOR_BLACK
+                # Same palette as lib/ui.sh: magenta titles, blue information,
+                # green success, yellow warnings, red errors, blue selection bar.
                 colors = [('title', curses.COLOR_MAGENTA, background),
                           ('accent', curses.COLOR_CYAN, background),
                           ('ok', curses.COLOR_GREEN, background),
                           ('warning', curses.COLOR_YELLOW, background),
                           ('error', curses.COLOR_RED, background),
-                          ('selected', curses.COLOR_WHITE, curses.COLOR_BLUE)]
+                          ('selected', curses.COLOR_WHITE, curses.COLOR_BLUE),
+                          ('info', curses.COLOR_BLUE, background)]
                 for number, (name, foreground, back) in enumerate(colors, 1):
                     curses.init_pair(number, foreground, back)
                     self.styles[name] = curses.color_pair(number) | curses.A_BOLD
+            self.styles['dim'] = curses.A_DIM
+            self.styles['bold'] = curses.A_BOLD
             return action()
         try:
             return curses.wrapper(start)
@@ -92,19 +109,28 @@ class Terminal:
                 pass
 
     def frame(self, title, notice='', notice_style='accent'):
+        """Header shared with lib/ui.sh; returns the first free row and height."""
         self.screen.erase()
         height, width = self.screen.getmaxyx()
         self.left = max(2, (width - 104) // 2)
         self.width = max(12, min(100, width - self.left - 2))
-        self.put(0, self.left, 'GLPI Docker Manager', 'title')
-        self.put(1, self.left, self.t('ui_subtitle'))
+        name = 'GLPI Docker Manager'
+        tagline = f' v{self.version} · {self.t("ui_subtitle")}'
+        if len(name) + len(tagline) > self.width:
+            tagline = f' v{self.version}'
+        self.put(0, self.left, name, 'title')
+        self.put(0, self.left + len(name), tagline, 'dim')
+        self.put(1, self.left, '─' * self.width, 'title')
         self.put(2, self.left, self.context, 'accent')
-        self.put(3, self.left, '─' * self.width, 'accent')
-        self.put(4, self.left, title, 'accent')
-        lines = textwrap.wrap(clean(notice), self.width)[:max(2, min(5, height - 17))]
-        for row, line in enumerate(lines, 5):
-            self.put(row, self.left, line, notice_style)
-        return 6 + len(lines), height
+        self.put(3, self.left, '[?]', 'title')
+        self.put(3, self.left + 4, title, 'bold')
+        marker = MARKERS.get(notice_style, '[*]')
+        lines = textwrap.wrap(clean(notice), self.width - 4)[:max(2, min(5, height - 17))]
+        for row, line in enumerate(lines, 4):
+            if row == 4:
+                self.put(row, self.left, marker, notice_style)
+            self.put(row, self.left + 4, line, notice_style if notice_style != 'accent' else '')
+        return 5 + len(lines), height
 
     def key(self):
         key = self.screen.get_wch()
@@ -148,7 +174,7 @@ class Terminal:
         """Rows are (value, label, semantic color); return a value or None on Back."""
         selected = min(selected, len(rows) - 1)
         if self.screen is None:
-            print('\n' + title, file=sys.stderr)
+            print('\n[?] ' + title, file=sys.stderr)
             if notice:
                 print(notice, file=sys.stderr)
             for number, (_, label, _) in enumerate(rows, 1):

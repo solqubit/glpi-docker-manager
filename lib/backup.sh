@@ -19,20 +19,27 @@ snapshot_restore() {
 backup_create() {
     assert_running
     local resume=${1:-true} origin=${2:-manual} target=${3:-} work archive role size free volume_size was_proxy=false required database_size
+    local usage measured=0
+    local -a mounts=() paths=()
     case $origin in manual|update|migrate|db-update|refresh-image|transfer) ;; *) die invalid backup_origin;; esac
+    ui_status "$(t status_measure)"
     # Use uncompressed volume usage plus database size as a conservative budget.
     database_size=$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT COALESCE(SUM(data_length+index_length),0) FROM information_schema.tables"')
     [[ $database_size =~ ^[0-9]+$ ]] || die backup_space
     # SQL text/hex literals can exceed physical table data. Staging and final
     # archive are budgeted without assuming a particular compression ratio.
     size=$((database_size*3))
+    # One read-only helper measures every volume instead of one container each.
     for role in "${SNAPSHOT_ROLES[@]}"; do
-        volume_size=$(docker run --rm --network none --user 0 \
-            --mount "type=volume,src=$(volume_name "$role"),dst=/data,readonly" \
-            --entrypoint du "$(cfg glpi_image)" -sb /data | awk '{print $1}')
-        [[ $volume_size =~ ^[0-9]+$ ]] || die backup_space
-        size=$((size+volume_size))
+        mounts+=(--mount "type=volume,src=$(volume_name "$role"),dst=/data/$role,readonly")
+        paths+=("/data/$role")
     done
+    usage=$(docker run --rm --network none --user 0 "${mounts[@]}" --entrypoint du "$(cfg glpi_image)" -sb "${paths[@]}")
+    while read -r volume_size _; do
+        [[ $volume_size =~ ^[0-9]+$ ]] || die backup_space
+        size=$((size+volume_size)); measured=$((measured+1))
+    done <<< "$usage"
+    (( measured == ${#SNAPSHOT_ROLES[@]} )) || die backup_space
     required=$(((size*2+1048575)/1048576))
     free=$(df -Pm "$STATE" | awk 'NR==2 {print $4}')
     ui_progress_note backup_estimate "$(((size+1048575)/1048576))" "$((required+512))" "$free"
@@ -45,8 +52,9 @@ backup_create() {
     dc stop glpi
     RESUME_GLPI_ON_EXIT=true
     cp -- "$CONFIG" "$work/config.json"
+    ui_status "$(t status_dump)"
     dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot --single-transaction --routines --events --triggers --hex-blob --no-tablespaces --set-gtid-purged=OFF "$MYSQL_DATABASE"' > "$work/mysql.sql"
-    for role in "${SNAPSHOT_ROLES[@]}"; do snapshot_save "$role" "$work/$role.tar.gz"; done
+    for role in "${SNAPSHOT_ROLES[@]}"; do ui_status "$(t status_snapshot "$role")"; snapshot_save "$role" "$work/$role.tar.gz"; done
     if [[ -f $STATE/current/tls/fullchain.pem ]]; then
         mkdir "$work/tls"; cp -- "$STATE/current/tls/"*.pem "$work/tls/"
     fi
@@ -59,6 +67,7 @@ backup_create() {
         name=${name#./}
         sha256sum -- "$name"
     done > checksums.sha256)
+    ui_status "$(t status_archive)"
     python3 "$GDM_ROOT/tools/archive.py" verify "$work" || die backup_invalid
     tar -C "$work" -czf "$archive.partial" .
     mv -- "$archive.partial" "$archive"
@@ -73,7 +82,7 @@ backup_create() {
     LAST_BACKUP=$archive
     say backup_ready "$archive"
     # Exact directory from mktemp under our private backup directory.
-    [[ $work == "$STATE/backups/.work-"* && ! -L $work ]] && rm -rf -- "$work"
+    if [[ $work == "$STATE/backups/.work-"* && ! -L $work ]]; then rm -rf -- "$work"; fi
 }
 backup_extract() {
     local archive=$1
@@ -88,9 +97,10 @@ restore_into_current() {
     data_need=$(python3 "$GDM_ROOT/tools/archive.py" footprint "$folder")
     pull_images "$data_need"
     volumes_ensure
-    for role in "${SNAPSHOT_ROLES[@]}"; do snapshot_restore "$role" "$folder/$role.tar.gz"; done
+    for role in "${SNAPSHOT_ROLES[@]}"; do ui_status "$(t status_restore_volume "$role")"; snapshot_restore "$role" "$folder/$role.tar.gz"; done
     dc up -d db
     wait_healthy db
+    ui_status "$(t status_import)"
     dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$MYSQL_DATABASE"' < "$folder/mysql.sql"
 }
 restore_backup() {

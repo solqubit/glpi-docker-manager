@@ -49,6 +49,12 @@ URL and initial sign-in instructions. This appears only after service, SQL,
 schema and HTTP/HTTPS checks succeed. Detailed installation output stays in
 private state logs instead of flooding the progress display.
 
+Messages share one marker style: `[+]` success, `[*]` information, `[!]`
+warning, `[✗]` error and `[?]` question. Long stages show a live spinner with
+elapsed time and the current detail (image being downloaded, service health,
+web check attempt). The GLPI release list is cached for 15 minutes and image
+lookups run in parallel, so update and version screens open much faster.
+
 Official release/security/support notices remain visible. Full release notes can
 be opened from their selector. See [interface behavior](docs/interface.md) for
 keyboard controls, monochrome and plain-terminal modes.

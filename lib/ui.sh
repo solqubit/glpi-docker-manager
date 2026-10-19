@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
 # Native terminal controls keep the first screen usable before package bootstrap.
+# Visual language (shared with tools/terminal_ui.py):
+#   [+] success · [*] information/progress · [!] warning · [✗] error · [?] question
 # shellcheck disable=SC2034
 UI_TTY_STATE=''
 UI_CURSOR_HIDDEN=false
 UI_SPINNER_PID=''
 UI_LAST_LOG=''
 UI_PROGRESS_FD=''
+UI_STATUS_FILE=''
+UI_CURRENT_STEP=''
+UI_LAST_CLOCK='00:00'
 UI_ACTIVE=false
 UI_SECRET_ACTIVE=false
 UI_SECRET_VISIBILITY=${GDM_PASSWORD_VISIBILITY:-visible}
 [[ $UI_SECRET_VISIBILITY == hidden ]] || UI_SECRET_VISIBILITY=visible
 UI_PAGE_LINES=0
+UI_LEVEL=info
 declare -a UI_CONTEXT=() UI_NOTICES=() UI_STEP_LABELS=()
 
 ui_interactive() { [[ -t 0 && -t 2 && ${TERM:-dumb} != dumb && ${GDM_UI:-auto} != plain ]] && command -v stty >/dev/null; }
-ui_color() { if [[ -z ${NO_COLOR+x} && -t 2 && ${TERM:-dumb} != dumb ]]; then printf '\033[%sm' "$1" >&2; fi; }
+ui_colors() { [[ -z ${NO_COLOR+x} && -t 2 && ${TERM:-dumb} != dumb ]]; }
+ui_color() { if ui_colors; then printf '\033[%sm' "$1" >&2; fi; }
 ui_dimensions() {
     UI_ROWS=24 UI_COLS=80
     local ui_rows ui_cols
@@ -42,45 +49,217 @@ ui_wrap() {
     done
     printf '%s\n' "$ui_line"
 }
+
+# ---------------------------------------------------------------- messages
+# Message keys map to a severity without parsing translated text.
+ui_level_of() {
+    case $1 in
+        failed|invalid|unhealthy|docker_start_failed|host_io_error|host_readonly|host_no_space|port_busy|\
+        storage_insufficient|storage_inodes|storage_temporary|backup_invalid|backup_space|low_resources|\
+        foreign_resource|bad_path|locked|permissions|image_missing|remote_docker|linux_only|architecture|\
+        update_boundary|unknown_command|services_required|not_installed|need_sudo|ui_interrupted)
+            UI_LEVEL=error;;
+        *warning*|*notice*|*unknown*|*required*|*manual*|*_failed|cancelled|cleanup_deferred|config_restored|\
+        destructive|older_release|security_release|resource_reference|bad_password|bad_root_password|\
+        ui_bad_*|ui_invalid_choice|ui_error_log|docker_service_stopped|docker_storage_unavailable|\
+        docker_plugins_missing|update_images_unavailable|update_no_patches|credentials_note|diagnose_note|\
+        host_storage_steps|acme_requirements|cert_instructions|releases_stale|install_exists|admin_command|registry_rate_limited|\
+        docker_context_help)
+            UI_LEVEL=warning;;
+        ready|updated|detected|*_done|*_ok|*_ready|*_saved|*_cached|self_signed)
+            UI_LEVEL=success;;
+        *) UI_LEVEL=info;;
+    esac
+}
+ui_marker_style() {
+    case $1 in
+        success) UI_MARK='+' UI_TONE='1;32' UI_BODY='0';;
+        warning) UI_MARK='!' UI_TONE='1;33' UI_BODY='0;33';;
+        error) UI_MARK='✗' UI_TONE='1;31' UI_BODY='0;31';;
+        ask) UI_MARK='?' UI_TONE='1;35' UI_BODY='1';;
+        *) UI_MARK='*' UI_TONE='1;34' UI_BODY='0';;
+    esac
+}
+# Print one marked message to stderr; continuation lines are aligned.
+ui_log() {
+    local ui_level=$1 ui_text=$2
+    ui_marker_style "$ui_level"
+    [[ $ui_level != success ]] || ui_text=${ui_text#✓ }
+    ui_text=${ui_text//$'\n'/$'\n      '}
+    printf '  ' >&2; ui_color "$UI_TONE"; printf '[%s]' "$UI_MARK" >&2; ui_color 0
+    printf ' ' >&2; ui_color "$UI_BODY"; printf '%s' "$ui_text" >&2; ui_color 0
+    printf '\n' >&2
+}
+# Same as ui_log for a locale key, highlighting the printf arguments.
+ui_say() {
+    local ui_level=$1 ui_key=$2 ui_arg ui_text; shift 2
+    local -a ui_args=()
+    if ! ui_colors; then ui_log "$ui_level" "$(t "$ui_key" "$@")"; return; fi
+    ui_marker_style "$ui_level"
+    for ui_arg in "$@"; do ui_args+=($'\033[1;36m'"$ui_arg"$'\033['"${UI_BODY}m"); done
+    ui_text=$(t "$ui_key" "${ui_args[@]}")
+    [[ $ui_level != success ]] || ui_text=${ui_text#✓ }
+    ui_text=${ui_text//$'\n'/$'\n      '}
+    printf '  \033[%sm[%s]\033[0m \033[%sm%s\033[0m\n' "$UI_TONE" "$UI_MARK" "$UI_BODY" "$ui_text" >&2
+}
 ui_notice() {
-    if ui_interactive; then UI_NOTICES+=("$1"); fi
+    local ui_text=$1
+    [[ ${2:-info} != success ]] || ui_text=${ui_text#✓ }
+    if ui_interactive; then UI_NOTICES+=("${2:-info}"$'\t'"$ui_text"); fi
+}
+
+# ---------------------------------------------------------------- layout
+# Compact "smslant" figlet banner; shown on start-up and in help only.
+ui_banner() {
+    local ui_fd=${1:-2} ui_line
+    local -a ui_art=(
+        '  _______   ___  ____  ___           __'
+        ' / ___/ /  / _ \/  _/ / _ \___  ____/ /_____ ____'
+        '/ (_ / /__/ ___// /  / // / _ \/ __/  '"'"'_/ -_) __/'
+        '\___/____/_/  /___/ /____/\___/\__/_/\_\\__/_/'
+    )
+    local ui_on=false
+    if [[ $ui_fd == 1 ]]; then [[ -z ${NO_COLOR+x} && -t 1 && ${TERM:-dumb} != dumb ]] && ui_on=true
+    else ui_colors && ui_on=true; fi
+    ui_dimensions
+    printf '\n' >&"$ui_fd"
+    if (( UI_COLS >= 56 )); then
+        for ui_line in "${ui_art[@]}"; do
+            if [[ $ui_on == true ]]; then printf '  \033[1;35m%s\033[0m\n' "$ui_line" >&"$ui_fd"
+            else printf '  %s\n' "$ui_line" >&"$ui_fd"; fi
+        done
+        if [[ $ui_on == true ]]; then printf '  \033[1;37mManager\033[0m \033[2mv%s · %s\033[0m\n\n' "$GDM_VERSION" "$(t ui_subtitle)" >&"$ui_fd"
+        else printf '  Manager v%s · %s\n\n' "$GDM_VERSION" "$(t ui_subtitle)" >&"$ui_fd"; fi
+    else
+        if [[ $ui_on == true ]]; then printf '  \033[1;35mGLPI Docker Manager\033[0m \033[2mv%s\033[0m\n\n' "$GDM_VERSION" >&"$ui_fd"
+        else printf '  GLPI Docker Manager v%s\n\n' "$GDM_VERSION" >&"$ui_fd"; fi
+    fi
+}
+# Three-line page header: title, rule, blank line.
+ui_header() {
+    local ui_subtitle ui_rule
+    ui_subtitle=" · $(t ui_subtitle)"
+    (( 20+${#GDM_VERSION}+${#ui_subtitle} <= UI_WIDTH+4 )) || ui_subtitle=''
+    printf '  ' >&2
+    ui_color '1;35'; printf 'GLPI Docker Manager' >&2; ui_color 0
+    ui_color 2; printf ' v%s%s' "$GDM_VERSION" "$ui_subtitle" >&2; ui_color 0
+    printf -v ui_rule '%*s' "$((UI_WIDTH+4))" ''
+    printf '\n  ' >&2; ui_color 35; printf '%s' "${ui_rule// /─}" >&2; ui_color 0
+    printf '\n\n' >&2
 }
 ui_page() {
     UI_PAGE_LINES=0
     if ! ui_interactive; then return; fi
     ui_dimensions
-    local ui_text ui_part UI_DRAW_LINES=0
+    local ui_entry ui_part ui_first UI_DRAW_LINES=0
     printf '\033[2J\033[H' >&2
-    ui_color '1;35'; printf '  GLPI Docker Manager\n' >&2; ui_color 0
-    ui_color 37; printf '  %s\n\n' "$(t ui_subtitle)" >&2; ui_color 0
+    ui_header
     UI_PAGE_LINES=3
     if (( ${#UI_CONTEXT[@]} > 0 )); then
         ui_box "${UI_CONTEXT[@]}"
         ((UI_PAGE_LINES+=UI_DRAW_LINES))
     fi
-    for ui_text in "${UI_NOTICES[@]}"; do
+    for ui_entry in "${UI_NOTICES[@]}"; do
+        ui_marker_style "${ui_entry%%$'\t'*}"
+        ui_first=true
         while IFS= read -r ui_part; do
-            ui_color '1;37'; printf '  %s\n' "$ui_part" >&2; ui_color 0
+            if [[ $ui_first == true ]]; then
+                printf '  ' >&2; ui_color "$UI_TONE"; printf '[%s]' "$UI_MARK" >&2; ui_color 0; printf ' ' >&2
+                ui_first=false
+            else printf '      ' >&2; fi
+            ui_color "$UI_BODY"; printf '%s' "$ui_part" >&2; ui_color 0; printf '\n' >&2
             ((UI_PAGE_LINES+=1))
-        done < <(ui_wrap "$ui_text" "$UI_WIDTH")
+        done < <(ui_wrap "${ui_entry#*$'\t'}" "$UI_WIDTH")
     done
     if (( ${#UI_NOTICES[@]} > 0 )); then printf '\n' >&2; ((UI_PAGE_LINES+=1)); fi
     UI_CONTEXT=() UI_NOTICES=()
 }
+ui_border() {
+    local ui_rule
+    printf -v ui_rule '%*s' "$((UI_WIDTH+2))" ''
+    ui_rule=${ui_rule// /─}
+    printf '  %s%s%s\n' "$1" "$ui_rule" "$2" >&2
+    ((UI_DRAW_LINES+=1))
+}
+ui_line() {
+    local ui_text=${1:-} ui_style=${2:-} ui_padding
+    ui_text=${ui_text:0:UI_WIDTH}
+    ui_padding=$((UI_WIDTH-${#ui_text}))
+    ui_color 35; printf '  │ ' >&2; ui_color 0
+    [[ -z $ui_style ]] || ui_color "$ui_style"
+    printf '%s%*s' "$ui_text" "$ui_padding" '' >&2
+    [[ -z $ui_style ]] || ui_color 0
+    ui_color 35; printf ' │\n' >&2; ui_color 0
+    ((UI_DRAW_LINES+=1))
+}
+ui_pair() {
+    local ui_label=$1 ui_value=$2 ui_column=24 ui_padding
+    if ((UI_WIDTH < 40)); then ui_line "$ui_label" 2; ui_line "$ui_value" '1;36'; return; fi
+    ui_value=${ui_value:0:UI_WIDTH-ui_column}
+    ui_padding=$((UI_WIDTH-ui_column-${#ui_value}))
+    ui_color 35; printf '  │ ' >&2; ui_color 0
+    ui_color 2; printf '%-*s' "$ui_column" "$ui_label" >&2; ui_color 0
+    ui_color '1;36'; printf '%s' "$ui_value" >&2; ui_color 0
+    printf '%*s' "$ui_padding" '' >&2
+    ui_color 35; printf ' │\n' >&2; ui_color 0
+    ((UI_DRAW_LINES+=1))
+}
+# A titled information card. Titles starting with ✓ become green success cards.
+ui_box() {
+    local ui_title=$1; shift
+    local ui_text ui_part ui_tone=35 ui_mark='[*]'
+    UI_DRAW_LINES=0
+    if [[ $ui_title == '✓'* ]]; then ui_tone=32 ui_mark='[+]'; fi
+    while [[ $ui_title == '✓ '* ]]; do ui_title=${ui_title#✓ }; done
+    ui_color "$ui_tone"; ui_border ╭ ╮; ui_color 0
+    ui_line "$ui_mark $ui_title" "1;$ui_tone"
+    (( $# == 0 )) || ui_line
+    for ui_text in "$@"; do
+        if [[ $ui_text == *$'\t'* ]]; then ui_pair "${ui_text%%$'\t'*}" "${ui_text#*$'\t'}"
+        else while IFS= read -r ui_part; do ui_line "$ui_part"; done < <(ui_wrap "$ui_text" "$UI_WIDTH"); fi
+    done
+    ui_color "$ui_tone"; ui_border ╰ ╯; ui_color 0
+    printf '\n' >&2
+    ((UI_DRAW_LINES+=1))
+}
+# The card and pending notices stay as context for the next page, so a prompt
+# that follows keeps both on screen instead of erasing the notices.
+ui_panel() {
+    local UI_DRAW_LINES=0
+    local -a ui_carried=()
+    ui_dimensions
+    if ! ui_interactive; then ui_box "$@"; return; fi
+    ui_carried=("${UI_NOTICES[@]}")
+    UI_CONTEXT=("$@")
+    ui_page
+    UI_CONTEXT=("$@") UI_NOTICES=("${ui_carried[@]}")
+}
+# A question heading: "[?] text" with aligned continuation lines.
+ui_question() {
+    local ui_part ui_first=true
+    while IFS= read -r ui_part; do
+        if [[ $ui_first == true ]]; then
+            printf '  ' >&2; ui_color '1;35'; printf '[?]' >&2; ui_color 0; printf ' ' >&2; ui_first=false
+        else printf '      ' >&2; fi
+        ui_color 1; printf '%s' "$ui_part" >&2; ui_color 0; printf '\033[K\n' >&2
+        ((UI_DRAW_LINES+=1))
+    done < <(ui_wrap "$1" "$((UI_WIDTH-2))")
+}
 ui_field() {
-    local ui_key=$1 ui_default=${2:-} ui_part UI_DRAW_LINES=0
+    local ui_key=$1 ui_default=${2:-} UI_DRAW_LINES=0
     if ui_interactive; then
-        ui_color 35; ui_border ╭ ╮; ui_color 0
-        while IFS= read -r ui_part; do ui_line "$ui_part" '1;36'; done < <(ui_wrap "$(t "$ui_key")" "$UI_WIDTH")
-        [[ -z $ui_default ]] || ui_line "$(t ui_default_value "$ui_default")" '2'
-        ui_color 35; ui_border ╰ ╯; ui_color 0
-        if [[ ${3:-input} == input ]]; then ui_color '1;36'; printf '  > ' >&2; ui_color 0; fi
+        ui_question "$(t "$ui_key")"
+        if [[ -n $ui_default ]]; then printf '      ' >&2; ui_color 2; printf '%s' "$(t ui_default_value "$ui_default")" >&2; ui_color 0; printf '\n' >&2; fi
+        printf '\n' >&2
+        if [[ ${3:-input} == input ]]; then printf '  ' >&2; ui_color '1;36'; printf '> ' >&2; ui_color 0; fi
     else
         t "$ui_key" >&2
         [[ -z $ui_default ]] || printf '[%s] ' "$ui_default" >&2
         printf '> ' >&2
     fi
 }
+
+# ---------------------------------------------------------------- input
 # Keep password editing in Bash: Tab changes visibility without losing input.
 # The line is erased on submission and secrets are never put in UI_CONTEXT.
 ui_secret_read() {
@@ -100,7 +279,9 @@ ui_secret_read() {
     UI_ACTIVE=true
     UI_SECRET_ACTIVE=true
     ui_field "$ui_label" '' title
-    printf '  %s\n  %s\n\n' "$(t password_prompt)" "$(t ui_password_keys)" >&2
+    printf '  %s\n  ' "$(t password_prompt)" >&2
+    ui_color 2; printf '%s' "$(t ui_password_keys)" >&2; ui_color 0
+    printf '\n\n' >&2
     while :; do
         ui_dimensions
         ui_marker=$(t "ui_password_$UI_SECRET_VISIBILITY")
@@ -156,57 +337,6 @@ ui_secret_read() {
         esac
     done
 }
-ui_border() {
-    local ui_rule
-    printf -v ui_rule '%*s' "$((UI_WIDTH+2))" ''
-    ui_rule=${ui_rule// /─}
-    printf '  %s%s%s\n' "$1" "$ui_rule" "$2" >&2
-    ((UI_DRAW_LINES+=1))
-}
-ui_line() {
-    local ui_text=${1:-} ui_style=${2:-} ui_padding
-    ui_text=${ui_text:0:UI_WIDTH}
-    ui_padding=$((UI_WIDTH-${#ui_text}))
-    printf '  │ ' >&2
-    [[ -z $ui_style ]] || ui_color "$ui_style"
-    printf '%s%*s' "$ui_text" "$ui_padding" '' >&2
-    [[ -z $ui_style ]] || ui_color 0
-    printf ' │\n' >&2
-    ((UI_DRAW_LINES+=1))
-}
-ui_pair() {
-    local ui_label=$1 ui_value=$2 ui_column=24 ui_padding
-    if ((UI_WIDTH < 40)); then ui_line "$ui_label" 2; ui_line "$ui_value" '1;36'; return; fi
-    ui_value=${ui_value:0:UI_WIDTH-ui_column}
-    ui_padding=$((UI_WIDTH-ui_column-${#ui_value}))
-    printf '  │ %-*s' "$ui_column" "$ui_label" >&2
-    ui_color '1;36'; printf '%s' "$ui_value" >&2; ui_color 0
-    printf '%*s │\n' "$ui_padding" '' >&2
-    ((UI_DRAW_LINES+=1))
-}
-ui_box() {
-    local ui_title=$1; shift
-    local ui_text ui_part ui_tone=35
-    UI_DRAW_LINES=0
-    [[ $ui_title != '✓'* ]] || ui_tone=32
-    ui_color "$ui_tone"; ui_border ╭ ╮; ui_color 0
-    ui_line "$ui_title" "1;$ui_tone"
-    for ui_text in "$@"; do
-        if [[ $ui_text == *$'\t'* ]]; then ui_pair "${ui_text%%$'\t'*}" "${ui_text#*$'\t'}"
-        else while IFS= read -r ui_part; do ui_line "$ui_part"; done < <(ui_wrap "$ui_text" "$UI_WIDTH"); fi
-    done
-    ui_color "$ui_tone"; ui_border ╰ ╯; ui_color 0
-    printf '\n' >&2
-    ((UI_DRAW_LINES+=1))
-}
-ui_panel() {
-    local UI_DRAW_LINES=0
-    ui_dimensions
-    UI_CONTEXT=()
-    ui_page
-    ui_box "$@"
-    if ui_interactive; then UI_CONTEXT=("$@"); fi
-}
 ui_stop_spinner() {
     if [[ -n $UI_SPINNER_PID ]]; then
         kill "$UI_SPINNER_PID" 2>/dev/null || true
@@ -214,6 +344,7 @@ ui_stop_spinner() {
         UI_SPINNER_PID=''
         printf '\r\033[2K' >&2
     fi
+    if [[ -n $UI_STATUS_FILE ]]; then rm -f -- "$UI_STATUS_FILE" 2>/dev/null || true; UI_STATUS_FILE=''; fi
 }
 ui_restore() {
     ui_stop_spinner
@@ -231,27 +362,30 @@ ui_restore() {
 ui_draw_choices() {
     # Arrays and drawing state are scoped by choose; Bash dynamic scope avoids
     # evaluating input or transporting selected values through terminal output.
-    local ui_i ui_last ui_title_line UI_DRAW_LINES=0
-    ui_color 35; ui_border ╭ ╮; ui_color 0
-    for ui_title_line in "${ui_questions[@]}"; do ui_line "$ui_title_line" '1'; done
-    ui_line
+    local ui_i ui_last ui_label ui_keys UI_DRAW_LINES=0
+    ui_question "$ui_title"
+    printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
     ui_last=$((ui_offset+ui_visible))
     (( ui_last <= ${#ui_values[@]} )) || ui_last=${#ui_values[@]}
     for (( ui_i=ui_offset; ui_i<ui_last; ui_i++ )); do
-        if (( ui_i == ui_selected )); then ui_line "> ${ui_labels[ui_i]}" '1;37;44'
-        else ui_line "  ${ui_labels[ui_i]}"; fi
+        ui_label=${ui_labels[ui_i]:0:UI_WIDTH-2}
+        if (( ui_i == ui_selected )); then
+            printf '  ' >&2; ui_color '1;37;44'
+            printf '> %s%*s' "$ui_label" "$((UI_WIDTH-${#ui_label}))" '' >&2; ui_color 0
+        else printf '    %s' "$ui_label" >&2; fi
+        printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
     done
-    ui_line
-    if (( UI_WIDTH < 50 )); then ui_line "$(t ui_keys_short)" '36'; else ui_line "$(t ui_keys)" '36'; fi
-    ui_line "$((ui_selected+1)) / ${#ui_values[@]}" '37'
-    ui_color 35; ui_border ╰ ╯; ui_color 0
+    printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
+    if (( UI_WIDTH < 50 )); then ui_keys=$(t ui_keys_short); else ui_keys=$(t ui_keys); fi
+    printf '  ' >&2; ui_color 2; printf '%s · %s/%s' "$ui_keys" "$((ui_selected+1))" "${#ui_values[@]}" >&2; ui_color 0
+    printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
     ui_drawn=$UI_DRAW_LINES
 }
 choose() {
     local ui_out=$1 ui_key=$2 ui_default=$3; shift 3
-    local -a ui_values=() ui_labels=() ui_questions=()
+    local -a ui_values=() ui_labels=()
     local ui_i ui_selected=0 ui_offset=0 ui_visible ui_drawn=0 ui_keypress ui_next ui_sequence ui_search=''
-    local ui_reply ui_match ui_title ui_previous_cols=0
+    local ui_reply ui_match ui_title ui_previous_cols=0 ui_question_lines
     [[ -t 0 ]] || die interactive_required
     while (( $# >= 2 )); do ui_values+=("$1"); ui_labels+=("$2"); shift 2; done
     (( ${#ui_values[@]} > 0 )) || return 1
@@ -286,10 +420,10 @@ choose() {
     printf '\033[?25l' >&2
     while :; do
         ui_dimensions
-        if (( ui_drawn > 0 && UI_COLS == ui_previous_cols )); then printf '\033[%sA' "$ui_drawn" >&2; fi
+        if (( ui_drawn > 0 && UI_COLS == ui_previous_cols )); then printf '\033[%sA' "$ui_drawn" >&2
+        else ui_question_lines=$(ui_wrap "$ui_title" "$((UI_WIDTH-2))" | wc -l); fi
         ui_previous_cols=$UI_COLS
-        mapfile -t ui_questions < <(ui_wrap "$ui_title" "$UI_WIDTH")
-        ui_visible=$((UI_ROWS-${#ui_questions[@]}-7-UI_PAGE_LINES))
+        ui_visible=$((UI_ROWS-ui_question_lines-4-UI_PAGE_LINES))
         (( ui_visible <= 10 )) || ui_visible=10
         (( ui_visible >= 1 )) || ui_visible=1
         (( ui_selected >= ui_offset )) || ui_offset=$ui_selected
@@ -360,59 +494,154 @@ ask_value() {
         say "ui_bad_$ui_kind"
     done
 }
-ui_run() {
-    local ui_step=$1 ui_label=$2; shift 2
-    local ui_previous
-    if ui_interactive; then
-        [[ $ui_step != 1 && $ui_step != 0 ]] || UI_STEP_LABELS=()
-        UI_CONTEXT=()
-        ui_page
-        for ui_previous in "${UI_STEP_LABELS[@]}"; do
-            ui_color 32; printf '  ✓ %s\n' "$ui_previous" >&2; ui_color 0
+
+# ---------------------------------------------------------------- progress
+ui_clock() { printf -v "$1" '%02d:%02d' "$(($2/60))" "$(($2%60))"; }
+# "[+] text · 00:12" once a stage has completed.
+ui_done_line() {
+    printf '  ' >&2; ui_color '1;32'; printf '[+]' >&2; ui_color 0
+    printf ' %s ' "$1" >&2; ui_color 2; printf '· %s' "$2" >&2; ui_color 0; printf '\n' >&2
+}
+# pwntools-like progress line, redrawn in place: "[⠹] text · 00:12 · status".
+# The status comes only from ui_status (trusted text), never from command logs.
+ui_spinner_start() {
+    local ui_text=$1
+    UI_CURSOR_HIDDEN=true
+    printf '\033[?25l' >&2
+    (
+        trap - EXIT ERR
+        trap 'exit 0' TERM INT
+        local ui_i=0 ui_started=$SECONDS ui_elapsed ui_status ui_head ui_tail ui_room ui_clock_text ui_on=false
+        local -a ui_frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+        [[ -z ${NO_COLOR+x} && ${TERM:-dumb} != dumb ]] && ui_on=true
+        while :; do
+            ui_elapsed=$((SECONDS-ui_started))
+            ui_clock ui_clock_text "$ui_elapsed"
+            ui_status=''
+            [[ ! -r $UI_STATUS_FILE ]] || { IFS= read -r ui_status < "$UI_STATUS_FILE" || :; }
+            ui_head=" $ui_text"
+            ui_tail=" · $ui_clock_text${ui_status:+ · $ui_status}"
+            ui_room=$((UI_COLS-8-${#ui_head}))
+            if (( ui_room < 9 )); then ui_head=${ui_head:0:UI_COLS-17}; ui_room=8; fi
+            ui_tail=${ui_tail:0:ui_room}
+            if [[ $ui_on == true ]]; then
+                printf '\r\033[2K  \033[1;34m[%s]\033[0m%s\033[2m%s\033[0m' "${ui_frames[ui_i]}" "$ui_head" "$ui_tail" >&"$UI_PROGRESS_FD"
+            else printf '\r\033[2K  [%s]%s%s' "${ui_frames[ui_i]}" "$ui_head" "$ui_tail" >&"$UI_PROGRESS_FD"; fi
+            ui_i=$(((ui_i+1)%${#ui_frames[@]}))
+            sleep 0.1 || exit 0
         done
-    fi
-    printf '\n' >&2
-    ui_color '1;36'
-    if [[ $ui_step == 0 ]]; then printf '  %s\n' "$(t "$ui_label")" >&2
-    else printf '  [%s/8] %s\n' "$ui_step" "$(t "$ui_label")" >&2; fi
-    ui_color 0
+    ) 2>> "$UI_LAST_LOG" &
+    UI_SPINNER_PID=$!
+}
+# Runs "$@" in this shell (errexit and shared state keep working) with output
+# captured in a private log. Interactive terminals see a spinner instead.
+ui_exec() {
+    local ui_text=$1 ui_tag=$2; shift 2
+    local ui_started=$SECONDS
+    UI_CURRENT_STEP=$ui_text
     if ui_interactive; then
+        ui_dimensions
         mkdir -p "$STATE/logs"
-        UI_LAST_LOG=$(mktemp "$STATE/logs/install-$(date -u +%Y%m%dT%H%M%S)-$ui_step-XXXXXX.log")
+        UI_LAST_LOG=$(mktemp "$STATE/logs/install-$(date -u +%Y%m%dT%H%M%S)-$ui_tag-XXXXXX.log")
+        UI_STATUS_FILE="$UI_LAST_LOG.status"
+        : > "$UI_STATUS_FILE"
         exec {UI_PROGRESS_FD}>&2
-        (
-            trap - EXIT ERR
-            trap 'exit 0' TERM INT
-            local ui_frame ui_started=$SECONDS ui_elapsed
-            while :; do
-                for ui_frame in '◐' '◓' '◑' '◒'; do
-                    ui_elapsed=$((SECONDS-ui_started))
-                    printf '\r  %s %s · %02d:%02d' "$ui_frame" "$(t ui_working)" "$((ui_elapsed/60))" "$((ui_elapsed%60))" >&"$UI_PROGRESS_FD"
-                    sleep 0.2 || exit 0
-                done
-            done
-        ) 2>> "$UI_LAST_LOG" &
-        UI_SPINNER_PID=$!
+        ui_spinner_start "$ui_text"
         # This call stays outside if/|| contexts so errexit remains effective
         # inside lifecycle functions; shared state remains in this shell.
         "$@" > "$UI_LAST_LOG" 2>&1
         ui_stop_spinner
         exec {UI_PROGRESS_FD}>&-
         UI_PROGRESS_FD=''
-    else "$@"; fi
+        if [[ $UI_CURSOR_HIDDEN == true ]]; then printf '\033[?25h' >&2; UI_CURSOR_HIDDEN=false; fi
+    else
+        ui_log info "$ui_text"
+        "$@"
+    fi
     UI_LAST_LOG=''
-    UI_STEP_LABELS+=("$(t "$ui_label")")
-    ui_color 32; printf '  ✓ %s\n' "$(t ui_step_done)" >&2; ui_color 0
+    UI_CURRENT_STEP=''
+    ui_clock UI_LAST_CLOCK "$((SECONDS-ui_started))"
+    ui_done_line "$ui_text" "$UI_LAST_CLOCK"
+}
+# A numbered stage on its own page: STEP is "N/T", 0 (unnumbered) or N.
+# The first stage of a sequence ("1/T", 1 or 0) clears the completed list.
+ui_run() {
+    local ui_step=$1 ui_label=$2; shift 2
+    local ui_text ui_entry
+    case $ui_step in 0|1|1/*) UI_STEP_LABELS=();; esac
+    ui_text=$(t "$ui_label")
+    [[ $ui_step == 0 ]] || ui_text="[$ui_step] $ui_text"
+    if ui_interactive; then
+        UI_CONTEXT=()
+        ui_page
+        for ui_entry in "${UI_STEP_LABELS[@]}"; do ui_done_line "${ui_entry%%$'\t'*}" "${ui_entry#*$'\t'}"; done
+    fi
+    ui_exec "$ui_text" "${ui_step//\//of}" "$@"
+    UI_STEP_LABELS+=("$ui_text"$'\t'"$UI_LAST_CLOCK")
+}
+# An inline spinner for slow lookups that do not deserve their own page.
+ui_task() {
+    local ui_label=$1; shift
+    ui_exec "$(t "$ui_label")" task "$@"
+}
+# Live detail for the running spinner (for example the image being pulled).
+ui_status() {
+    if [[ -n $UI_STATUS_FILE ]]; then printf '%s\n' "$*" > "$UI_STATUS_FILE" 2>/dev/null || true; fi
+    printf '      · %s\n' "$*" >&2
 }
 ui_pause() {
     local ui_pause_input
     [[ -t 0 ]] || return 0
-    printf '\n%s' "$(t "${1:-ui_continue}")" >&2
+    printf '\n  ' >&2; ui_color 2; printf '%s' "$(t "${1:-ui_continue}")" >&2; ui_color 0
     IFS= read -r ui_pause_input || true
 }
 ui_progress_note() {
     say "$@"
     if [[ -n ${UI_PROGRESS_FD:-} ]]; then
-        printf '\r\033[2K  %s\n' "$(t "$@")" >&"$UI_PROGRESS_FD"
+        printf '\r\033[2K' >&"$UI_PROGRESS_FD"
+        ui_say info "$@" 2>&"$UI_PROGRESS_FD"
     fi
+}
+
+# ---------------------------------------------------------------- screens
+ui_interrupted() {
+    printf '\n\n  ' >&2; ui_color '1;31'; printf '[!] %s' "$(t ui_interrupted)" >&2; ui_color 0; printf '\n\n' >&2
+}
+ui_welcome() {
+    [[ -t 2 ]] || return 0
+    ! ui_interactive || printf '\033[2J\033[H' >&2
+    ui_banner 2
+}
+# Help panel on stdout, grouped like the dashboard. Colours only on a terminal.
+ui_help() {
+    local on=false group entry name key
+    [[ -z ${NO_COLOR+x} && -t 1 && ${TERM:-dumb} != dumb ]] && on=true
+    ! [[ -t 1 ]] || ui_banner 1
+    # "group_key;name=description_key;..." — names never contain ";" or "=".
+    local -a groups=(
+        "help_group_options;--lang en|es=help_opt_lang;--state-dir PATH=help_opt_state;-h, --help=help_opt_help;--version=help_opt_version"
+        "help_group_service;status=menu_status;start=menu_start;stop=menu_stop;logs=menu_logs"
+        "help_group_updates;install [x.y.z]=help_cmd_install;check-updates=menu_versions;update [x.y.z]=menu_update;migrate [x.y.z]=help_cmd_migrate;refresh-image=menu_refresh;db-update=menu_database_update"
+        "help_group_data;backup=menu_backup;backups=menu_backups;restore [file]=menu_restore;transfer=menu_transfer"
+        "help_group_settings;address=menu_address;https=menu_https;db-exposure=menu_exposure;credentials=menu_credentials;language=menu_language"
+        "help_group_support;diagnose=menu_diagnose;recover=menu_recover;version=help_opt_version;help=help_opt_help"
+    )
+    local -a entries=()
+    local out line yellow='' blue='' purple='' bold='' reset=''
+    if [[ $on == true ]]; then
+        yellow=$'\033[1;33m' blue=$'\033[1;34m' purple=$'\033[1;35m' bold=$'\033[1m' reset=$'\033[0m'
+    fi
+    # Built first and written once, so "start.sh help | grep -q" cannot break
+    # the pipe halfway through the output.
+    printf -v out '  %s[+]%s %s%s%s\n' "$yellow" "$reset" "$bold" "$(t help_usage)" "$reset"
+    for group in "${groups[@]}"; do
+        IFS=';' read -r -a entries <<< "$group"
+        printf -v line '\n  %s[*]%s %s%s%s\n' "$blue" "$reset" "$bold" "$(t "${entries[0]}")" "$reset"; out+=$line
+        for entry in "${entries[@]:1}"; do
+            name=${entry%=*}; key=${entry##*=}
+            printf -v line '      %s%-18s%s %s\n' "$purple" "$name" "$reset" "$(t "$key")"; out+=$line
+        done
+    done
+    printf -v line '\n  %s[!]%s %s\n  %s[*]%s %s\n\n' "$yellow" "$reset" "$(t help_notes)" "$blue" "$reset" "$(t help_paths)"
+    printf '%s' "$out$line"
 }

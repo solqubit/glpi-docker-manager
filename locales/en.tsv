@@ -104,7 +104,6 @@ config_restored	Previous configuration restored after validation failed. Inspect
 credentials_warning	Database credentials are hidden. Reveal them in this terminal? [y/N]
 credentials_note	These are database credentials, not GLPI web account passwords. Editing .env does not rotate existing MySQL accounts.
 menu	\n  GLPI Docker Manager\n  1) Status                 2) Start                3) Stop\n  4) Logs                   5) Check updates        6) Update GLPI\n  7) Backup                 8) Restore              9) HTTPS\n 10) MySQL exposure        11) Credentials         12) Transfer\n 13) Major migration       14) MySQL patch         15) Language\n 16) Diagnose              17) Refresh GLPI image   18) Recovery\n  0) Exit\n
-help	Usage: ./start.sh [--lang en|es] [--state-dir /absolute/path] [command] [argument]\nCommands: install [version], status, start, stop, logs, check-updates, update [version], refresh-image, migrate [version], backup, backups, restore [archive], transfer, address, https, db-exposure, credentials, db-update, language, diagnose, recover, version, help.\nRun without a command for the interactive menu. Docker installation, restores, migrations and sensitive changes ask for confirmation.\nDefault state: /opt/glpi-docker-manager . Imported TLS: /opt/glpi-docker-manager/certs/custom/{fullchain.pem,privkey.pem} .
 stop_confirm	Stop GLPI and MySQL? [y/N]
 diagnose_note	Diagnostics do not print passwords. Raw Docker/GLPI logs may contain sensitive application data; review before sharing.
 recover_prompt	An operation was interrupted. Inspect operation.json and logs. Restore a known-good backup, or type RESUME only after validating the current image/schema to retry readiness checks. Automatic database rollback is not attempted.
@@ -377,3 +376,40 @@ backup_origin_refresh-image	Before image refresh
 backup_origin_transfer	Server transfer
 backup_origin_unknown	Not recorded
 update_branch_available	GLPI %s is also available in the next branch. Open Update GLPI / change branch to review it with migration warnings.
+ui_interrupted	Exiting... terminal restored.
+help_usage	Usage: ./start.sh [--lang en|es] [--state-dir /absolute/path] [command] [argument]
+help_group_options	Options
+help_group_service	Service
+help_group_updates	Installation and updates
+help_group_data	Data and backups
+help_group_settings	Settings
+help_group_support	Support
+help_opt_lang	Interface language
+help_opt_state	Installation root (default: /opt/glpi-docker-manager)
+help_opt_help	Show this help
+help_opt_version	Show the manager version
+help_cmd_install	Install GLPI (optionally an exact version)
+help_cmd_migrate	Migrate to the next GLPI branch
+help_notes	Run without a command for the interactive menu. Docker installation, restores, migrations and sensitive changes ask for confirmation.
+help_paths	Imported TLS: /opt/glpi-docker-manager/certs/custom/{fullchain.pem,privkey.pem}
+docker_ready	Docker %s is reachable
+releases_cached	Using the GLPI release list fetched %s min ago
+releases_stale	GitHub is unreachable; using the saved GLPI release list.
+task_versions	Looking for available GLPI images
+version_list_title	Stable GLPI %s releases
+db_update_versions	MySQL %s → %s
+status_pulling	downloading %s
+status_waiting	waiting for %s: %s (%ss)
+status_http	web check, attempt %s/30
+status_schema	checking SQL and the GLPI schema
+status_console	GLPI console: %s
+status_measure	measuring volumes and database
+status_dump	dumping the MySQL database
+status_snapshot	saving volume %s
+status_restore_volume	restoring volume %s
+status_import	importing the MySQL dump
+status_archive	compressing and verifying the archive
+status_release_page	GitHub page %s
+status_resolving	checking %s
+db_updated	MySQL update verified. Current MySQL: %s.
+registry_rate_limited	Docker Hub rejected some lookups because of its rate limit (HTTP 429). Wait a few minutes or run docker login, then try again.

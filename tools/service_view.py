@@ -41,25 +41,25 @@ def access_url(config):
 
 def status_rows(config, services, ui):
     by_service = {item.get('Service'): item for item in services}
-    rows = [(None, ui.t('setup_access', access_url(config)), 'accent')]
+    rows = [(None, '[*] ' + ui.t('setup_access', access_url(config)), 'accent')]
     versions = {'glpi': config['glpi_version'], 'db': config['mysql_version'],
                 'proxy': config['caddy_image'].split('@')[0].split(':')[-1]}
     names = {'glpi': 'GLPI', 'db': 'MySQL', 'proxy': 'Caddy / HTTPS'}
     for name in ['glpi', 'db'] + (['proxy'] if config['tls'] != 'off' else []):
         item = by_service.get(name)
         if not item:
-            rows.append((None, names[name] + ' · ' + ui.t('ui_service_missing'), 'warning'))
+            rows.append((None, '[!] ' + names[name] + ' · ' + ui.t('ui_service_missing'), 'warning'))
             continue
         active = item.get('State') == 'running'
         health = item.get('Health') or ''
         label = ui.t('ui_status_running' if active else 'ui_status_stopped')
         style = 'warning' if active and health == 'starting' else 'ok' if active and health != 'unhealthy' else 'error'
-        marker = '✓' if style == 'ok' else '!'
+        marker = {'ok': '[+]', 'warning': '[!]'}.get(style, '[✗]')
         rows.append((None, f"{marker} {names[name]} {versions[name]} · {label}", style))
         if health:
             translated = {'healthy': ui.t('ui_health_ok'), 'starting': ui.t('ui_status_starting'),
                           'unhealthy': ui.t('ui_status_unhealthy')}.get(health, health)
-            rows.append((None, f"    {ui.t('ui_service_health')}: {translated}", style))
+            rows.append((None, f"      {ui.t('ui_service_health')}: {translated}", style))
         mappings = []
         for publisher in item.get('Publishers') or []:
             if publisher.get('PublishedPort'):
@@ -68,7 +68,7 @@ def status_rows(config, services, ui):
             mappings = [f'{host} → {target}/tcp' for host, target in
                         re.findall(r':([0-9]+)->([0-9]+)/tcp', item.get('Ports', ''))]
         ports = ', '.join(dict.fromkeys(mappings)) or ui.t('ui_service_internal')
-        rows.append((None, f"    {ui.t('ui_service_ports')}: {ports}", ''))
+        rows.append((None, f"      {ui.t('ui_service_ports')}: {ports}", ''))
     return rows
 
 
@@ -90,7 +90,7 @@ def main():
         title = ui.t('ui_logs_details')
     if interactive == 'true' and sys.stdin.isatty() and sys.stdout.isatty():
         ui.run(lambda: ui.menu(title, rows + [('back', ui.t('ui_status_back'), 'accent')],
-                              help_text=ui.t('setup_keys')))
+                              help_text=ui.t('ui_status_back')))
     else:
         print(title + '\n')
         for _, label, _ in rows:
