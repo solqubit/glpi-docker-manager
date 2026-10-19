@@ -147,14 +147,19 @@ install_wizard() {
             *) return "$editor_result";;
         esac
     done
+    ui_task setup_staging install_stage "$file" "$clean_file"
+    installation_finish
+}
+# Validation, certificates and Compose checks take a few seconds after the form.
+install_stage() {
+    local file=$1 clean_file=$2
     jq 'del(._detected_host,._notice)' "$file" > "$clean_file"
     config_validate "$clean_file"
-    draft_ports_check "$clean_file"
+    draft_ports_check "$clean_file" || die port_busy "$BUSY_PORT"
     config_stage "$clean_file"
     draft_ports_check "$clean_file" || die port_busy "$BUSY_PORT"
     config_activate "$REVISION"
     journal_begin install
-    installation_finish
 }
 # MySQL and Caddy lookups are independent registry round trips: run both at once.
 # Sets the caller's mysql_version/mysql_image/caddy_image (dynamic scope).

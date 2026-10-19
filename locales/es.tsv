@@ -535,3 +535,4 @@ self_update_restart	Reiniciando con la nueva versión del gestor…
 setup_timezone_server	Zona horaria del servidor: %s
 setup_field_values	Actual: %s · Predeterminado: %s
 setup_password_generated	%s: se generó una contraseña aleatoria de 48 caracteres. Puedes verla después en Ver credenciales de la base.
+setup_staging	Validando y preparando la configuración

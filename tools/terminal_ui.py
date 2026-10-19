@@ -90,7 +90,12 @@ class Terminal:
             self.styles['bold'] = curses.A_BOLD
             return action()
         try:
-            return curses.wrapper(start)
+            result = curses.wrapper(start)
+            # Leaving curses restores the previous screen, which still shows the
+            # last Bash prompt; clear it so no stale, inactive menu reappears.
+            sys.stderr.write('\033[2J\033[H')
+            sys.stderr.flush()
+            return result
         except curses.error:
             # Missing terminfo or a limited curses build still permits setup.
             self.screen = None

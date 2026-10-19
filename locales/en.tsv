@@ -535,3 +535,4 @@ self_update_restart	Restarting with the new manager version…
 setup_timezone_server	Server time zone: %s
 setup_field_values	Current: %s · Default: %s
 setup_password_generated	%s: a random 48-character password was generated. View it later in View database credentials.
+setup_staging	Validating and preparing the configuration
