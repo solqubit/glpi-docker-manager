@@ -1,0 +1,379 @@
+interactive_required	This operation needs an interactive terminal. Run ./start.sh in a terminal.
+invalid	Invalid value: %s
+bad_path	State directory must be an absolute, non-symlink directory other than /.
+permissions	Cannot access %s. Run the manager with sudo, or choose a writable --state-dir.
+need_sudo	Administrative access is required. Install/enable sudo with your administrator, or run the manager from a root shell.
+admin_required	WARNING: Installation and administration require sudo/root. No installation or system changes have been started.
+admin_command	Run this command, or use a root shell:
+admin_retry_notice	The administrative command failed. Review its output, resolve the reported problem and retry in this wizard.
+locked	Another manager process is operating on this state directory.
+failed	Operation failed at %s. No credentials are included in this message.
+recovery_notice	An incomplete operation was recorded in %s. Use recover or restore; services may remain stopped.
+password_prompt	Type your password, or leave it empty to generate one. No minimum length.
+bad_password	Passwords cannot contain control characters.
+bad_root_password	The official MySQL root initialization does not safely accept quotes or backslashes. Use another administrator password without those characters, or press Enter to generate one. The application password supports them.
+destructive	This changes existing data. Type exactly %s to continue:
+cancelled	Cancelled.
+dependencies	Missing dependencies:%s
+install_dependencies	Install the listed dependencies using the detected package manager? [y/N]
+manual_dependencies	Install curl, jq, openssl, tar, gzip, coreutils, util-linux and iproute2 manually, then run again.
+docker_service_stopped	The local Docker engine is not responding. Starting its existing service and checking again; sudo may request your password.
+docker_retry_confirm	After reviewing the instructions, retry and continue this wizard? [y/N]
+docker_start_failed	Docker could not be started or is still unavailable. On systemd, inspect: sudo systemctl status docker --no-pager ; sudo journalctl -u docker -n 50 --no-pager . With service, inspect: sudo service docker status . Resolve the reported daemon/socket problem and run the manager again.
+docker_context_help	The current endpoint is %s. For rootless Docker, try: systemctl --user start docker ; docker info . For Docker Desktop, start Desktop and verify its Linux integration/context. The manager cannot start the host's default service for a custom socket. See https://docs.docker.com/engine/security/rootless/
+docker_plugins_missing	Docker works, but Compose V2 or Buildx is missing. The manager can install available plugin packages from your configured repositories.
+docker_plugins_confirm	Install the missing Docker plugins using the detected package manager? [y/N]
+docker_plugins_manual	Compatible plugin packages were not found in the configured repositories. Follow https://docs.docker.com/compose/install/linux/ and https://docs.docker.com/build/install/buildx/ ; verify docker compose version and docker buildx version, then run again.
+plugin_packages	Plugin packages: %s
+compose_missing	Install the Docker Compose V2 plugin. See https://docs.docker.com/compose/install/linux/
+buildx_missing	Install the Docker Buildx plugin to verify image digests and architectures: https://docs.docker.com/build/install/buildx/
+manual_docker	Automatic Docker installation is not documented for this distribution. Install Docker Engine, Buildx and Compose using your distribution's instructions: https://docs.docker.com/engine/install/ . Then run again; unlisted distributions are allowed.
+docker_plan	Docker Engine, Buildx and Compose will be installed for %s. Procedure: %s . Existing competing packages will not be removed.
+install_docker	Install Docker using the procedure shown above? [y/N]
+repository_exists	A manager Docker repository file already exists. Inspect it before retrying bootstrap.
+daemon_manual	Start the Docker daemon using your init system, then run the manager again.
+linux_only	Run this manager on Linux with Bash 4.4+.
+architecture	The initial supported image architectures are amd64 and arm64.
+remote_docker	Use a local Docker Engine/context. Remote engines cannot access this host's configuration paths.
+detected	System: %s · %s
+resources	RAM: %s MiB; available state disk: %s MiB.
+low_resources	At least 1 GiB RAM and 2 GiB available disk are required.
+resource_warning	How would you like to continue with the available resources?
+release_limit	Release pagination exceeded its safety limit. No release list was accepted.
+support_unknown	Support status could not be verified automatically. Review https://github.com/glpi-project/glpi/security/policy
+release_notes	Official release notes for GLPI %s: %s
+security_release	SECURITY RELEASE: upstream recommends upgrading. Review the security fixes and any important notices in the official release notes below.
+production_http_warning	Production HTTP was selected. Configure HTTPS or a trusted external TLS proxy before exposing users' sessions. Continue with HTTP? [y/N]
+glpi10_warning	WARNING: GLPI 10 is outside ordinary upstream support following GLPI 12. Version 10.0.28 was announced as the final 10.0 release. No further ordinary bug/security fixes are expected. See https://www.glpi-project.org/en/glpi-12/ . Release notes above may describe the policy at their publication date.
+unsupported_confirm	Keep using this unsupported branch after reviewing the warning? [y/N]
+older_release	A newer stable release exists in this branch: %s. Older patches may lack security fixes.
+choose_version	Which GLPI version would you like to install?
+more_versions	Another stable version…
+exact_version	Exact stable version:
+selection	Selection:
+image_missing	No compatible official image could be verified for %s. Check the network, registry limits and architecture.
+not_installed	No managed installation exists in this state directory. Use install or restore.
+foreign_resource	Resource %s does not belong to this installation. Refusing to use it.
+unhealthy	Service %s did not become healthy. Inspect logs and the recovery journal.
+services_required	GLPI and MySQL must both be running for this operation.
+cert_instructions	Place the PEM certificate followed by intermediate certificates at %s and its matching unencrypted PEM private key at %s. The directory is private; do not place keys in Git. Then rerun HTTPS configuration. Convert PFX/PKCS12 first; see docs/https.md.
+acme_ports	The automatic ACME mode requires host ports 80 and 443. Use custom certificates for another port layout.
+acme_requirements	For %s: point public DNS A/AAAA records to this server; allow inbound TCP 80/443 and outbound HTTPS; remove incorrect AAAA records. Certificate issuance/renewal is managed by Caddy.
+self_signed	A self-signed certificate was generated automatically: %s. Import only this certificate into your clients' trust stores; keep the private key secret.
+tls_prompt	How would you like to secure access to GLPI?
+hostname_prompt	Public hostname or IPv4 address (no scheme, path or port):
+welcome	GLPI Docker Manager
+language_prompt	Language / Idioma: en / es:
+first_action	What would you like to do?
+major_prompt	Choose the GLPI branch:
+mode_prompt	What will this installation be used for?
+port_prompt	HTTP host port:
+https_port_prompt	HTTPS host port:
+timezone_prompt	IANA timezone, for example America/Guayaquil:
+db_name_prompt	Database name:
+db_user_prompt	Database application user:
+expose_prompt	Expose the database port for external connections?
+storage_notice	Application and database data stays inside the installation root, mounted through labelled persistent Docker volumes.
+root_password	Choose the separate MySQL administrator password.
+install_confirm	Create the configuration and deploy this installation? [y/N]
+ready	Open GLPI in your browser: %s
+port_busy	A required host port is already in use: %s
+install_exists	An installation already exists. Configuration and credentials were not changed.
+install_resume	Configuration exists but installation did not complete. Resume the original installation without regenerating credentials? [y/N]
+backup_started	Stopping GLPI and its cron worker for a consistent backup. Access is interrupted during this operation.
+backup_ready	Backup completed and checksums verified: %s . It contains secrets; store an off-server copy privately.
+backup_invalid	The backup failed validation. No restore was attempted.
+backup_list	Available backups:
+backup_path	Absolute path to the backup archive:
+restore_effect	Restore creates fresh volumes using the backup's original image versions. Existing volumes are retained. Current services will stop; newer writes are not merged.
+restore_done	Restore verified. Previous volumes are retained. Review URL, HTTPS/DNS and all integrations before switching traffic.
+transfer	Source GLPI and its cron worker remain STOPPED at this backup's snapshot. Copy %s privately to the destination, clone this repository there and run ./start.sh restore. Verify URL, certificates, users, data and integrations before changing DNS. Keep the source stopped while the destination is active. To cancel the transfer, run ./start.sh start on the source.
+transfer_confirm	Prepare the final transfer backup and leave source GLPI stopped to prevent divergent writes or duplicate background jobs? [y/N]
+backup_space	Not enough free space for a backup and verification. Free space or move the state directory to a larger filesystem.
+update_current	Installed GLPI: %s → selected target: %s.
+update_none	No later stable release exists in this branch.
+update_confirm	Create a fresh backup and update GLPI to the selected release? [y/N]
+migration_warning	Major migration requires reviewing plugins, inventory, API integrations and release notes. GLPI 12 changes knowledge-base permissions and reverse-proxy handling. A rehearsal uses isolated volumes, no published ports and no external network; cron is disabled. Functional review is still required.
+migration_review	Have you reviewed plugin compatibility and the target release's migration requirements? [y/N]
+rehearsal_ok	The isolated database migration and schema check succeeded. This does not certify plugins or integrations.
+updated	Update verified. Current GLPI: %s.
+db_update_warning	MySQL maintenance is limited to the recorded 8.4 series. Test the target on a backup first and schedule downtime. Changing engine images can alter database files.
+db_update_confirm	Back up and apply the selected MySQL patch? [y/N]
+config_confirm	Apply this configuration change? Services may briefly restart. [y/N]
+config_restored	Previous configuration restored after validation failed. Inspect logs before trying again.
+credentials_warning	Database credentials are hidden. Reveal them in this terminal? [y/N]
+credentials_note	These are database credentials, not GLPI web account passwords. Editing .env does not rotate existing MySQL accounts.
+menu	\n  GLPI Docker Manager\n  1) Status                 2) Start                3) Stop\n  4) Logs                   5) Check updates        6) Update GLPI\n  7) Backup                 8) Restore              9) HTTPS\n 10) MySQL exposure        11) Credentials         12) Transfer\n 13) Major migration       14) MySQL patch         15) Language\n 16) Diagnose              17) Refresh GLPI image   18) Recovery\n  0) Exit\n
+help	Usage: ./start.sh [--lang en|es] [--state-dir /absolute/path] [command] [argument]\nCommands: install [version], status, start, stop, logs, check-updates, update [version], refresh-image, migrate [version], backup, backups, restore [archive], transfer, address, https, db-exposure, credentials, db-update, language, diagnose, recover, version, help.\nRun without a command for the interactive menu. Docker installation, restores, migrations and sensitive changes ask for confirmation.\nDefault state: /opt/glpi-docker-manager . Imported TLS: /opt/glpi-docker-manager/certs/custom/{fullchain.pem,privkey.pem} .
+stop_confirm	Stop GLPI and MySQL? [y/N]
+diagnose_note	Diagnostics do not print passwords. Raw Docker/GLPI logs may contain sensitive application data; review before sharing.
+recover_prompt	An operation was interrupted. Inspect operation.json and logs. Restore a known-good backup, or type RESUME only after validating the current image/schema to retry readiness checks. Automatic database rollback is not attempted.
+recover_done	Current services and schema verified; the operation journal was closed.
+unknown_command	Unknown command: %s. Run ./start.sh help.
+update_boundary	Choose a later version in the current branch or the immediately following major. Downgrades and skipped majors are not supported.
+same_image	The image digest has not changed.
+language_saved	Language saved.
+ui_keys	↑ ↓ move · Enter select · Esc cancel
+ui_keys_short	↑ ↓ · Enter · Esc
+ui_yes	Yes
+ui_no	No
+ui_subtitle	Install and manage GLPI, step by step.
+ui_checking	Checking the system and Docker…
+ui_prerequisites_done	✓ System and Docker are ready. You can continue.
+ui_first_title	Let's get started
+ui_first_body	GLPI is not installed by this manager yet. Choose an option below; the wizard will guide you through setup.
+ui_install	Install GLPI
+ui_restore_backup	Restore a backup
+ui_exit	Exit
+ui_menu_prompt	Choose an action:
+ui_pending_title	An operation needs attention
+ui_pending_body	The installation is not ready yet. Resume setup or review its logs before continuing.
+ui_resume_install	Resume installation
+ui_dashboard	Your GLPI installation
+ui_status_running	Running
+ui_status_stopped	Stopped
+ui_status_unknown	Status unavailable
+ui_status	Service · View status
+ui_start	Service · Start
+ui_stop	Service · Stop
+ui_logs	Service · View logs
+ui_check_updates	Updates · Check available versions
+ui_update	Updates · Update GLPI
+ui_backup	Data · Create a backup
+ui_https	Configuration · HTTPS and certificates
+ui_db_exposure	Configuration · Publish or close MySQL port
+ui_credentials	Configuration · View database credentials
+ui_transfer	Data · Move to another server
+ui_migrate	Updates · Migrate to a new GLPI branch
+ui_db_update	Updates · Update MySQL patches
+ui_language	Configuration · Language
+ui_diagnose	Help · Diagnose the installation
+ui_refresh	Updates · Refresh the same GLPI image
+ui_recover	Help · Recover an interrupted operation
+ui_mode_test	Testing
+ui_mode_production	Production
+ui_tls_off	HTTP only
+ui_tls_self-signed	Self-signed HTTPS · generate automatically
+ui_tls_acme	Public HTTPS · Let's Encrypt · automatic renewal
+ui_tls_custom	HTTPS · import my PEM certificates
+ui_releases_loading	Looking up official GLPI versions…
+ui_summary	Review your installation
+ui_environment	Environment
+ui_host	Server address
+ui_database	Database / user
+ui_db_public	Published on 3306:3306
+ui_db_private	Internal access only
+ui_secrets_hidden	Passwords are protected and are not shown here.
+ui_install_success	✓ GLPI installed and verified
+ui_initial_account	First sign-in: user glpi · password glpi
+ui_next_steps	Change the default GLPI web passwords. Run the manager again to administer this installation.
+ui_step_volumes	Preparing persistent storage
+ui_step_images	Downloading the official images
+ui_step_plugins	Preparing application directories
+ui_step_database	Starting and checking MySQL
+ui_step_install	Installing the GLPI database
+ui_step_requirements	Checking GLPI requirements
+ui_step_services	Starting GLPI and web access
+ui_step_verify	Verifying services, database and access
+ui_working	Working…
+ui_step_done	Completed
+ui_error_log	Details for this step: %s
+ui_continue	Press Enter to return to the menu…
+ui_bad_port	Enter a port number between 1 and 65535.
+ui_bad_identifier	Use up to 32 letters, digits or underscores, starting with a letter.
+ui_bad_db-user	Use up to 32 letters, digits or underscores, starting with a letter. Choose an application user other than root.
+ui_bad_timezone	Enter an installed IANA timezone, for example UTC or America/Guayaquil.
+ui_bad_hostname	Enter a domain or IPv4 address, without http://, paths or ports.
+ui_plain_keys	Type an option number and press Enter.
+ui_invalid_choice	Choose one of the displayed option numbers.
+ui_release_prompt	Official release notes are available. How would you like to continue?
+ui_release_continue	Continue setup
+ui_release_details	Read the complete release notes
+ui_continue_setup	Press Enter to continue setup…
+ui_app_password	GLPI_DB_PASSWORD · GLPI database password
+ui_root_password	MYSQL_ROOT_PASSWORD · MySQL administrator password
+ui_password_keys	Tab: show / hide · Enter: continue · Ctrl+U: clear
+ui_password_visible	Visible
+ui_password_hidden	Hidden
+ui_password_saved	Password accepted
+ui_default_value	Default: %s · Enter to keep it
+ui_defaults_title	Standard settings
+ui_settings_prompt	Keep these settings or customize them?
+ui_settings_defaults	Keep defaults · choose only my passwords
+ui_settings_custom	Customize ports, timezone, database and user
+ui_continue_install	Continue installing GLPI
+ui_back_menu	Return to the main menu
+resource_reference	Sizing reference: 4 GiB RAM and 10 GiB free disk. Actual needs depend on usage; the same GLPI is installed in every case.
+docker_storage_space	Filesystem %s: %s MiB free; this operation estimates %s MiB including 512 MiB of headroom.
+docker_storage_unavailable	Cannot inspect the engine storage path %s from this environment. Verify free disk and inodes on the engine host before deploying.
+storage_insufficient	Insufficient free space at %s: this operation estimates %s MiB, but %s MiB is available. Free or add capacity before retrying.
+storage_inodes	Too few free inodes at %s. Inspect the filesystem before continuing; existing Docker data was preserved.
+storage_temporary	Docker storage %s is on a temporary/read-only filesystem. Install Linux on a persistent disk before deploying GLPI.
+host_io_error	A host Input/output error was detected. The system could not read or write files; the installation has been stopped.
+host_readonly	The host reported a read-only filesystem. The installation has been stopped.
+host_no_space	The host reported no space left on the device. Check capacity and free inodes on the Docker/containerd filesystems.
+host_storage_steps	Inspect the step log and storage from the host/hypervisor. When system tools work, check df -h, df -i and kernel logs. If even ls/sudo fail, use the hypervisor or a rescue environment. Resume only after storage is healthy.
+cleanup_deferred	Some private temporary files may remain under %s because cleanup could not complete. Inspect them after restoring storage access.
+ui_db_access_title	Database network access
+ui_db_access_body	GLPI connects internally to MySQL without publishing a port. Exposure publishes server port 3306 for external database clients; firewall and routing rules still apply.
+ui_db_access_later	You can open or close this port later from the manager.
+ui_db_expose_yes	Yes · expose MySQL on server port 3306
+ui_db_expose_no	No · keep MySQL internal to GLPI
+ui_letsencrypt_title	Public certificate from Let's Encrypt
+ui_letsencrypt_body	For a VPS or publicly reachable server with your own domain: Caddy requests and renews the Let's Encrypt certificate automatically.
+ui_letsencrypt_ports	Point the domain to this server and allow inbound TCP 80/443. These ports will be used for HTTP/HTTPS. Enter the domain below.
+setup_title	Installation settings
+setup_intro	Edit any row with Enter. Defaults are ready; both passwords need your confirmation. Internal MySQL connection: db:3306.
+setup_host	Access address / IP
+setup_http	HTTP port
+setup_https	HTTPS port
+setup_timezone	Time zone
+setup_tls	HTTPS certificate
+setup_exposure	External MySQL access
+setup_database	Database name
+setup_user	Database user
+setup_pending	pending
+setup_invalid	needs correction
+setup_default	default
+setup_valid	validated
+setup_secret_set	Entered and confirmed
+setup_secret_empty	Enter to type or generate
+setup_password_required	Enter a password or generate one with Enter.
+setup_continue	Continue · Review installation
+setup_deploy	Install now
+setup_return_edit	← Return to settings
+setup_version_back	← Change GLPI version
+setup_cancel	Cancel installation
+setup_cancel_confirm	Leave setup without installing?
+setup_form_help	↑ ↓ choose a field; Enter edits it and returns here. Password values stay out of the summary. Scroll to see every field.
+setup_keys	↑ ↓ move · Enter select · Esc back
+setup_search_keys	Type to search · ↑ ↓ move · Enter select · Esc back
+setup_edit_keys	Enter save · Esc discard changes · Ctrl+U clear
+setup_edit_hint	Edit the current value and press Enter to validate it. Esc returns without changing it.
+setup_saved	✓ %s saved. You can edit another field or continue.
+setup_timezone_area	Time zone · Choose a region
+setup_timezone_city	Time zone · Choose a city
+setup_timezone_help	Choose an IANA time zone. Search by region or city; Esc returns to the previous list.
+setup_search	Search: %s
+setup_no_matches	No matches. Backspace clears the search.
+setup_plain_choice	Option number, text search, Enter to select, or b to go back:
+setup_network_hint	Detected address: %s. If it is localhost, enter the server IP for network access. You may also enter a domain.
+setup_port_conflict	HTTP and HTTPS need different ports; external MySQL uses 3306.
+setup_public_domain	Let's Encrypt needs a public domain, not an IP, localhost or a .local name.
+setup_tls_help	Let's Encrypt uses a public domain and ports 80/443. Self-signed certificates are generated automatically. Import custom PEM files under your configured certificates directory.
+setup_access	Access: %s
+setup_review_hint	Review before installing. Choose any value to return to its settings; nothing has been deployed yet.
+setup_review_keys	Enter installs only on Install now. Choose Return to settings or press Esc to correct values.
+setup_loading_images	Resolving official MySQL and proxy images before opening settings…
+ui_service_ready	✓ GLPI is running and verified
+ui_service_starting	Starting and checking your GLPI installation
+ui_service_checking	Checking services, database and web access
+ui_service_stopped	GLPI is stopped. How would you like to continue?
+ui_service_start_now	Start and verify GLPI
+ui_service_keep_stopped	Keep stopped and open the menu
+ui_service_health	Health
+ui_service_ports	Published ports
+ui_service_internal	Internal network only
+ui_service_missing	Not created / initialization pending
+ui_status_details	Service status and access
+ui_status_back	Return to the menu
+ui_logs_details	Service logs · scroll to read
+ui_status_starting	Starting / checking health
+ui_status_unhealthy	Needs attention · unhealthy service
+setup_standard_ports	Use standard ports · HTTP 80 / HTTPS 443
+setup_apply	Apply changes and verify access
+menu_status	Service status
+menu_start	Start / verify GLPI
+menu_stop	Stop services
+menu_logs	View service logs
+menu_update	Update GLPI / change branch
+menu_versions	Check available versions
+menu_backup	Create backup
+menu_restore	Restore a backup
+menu_address	Access IP / ports / time zone
+menu_https	HTTPS and certificates
+menu_exposure	Expose / close MySQL port
+menu_credentials	View database credentials
+menu_transfer	Move to another server
+menu_database_update	Update MySQL patches
+menu_language	Change language
+menu_diagnose	Diagnose installation
+menu_refresh	Refresh current image
+menu_recover	Recover interrupted operation
+menu_backups	Manage backups
+setup_access_intro	Edit a field with Enter. Return to this screen after each change. Services restart only when you apply the reviewed configuration.
+setup_access_review_hint	Review the changes before restarting the services.
+setup_access_review_keys	Enter applies changes only on Apply changes. Choose Return to configuration or press Esc to correct a field.
+update_step_apply	Applying the update and verifying GLPI
+settings_step_apply	Applying configuration and verifying web access
+service_step_stop	Stopping the services
+service_stopped_done	Services stopped. Choose Start to bring GLPI back online.
+backup_step_restore	Restoring the backup into fresh volumes and verifying GLPI
+backup_selected	Selected backup · review before restoring
+backup_none	No backups are saved here yet.
+ui_health_ok	Verified
+menu_all_options	All actions · ← → change column · ↑ ↓ move · Enter select
+menu_state_path	Configuration: %s/current
+menu_backups_path	Backups: %s
+update_latest	Installed GLPI: %s; latest stable in the same branch: %s.
+update_images_unavailable	Later releases exist, but no compatible image could be verified. Check registry access and your architecture before retrying.
+update_no_patches	No later installable patches remain in this branch. You may choose an explicit migration to the next branch below.
+backup_choose_other	Choose an archive from another path
+backup_choose_help	Select a backup, including those created before updates. Its contents will be verified before asking for RESTORE; current volumes are retained.
+backup_recovery_ready	✓ Recovery backup is available
+backup_recovery_help	To return to this backup, open Restore a backup in the main menu and choose this archive. Restore uses fresh volumes and the recorded GLPI/MySQL versions.
+update_step_backup	Creating a recovery backup
+update_step_rehearsal	Rehearsing the update on an isolated restored copy
+update_loading	Checking available official update images
+update_same_branch	Same branch
+update_new_branch	New branch · migration warning and rehearsal
+update_select_title	Available GLPI updates
+update_select_help	Choose any later installed-image version. You can update one release at a time. A new branch requires an isolated rehearsal and explicit confirmation.
+update_select_prompt	Which version would you like to install?
+setup_access_title	Web access settings
+layout_code_conflict	Cannot replace an existing unmanaged path: %s. Move it aside or select a different installation root.
+layout_checkout_in_root	Keep the downloaded Git checkout outside %s, or place it in its manager/ subdirectory. The root is reserved for private runtime data; setup installs the operational code there automatically.
+layout_entrypoint	Open the installed manager with: sudo %s
+storage_image_cached	Image already downloaded: %s. No download space is required for it.
+storage_image_estimate_unknown	Could not read the layer sizes of %s; estimating 2048 MiB for this missing image.
+backup_estimate	Estimated uncompressed data: %s MiB. Workspace and headroom: %s MiB. Available: %s MiB. Final archive size depends on compression.
+backup_manual_done	✓ Manual backup created and verified
+backup_transfer_done	✓ Transfer backup created and verified
+backup_manual_help	Open Manage backups to view details, verify, export, restore or delete this archive.
+backups_overview	Manage backups · %s files · %s MiB
+backups_help	Select an archive to view details and choose an action. Existing files are kept until you explicitly delete one.
+backups_details	Backup details and actions
+backups_detail_help	Choose Verify, Restore, Export or Delete. Esc returns to the archive list.
+backups_origin	Origin: %s
+backups_date	Created (UTC): %s
+backups_size	Archive size: %s MiB
+backups_target	Target version of the operation that created it: %s
+backups_verified	✓ Checksums and archive contents verified: %s
+backups_invalid	Verification failed or the archive is damaged. Verify it again before restoring.
+backups_unverified	Pending verification of this file.
+backups_recovery_point	Recovery point recorded by the manager.
+backups_verify	Verify integrity · no restoration
+backups_restore	Restore this backup
+backups_export	Export a verified copy
+backups_delete	Delete this backup
+backups_return	Return to the archive list
+backups_delete_hint	Selected: %s. Type DELETE to permanently remove this archive. Application data stays in place.
+backups_delete_word	Type DELETE exactly, or press Esc to cancel.
+backups_protected	This archive is the recovery point of an incomplete operation. Complete recovery before deleting it.
+backups_export_hint	Enter the full destination file path, for example /mnt/backup/%s. The parent folder must exist; existing files are never overwritten.
+backups_bad_destination	Choose a new absolute file path in an existing directory.
+backups_check_done	Verification completed. Read the integrity result below.
+backups_deleted	The selected archive was deleted. Other backups and application data were preserved.
+backups_exported	Verified copy saved at: %s
+backups_step_inspect	Reading backup details
+backups_step_verify	Checking archive structure and every checksum
+backups_step_export	Verifying and exporting the backup
+backups_step_delete	Removing the selected backup
+backup_origin_manual	Manual
+backup_origin_update	Before GLPI update
+backup_origin_migrate	Before branch migration
+backup_origin_db-update	Before MySQL update
+backup_origin_refresh-image	Before image refresh
+backup_origin_transfer	Server transfer
+backup_origin_unknown	Not recorded
+update_branch_available	GLPI %s is also available in the next branch. Open Update GLPI / change branch to review it with migration warnings.

@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.state/
+.tools/
+tests/.runtime/
+*.log
+*.sql
+*.tar.gz
+*.pem
+*.key
+__pycache__/
+*.pyc
+!tests/fixtures/

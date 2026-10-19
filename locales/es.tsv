@@ -1,0 +1,379 @@
+interactive_required	Esta operación necesita una terminal interactiva. Ejecuta ./start.sh desde una terminal.
+invalid	Valor no válido: %s
+bad_path	El directorio de estado debe ser absoluto, distinto de / y no ser un enlace simbólico.
+permissions	No se puede acceder a %s. Ejecuta el gestor con sudo o elige un --state-dir con permisos.
+need_sudo	Se requieren permisos administrativos. Instala/habilita sudo con tu administrador o ejecuta el gestor desde una sesión root.
+admin_required	ADVERTENCIA: La instalación y administración requieren sudo/root. No se ha iniciado ninguna instalación ni cambio del sistema.
+admin_command	Ejecuta este comando o utiliza una sesión root:
+admin_retry_notice	El comando administrativo falló. Revisa su salida, resuelve el problema indicado y vuelve a intentarlo en este asistente.
+locked	Otro proceso del gestor está operando sobre esta instalación.
+failed	La operación falló en %s. Este mensaje no incluye credenciales.
+recovery_notice	Hay una operación incompleta registrada en %s. Usa recover o restore; los servicios pueden seguir detenidos.
+password_prompt	Escribe tu contraseña o déjala vacía para generarla. Sin longitud mínima.
+bad_password	Las contraseñas no pueden contener caracteres de control.
+bad_root_password	La inicialización root oficial de MySQL no admite de forma segura comillas ni barras inversas. Usa otra contraseña de administrador sin esos caracteres o pulsa Enter para generarla. La contraseña de aplicación sí los admite.
+destructive	Esta operación cambia datos existentes. Escribe exactamente %s para continuar:
+cancelled	Cancelado.
+dependencies	Faltan dependencias:%s
+install_dependencies	¿Instalar las dependencias indicadas con el gestor de paquetes detectado? [s/N]
+manual_dependencies	Instala curl, jq, openssl, tar, gzip, coreutils, util-linux e iproute2 manualmente y vuelve a ejecutar.
+docker_service_stopped	El motor local de Docker no responde. Se iniciará su servicio existente y se volverá a comprobar; sudo puede pedir tu contraseña.
+docker_retry_confirm	Después de revisar las instrucciones, ¿reintentar y continuar este asistente? [s/N]
+docker_start_failed	Docker no pudo iniciarse o sigue sin estar disponible. Con systemd, revisa: sudo systemctl status docker --no-pager ; sudo journalctl -u docker -n 50 --no-pager . Con service, revisa: sudo service docker status . Resuelve el problema del motor/socket indicado y vuelve a ejecutar el gestor.
+docker_context_help	El endpoint actual es %s. Para Docker rootless, prueba: systemctl --user start docker ; docker info . Para Docker Desktop, inicia Desktop y verifica su integración/contexto Linux. El gestor no puede iniciar el servicio predeterminado del anfitrión para un socket personalizado. Consulta https://docs.docker.com/engine/security/rootless/
+docker_plugins_missing	Docker funciona, pero falta Compose V2 o Buildx. El gestor puede instalar los paquetes de plugins disponibles en tus repositorios configurados.
+docker_plugins_confirm	¿Instalar los plugins Docker que faltan mediante el gestor de paquetes detectado? [s/N]
+docker_plugins_manual	No se encontraron paquetes de plugins compatibles en los repositorios configurados. Sigue https://docs.docker.com/compose/install/linux/ y https://docs.docker.com/build/install/buildx/ ; comprueba docker compose version y docker buildx version y vuelve a ejecutar.
+plugin_packages	Paquetes de plugins: %s
+compose_missing	Instala el plugin Docker Compose V2. Consulta https://docs.docker.com/compose/install/linux/
+buildx_missing	Instala el plugin Docker Buildx para verificar digests y arquitecturas: https://docs.docker.com/build/install/buildx/
+manual_docker	La instalación automática de Docker no está documentada para esta distribución. Instala Docker Engine, Buildx y Compose siguiendo las instrucciones de tu distribución: https://docs.docker.com/engine/install/ . Después vuelve a ejecutar; se permiten distribuciones fuera de la lista.
+docker_plan	Se instalarán Docker Engine, Buildx y Compose para %s. Procedimiento: %s . No se eliminarán paquetes existentes que entren en conflicto.
+install_docker	¿Instalar Docker mediante el procedimiento mostrado? [s/N]
+repository_exists	Ya existe un archivo de repositorio Docker del gestor. Revísalo antes de reintentar.
+daemon_manual	Inicia el servicio Docker con el sistema de inicio de tu distribución y vuelve a ejecutar.
+linux_only	Ejecuta este gestor en Linux con Bash 4.4 o posterior.
+architecture	Las arquitecturas de imagen admitidas inicialmente son amd64 y arm64.
+remote_docker	Utiliza un Docker Engine/contexto local. Un servidor remoto no puede acceder a estas rutas de configuración.
+detected	Sistema: %s · %s
+resources	RAM: %s MiB; disco disponible para estado: %s MiB.
+low_resources	Se requieren al menos 1 GiB de RAM y 2 GiB de disco disponible.
+resource_warning	¿Cómo quieres continuar con los recursos disponibles?
+release_limit	La paginación de versiones superó el límite de seguridad. No se aceptó la lista.
+support_unknown	No se pudo verificar automáticamente el soporte. Revisa https://github.com/glpi-project/glpi/security/policy
+release_notes	Notas oficiales de GLPI %s: %s
+security_release	VERSIÓN DE SEGURIDAD: el proyecto recomienda actualizar. Revisa las correcciones de seguridad y los avisos importantes en las notas oficiales que aparecen a continuación.
+production_http_warning	Elegiste HTTP para producción. Configura HTTPS o un proxy TLS externo de confianza antes de exponer las sesiones de los usuarios. ¿Continuar con HTTP? [s/N]
+glpi10_warning	ADVERTENCIA: GLPI 10 está fuera del soporte ordinario tras GLPI 12. Se anunció 10.0.28 como última versión de la rama 10.0. No se esperan más correcciones ordinarias de errores o seguridad. Consulta https://www.glpi-project.org/en/glpi-12/ . Las notas anteriores pueden describir la política en su fecha de publicación.
+unsupported_confirm	¿Seguir utilizando esta rama sin soporte después de revisar la advertencia? [s/N]
+older_release	Existe una versión estable posterior en esta rama: %s. Los parches antiguos pueden carecer de correcciones de seguridad.
+choose_version	¿Qué versión de GLPI quieres instalar?
+more_versions	Otra versión estable…
+exact_version	Versión estable exacta:
+selection	Selección:
+image_missing	No se pudo verificar una imagen oficial compatible para %s. Revisa conexión, límites del registro y arquitectura.
+not_installed	No existe una instalación administrada en este directorio. Usa install o restore.
+foreign_resource	El recurso %s no pertenece a esta instalación. Se rechaza su uso.
+unhealthy	El servicio %s no alcanzó un estado saludable. Revisa registros y el diario de recuperación.
+services_required	GLPI y MySQL deben estar ejecutándose para esta operación.
+cert_instructions	Coloca el certificado PEM seguido de los certificados intermedios en %s y su clave privada PEM correspondiente, sin contraseña, en %s. El directorio es privado; no guardes claves en Git. Después vuelve a configurar HTTPS. Convierte primero los PFX/PKCS12; consulta docs/https.md.
+acme_ports	El modo ACME automático requiere los puertos 80 y 443 del servidor. Para otros puertos utiliza certificados importados.
+acme_requirements	Para %s: apunta los registros DNS públicos A/AAAA a este servidor; permite TCP 80/443 entrante y HTTPS saliente; elimina registros AAAA incorrectos. Caddy gestiona la emisión y renovación.
+self_signed	Se generó automáticamente un certificado autofirmado: %s. Importa solo este certificado en la confianza de tus equipos; conserva la clave privada en secreto.
+tls_prompt	¿Cómo quieres proteger el acceso a GLPI?
+hostname_prompt	Dominio público o dirección IPv4 (sin protocolo, ruta ni puerto):
+welcome	GLPI Docker Manager
+language_prompt	Idioma / Language: en / es:
+first_action	¿Qué quieres hacer?
+major_prompt	Selecciona la rama de GLPI:
+mode_prompt	¿Para qué utilizarás esta instalación?
+port_prompt	Puerto HTTP del servidor:
+https_port_prompt	Puerto HTTPS del servidor:
+timezone_prompt	Zona horaria IANA, por ejemplo America/Guayaquil:
+db_name_prompt	Nombre de la base de datos:
+db_user_prompt	Usuario de aplicación de la base de datos:
+expose_prompt	¿Exponer el puerto de la base de datos para conexiones externas?
+storage_notice	Los datos de GLPI y MySQL quedan dentro de la carpeta de instalación, montados mediante volúmenes Docker persistentes etiquetados.
+root_password	Elige la contraseña independiente del administrador de MySQL.
+install_confirm	¿Crear la configuración y desplegar esta instalación? [s/N]
+ready	Abre GLPI en tu navegador: %s
+port_busy	Un puerto necesario del servidor ya está ocupado: %s
+install_exists	Ya existe una instalación. Se conservaron configuración y credenciales.
+install_resume	La configuración existe pero la instalación no terminó. ¿Reanudarla sin regenerar credenciales? [s/N]
+backup_started	Se detendrán GLPI y sus tareas automáticas para un respaldo consistente. El acceso estará interrumpido durante esta operación.
+backup_ready	Respaldo terminado y sumas verificadas: %s . Contiene secretos; guarda una copia privada fuera del servidor.
+backup_invalid	El respaldo no pasó la validación. No se intentó restaurarlo.
+backup_list	Respaldos disponibles:
+backup_path	Ruta absoluta al archivo de respaldo:
+restore_effect	La restauración crea volúmenes vacíos con las versiones originales del respaldo. Conserva los volúmenes anteriores. Se detendrán los servicios actuales; las escrituras posteriores no se combinarán.
+restore_done	Restauración verificada. Se conservaron los volúmenes anteriores. Revisa dirección, HTTPS/DNS e integraciones antes de cambiar el tráfico.
+transfer	GLPI y sus tareas automáticas del origen quedan DETENIDOS en el momento de este respaldo. Copia %s de forma privada al destino, clona allí el repositorio y ejecuta ./start.sh restore. Verifica dirección, certificados, usuarios, datos e integraciones antes de cambiar DNS. Conserva el origen detenido mientras el destino esté activo. Para cancelar el traslado, ejecuta ./start.sh start en el origen.
+transfer_confirm	¿Preparar el respaldo final de traslado y dejar GLPI detenido para evitar escrituras divergentes o tareas duplicadas? [s/N]
+backup_space	No hay espacio suficiente para respaldar y verificar. Libera espacio o traslada el directorio de estado a un disco mayor.
+update_current	GLPI instalado: %s → versión seleccionada: %s.
+update_none	No existe una versión estable posterior en esta rama.
+update_confirm	¿Crear un respaldo nuevo y actualizar GLPI a la versión seleccionada? [s/N]
+migration_warning	Una migración principal exige revisar plugins, inventario, integraciones API y notas de versión. GLPI 12 cambia permisos de la base de conocimiento y manejo del proxy. El ensayo usa volúmenes aislados, sin puertos publicados ni red exterior; las tareas automáticas están desactivadas. Aún es necesaria una revisión funcional.
+migration_review	¿Revisaste la compatibilidad de plugins y los requisitos de migración de la versión destino? [s/N]
+rehearsal_ok	La migración de base de datos y comprobación del esquema en la copia aislada fueron correctas. Esto no certifica plugins ni integraciones.
+updated	Actualización verificada. GLPI actual: %s.
+db_update_warning	El mantenimiento MySQL se limita a la serie 8.4 registrada. Prueba el destino sobre un respaldo y programa una interrupción. Cambiar la imagen del motor puede modificar sus archivos de datos.
+db_update_confirm	¿Respaldar y aplicar el parche MySQL seleccionado? [s/N]
+config_confirm	¿Aplicar este cambio de configuración? Los servicios pueden reiniciarse brevemente. [s/N]
+config_restored	Se restauró la configuración anterior al fallar la validación. Revisa registros antes de reintentar.
+credentials_warning	Las credenciales de base están ocultas. ¿Mostrarlas en esta terminal? [s/N]
+credentials_note	Son credenciales de base de datos, distintas de las cuentas web GLPI. Editar .env no cambia las contraseñas existentes en MySQL.
+menu	\n  GLPI Docker Manager\n  1) Estado                 2) Iniciar              3) Detener\n  4) Registros              5) Buscar versiones     6) Actualizar GLPI\n  7) Respaldo               8) Restaurar            9) HTTPS\n 10) Publicación MySQL     11) Credenciales         12) Traslado\n 13) Migración principal   14) Parche MySQL         15) Idioma\n 16) Diagnóstico           17) Renovar imagen GLPI  18) Recuperación\n  0) Salir\n
+help	Uso: ./start.sh [--lang en|es] [--state-dir /ruta/absoluta] [comando] [argumento]\nComandos: install [versión], status, start, stop, logs, check-updates, update [versión], refresh-image, migrate [versión], backup, backups, restore [archivo], transfer, address, https, db-exposure, credentials, db-update, language, diagnose, recover, version, help.\nSin comando abre el menú interactivo. Instalar Docker, restaurar, migrar y cambiar opciones sensibles requiere confirmación.\nEstado predeterminado: /opt/glpi-docker-manager . TLS importado: /opt/glpi-docker-manager/certs/custom/{fullchain.pem,privkey.pem} .
+stop_confirm	¿Detener GLPI y MySQL? [s/N]
+diagnose_note	El diagnóstico no muestra contraseñas. Los registros originales de Docker/GLPI pueden contener datos sensibles; revísalos antes de compartirlos.
+recover_prompt	Se interrumpió una operación. Revisa operation.json y los registros. Restaura un respaldo válido o escribe RESUME para comprobar la imagen/esquema actuales y reintentar la verificación. No se intentará revertir automáticamente la base de datos.
+recover_done	Se verificaron servicios y esquema actuales y se cerró el diario de operación.
+unknown_command	Comando desconocido: %s. Ejecuta ./start.sh help.
+update_boundary	Elige una versión posterior de la misma rama o la siguiente rama principal. No se permite retroceder ni saltar ramas principales.
+same_image	El digest de la imagen no ha cambiado.
+language_saved	Idioma guardado.
+ui_keys	↑ ↓ mover · Enter elegir · Esc cancelar
+ui_keys_short	↑ ↓ · Enter · Esc
+ui_yes	Sí
+ui_no	No
+ui_subtitle	Instala y administra GLPI, paso a paso.
+ui_checking	Comprobando el sistema y Docker…
+ui_prerequisites_done	✓ El sistema y Docker están listos. Puedes continuar.
+ui_first_title	Comencemos
+ui_first_body	Todavía no hay un GLPI instalado por este gestor. Elige una opción; el asistente te guiará durante la configuración.
+ui_install	Instalar GLPI
+ui_restore_backup	Restaurar un respaldo
+ui_exit	Salir
+ui_menu_prompt	Selecciona una acción:
+ui_pending_title	Una operación necesita atención
+ui_pending_body	La instalación aún no está lista. Retoma la configuración o revisa sus registros antes de continuar.
+ui_resume_install	Continuar la instalación
+ui_dashboard	Tu instalación de GLPI
+ui_status_running	En ejecución
+ui_status_stopped	Detenido
+ui_status_unknown	Estado no disponible
+ui_status	Servicio · Ver estado
+ui_start	Servicio · Iniciar
+ui_stop	Servicio · Detener
+ui_logs	Servicio · Ver registros
+ui_check_updates	Actualizaciones · Consultar versiones
+ui_update	Actualizaciones · Actualizar GLPI
+ui_backup	Datos · Crear un respaldo
+ui_https	Configuración · HTTPS y certificados
+ui_db_exposure	Configuración · Abrir o cerrar el puerto MySQL
+ui_credentials	Configuración · Ver credenciales de la base
+ui_transfer	Datos · Trasladar a otro servidor
+ui_migrate	Actualizaciones · Migrar a otra rama de GLPI
+ui_db_update	Actualizaciones · Actualizar parches MySQL
+ui_language	Configuración · Idioma
+ui_diagnose	Ayuda · Diagnosticar la instalación
+ui_refresh	Actualizaciones · Renovar la misma imagen GLPI
+ui_recover	Ayuda · Recuperar una operación interrumpida
+ui_mode_test	Pruebas
+ui_mode_production	Producción
+ui_tls_off	Solo HTTP
+ui_tls_self-signed	HTTPS autofirmado · generar automáticamente
+ui_tls_acme	HTTPS público · Let's Encrypt · renovación automática
+ui_tls_custom	HTTPS · importar mis certificados PEM
+ui_releases_loading	Consultando las versiones oficiales de GLPI…
+ui_summary	Revisa tu instalación
+ui_environment	Entorno
+ui_host	Dirección del servidor
+ui_database	Base de datos / usuario
+ui_db_public	Publicado en 3306:3306
+ui_db_private	Solo acceso interno
+ui_secrets_hidden	Las contraseñas están protegidas y no se muestran aquí.
+ui_install_success	✓ GLPI instalado y verificado
+ui_initial_account	Primer acceso: usuario glpi · contraseña glpi
+ui_next_steps	Cambia las contraseñas web predeterminadas de GLPI. Vuelve a ejecutar el gestor para administrar esta instalación.
+ui_step_volumes	Preparando el almacenamiento persistente
+ui_step_images	Descargando las imágenes oficiales
+ui_step_plugins	Preparando los directorios de la aplicación
+ui_step_database	Iniciando y comprobando MySQL
+ui_step_install	Instalando la base de datos de GLPI
+ui_step_requirements	Comprobando los requisitos de GLPI
+ui_step_services	Iniciando GLPI y el acceso web
+ui_step_verify	Verificando servicios, base de datos y acceso
+ui_working	Trabajando…
+ui_step_done	Completado
+ui_error_log	Detalles de esta etapa: %s
+ui_continue	Pulsa Enter para volver al menú…
+ui_bad_port	Escribe un número de puerto entre 1 y 65535.
+ui_bad_identifier	Usa hasta 32 letras, números o guiones bajos, empezando por una letra.
+ui_bad_db-user	Usa hasta 32 letras, números o guiones bajos, empezando por una letra. El usuario de la aplicación debe ser distinto de root.
+ui_bad_timezone	Escribe una zona IANA instalada, por ejemplo UTC o America/Guayaquil.
+ui_bad_hostname	Escribe un dominio o IPv4, sin http://, rutas ni puertos.
+ui_plain_keys	Escribe el número de una opción y pulsa Enter.
+ui_invalid_choice	Elige uno de los números de opción mostrados.
+ui_release_prompt	Las notas oficiales están disponibles. ¿Cómo quieres continuar?
+ui_release_continue	Continuar la configuración
+ui_release_details	Leer las notas completas de la versión
+ui_continue_setup	Pulsa Enter para continuar la configuración…
+ui_app_password	GLPI_DB_PASSWORD · Contraseña de la base de GLPI
+ui_root_password	MYSQL_ROOT_PASSWORD · Contraseña del administrador MySQL
+ui_password_keys	Tab: mostrar / ocultar · Enter: continuar · Ctrl+U: borrar
+ui_password_visible	Visible
+ui_password_hidden	Oculta
+ui_password_saved	Contraseña aceptada
+ui_default_value	Predeterminado: %s · Enter para conservarlo
+ui_defaults_title	Configuración habitual
+ui_settings_prompt	¿Conservar estos valores o personalizarlos?
+ui_settings_defaults	Conservar valores · elegir solo mis contraseñas
+ui_settings_custom	Personalizar puertos, zona horaria, base y usuario
+ui_continue_install	Continuar con la instalación de GLPI
+ui_back_menu	Volver al menú principal
+resource_reference	Referencia de dimensionamiento: 4 GiB de RAM y 10 GiB libres. Las necesidades dependen del uso; siempre se instala el mismo GLPI.
+docker_storage_space	Sistema de archivos %s: %s MiB libres; esta operación estima %s MiB, incluidos 512 MiB de margen.
+docker_storage_unavailable	No se puede inspeccionar la ruta del motor %s desde este entorno. Comprueba espacio e inodos libres en el equipo que ejecuta Docker antes de instalar.
+storage_insufficient	Espacio insuficiente en %s: esta operación estima %s MiB y hay %s MiB disponibles. Libera o amplía capacidad antes de reintentar.
+storage_inodes	Quedan muy pocos inodos libres en %s. Revisa el sistema de archivos antes de continuar; los datos Docker existentes se conservaron.
+storage_temporary	El almacenamiento Docker %s está en un sistema de archivos temporal o de solo lectura. Instala Linux en un disco persistente antes de desplegar GLPI.
+host_io_error	Se detectó un error Input/output del sistema. No se pudieron leer o escribir archivos; la instalación se ha detenido.
+host_readonly	El sistema indicó que el sistema de archivos es de solo lectura. La instalación se ha detenido.
+host_no_space	El sistema indicó que no queda espacio en el dispositivo. Comprueba capacidad e inodos libres en los sistemas de archivos de Docker y containerd.
+host_storage_steps	Revisa el registro del paso y el almacenamiento desde el host o hipervisor. Si funcionan las herramientas, comprueba df -h, df -i y los registros del kernel. Si fallan incluso ls/sudo, usa el hipervisor o un entorno de rescate. Retoma solo cuando el almacenamiento esté operativo.
+cleanup_deferred	Pueden quedar archivos temporales privados en %s porque no se pudo completar su limpieza. Revísalos cuando recuperes el acceso al almacenamiento.
+ui_db_access_title	Acceso de red a la base de datos
+ui_db_access_body	GLPI se conecta internamente a MySQL sin publicar puertos. Exponerlo publica el puerto 3306 del servidor para clientes externos; siguen aplicando las reglas de firewall y red.
+ui_db_access_later	Podrás abrir o cerrar este puerto después desde el gestor.
+ui_db_expose_yes	Sí · exponer MySQL en el puerto 3306 del servidor
+ui_db_expose_no	No · mantener MySQL interno para GLPI
+ui_letsencrypt_title	Certificado público de Let's Encrypt
+ui_letsencrypt_body	Para una VPS o servidor accesible públicamente con dominio propio: Caddy solicitará y renovará automáticamente el certificado de Let's Encrypt.
+ui_letsencrypt_ports	Apunta el dominio a este servidor y permite TCP 80/443 entrante. Se usarán esos puertos para HTTP/HTTPS. Escribe el dominio a continuación.
+setup_title	Configuración de la instalación
+setup_intro	Edita cualquier fila con Enter. Los valores por defecto están listos; debes confirmar ambas contraseñas. MySQL interno: db:3306.
+setup_host	Dirección de acceso / IP
+setup_http	Puerto HTTP
+setup_https	Puerto HTTPS
+setup_timezone	Zona horaria
+setup_tls	Certificado HTTPS
+setup_exposure	Acceso externo a MySQL
+setup_database	Nombre de la base
+setup_user	Usuario de la base
+setup_pending	pendiente
+setup_invalid	por corregir
+setup_default	por defecto
+setup_valid	validado
+setup_secret_set	Introducida y confirmada
+setup_secret_empty	Enter para escribir o generar
+setup_password_required	Escribe una contraseña o genérala con Enter.
+setup_continue	Continuar · Revisar instalación
+setup_deploy	Instalar ahora
+setup_return_edit	← Volver a la configuración
+setup_version_back	← Cambiar versión de GLPI
+setup_cancel	Cancelar instalación
+setup_cancel_confirm	¿Salir de la configuración sin instalar?
+setup_form_help	↑ ↓ elige un campo; Enter lo edita y te devuelve aquí. Las claves no se muestran en el resumen. Desplázate para ver todos los campos.
+setup_keys	↑ ↓ mover · Enter elegir · Esc volver
+setup_search_keys	Escribe para buscar · ↑ ↓ mover · Enter elegir · Esc volver
+setup_edit_keys	Enter guardar · Esc descartar cambios · Ctrl+U borrar
+setup_edit_hint	Edita el valor actual y pulsa Enter para validarlo. Esc regresa sin cambiarlo.
+setup_saved	✓ %s guardado. Puedes editar otro campo o continuar.
+setup_timezone_area	Zona horaria · Elige una región
+setup_timezone_city	Zona horaria · Elige una ciudad
+setup_timezone_help	Elige una zona IANA. Busca por región o ciudad; Esc regresa a la lista anterior.
+setup_search	Buscar: %s
+setup_no_matches	Sin coincidencias. Retroceso permite borrar la búsqueda.
+setup_plain_choice	Número, texto para buscar, Enter para elegir o b para volver:
+setup_network_hint	Dirección detectada: %s. Si es localhost, escribe la IP del servidor para acceder desde la red. También puedes escribir un dominio.
+setup_port_conflict	HTTP y HTTPS deben usar puertos distintos; el MySQL externo utiliza 3306.
+setup_public_domain	Let's Encrypt necesita un dominio público, no una IP, localhost ni un nombre .local.
+setup_tls_help	Let's Encrypt usa un dominio público y los puertos 80/443. Los autofirmados se generan automáticamente. Importa tus PEM en el directorio de certificados configurado.
+setup_access	Acceso: %s
+setup_review_hint	Revisa antes de instalar. Elige cualquier dato para volver a su configuración; todavía no se ha desplegado nada.
+setup_review_keys	Enter instala solo sobre Instalar ahora. Elige Volver a la configuración o pulsa Esc para corregir datos.
+setup_loading_images	Resolviendo las imágenes oficiales de MySQL y del proxy antes de abrir la configuración…
+ui_service_ready	✓ GLPI está iniciado y verificado
+ui_service_starting	Iniciando y comprobando tu instalación de GLPI
+ui_service_checking	Comprobando servicios, base de datos y acceso web
+ui_service_stopped	GLPI está detenido. ¿Cómo quieres continuar?
+ui_service_start_now	Iniciar y verificar GLPI
+ui_service_keep_stopped	Conservar detenido y abrir el menú
+ui_service_health	Salud
+ui_service_ports	Puertos publicados
+ui_service_internal	Solo red interna
+ui_service_missing	Sin crear / inicialización pendiente
+ui_status_details	Estado de los servicios y acceso
+ui_status_back	Volver al menú
+ui_logs_details	Registros de servicios · desplázate para leer
+ui_status_starting	Iniciando / comprobando salud
+ui_status_unhealthy	Requiere atención · servicio sin salud
+setup_standard_ports	Usar puertos habituales · HTTP 80 / HTTPS 443
+setup_apply	Aplicar cambios y verificar el acceso
+menu_status	Estado de servicios
+menu_start	Iniciar / verificar GLPI
+menu_stop	Detener servicios
+menu_logs	Ver registros de servicios
+menu_update	Actualizar GLPI / cambiar rama
+menu_versions	Consultar versiones disponibles
+menu_backup	Crear respaldo
+menu_restore	Restaurar un respaldo
+menu_address	IP / puertos / zona horaria
+menu_https	HTTPS y certificados
+menu_exposure	Exponer / cerrar puerto MySQL
+menu_credentials	Ver credenciales de la base
+menu_transfer	Trasladar a otro servidor
+menu_database_update	Actualizar parches MySQL
+menu_language	Cambiar idioma
+menu_diagnose	Diagnosticar instalación
+menu_refresh	Renovar imagen actual
+menu_recover	Recuperar operación pendiente
+menu_backups	Administrar respaldos
+setup_access_intro	Edita un campo con Enter y regresa aquí tras cada cambio. Los servicios se reinician solo al aplicar la configuración revisada.
+setup_access_review_hint	Revisa los cambios antes de reiniciar los servicios.
+setup_access_review_keys	Enter aplica solo sobre Aplicar cambios. Elige Volver a la configuración o pulsa Esc para corregir datos.
+update_step_apply	Aplicando la actualización y verificando GLPI
+settings_step_apply	Aplicando la configuración y verificando el acceso web
+service_step_stop	Deteniendo los servicios
+service_stopped_done	Servicios detenidos. Elige Iniciar para volver a acceder a GLPI.
+backup_step_restore	Restaurando el respaldo en volúmenes nuevos y verificando GLPI
+backup_selected	Respaldo seleccionado · revisa antes de restaurar
+backup_none	Todavía no hay respaldos guardados aquí.
+ui_health_ok	Verificada
+menu_all_options	Todas las acciones · ← → cambia columna · ↑ ↓ mueve · Enter elige
+menu_state_path	Configuración: %s/current
+menu_backups_path	Respaldos: %s
+update_latest	GLPI instalado: %s; última versión estable de la misma rama: %s.
+update_images_unavailable	Hay versiones posteriores, pero no se pudo verificar ninguna imagen compatible. Revisa el acceso al registro y la arquitectura antes de reintentar.
+update_no_patches	No quedan parches posteriores instalables en esta rama. Puedes elegir una migración explícita a la siguiente rama en la lista.
+backup_choose_other	Elegir un archivo desde otra ruta
+backup_choose_help	Selecciona un respaldo, incluidos los creados antes de actualizar. Se verificará su contenido antes de pedir RESTORE; los volúmenes actuales se conservan.
+backup_recovery_ready	✓ Respaldo de recuperación disponible
+backup_recovery_help	Para regresar a este respaldo, abre Restaurar un respaldo en el menú y elige este archivo. Se usarán volúmenes nuevos y las versiones GLPI/MySQL registradas.
+update_step_backup	Creando un respaldo de recuperación
+update_step_rehearsal	Ensayando la actualización en una copia restaurada y aislada
+update_loading	Comprobando las imágenes oficiales disponibles para actualizar
+update_same_branch	Misma rama
+update_new_branch	Nueva rama · aviso y ensayo de migración
+update_select_title	Actualizaciones de GLPI disponibles
+update_select_help	Elige cualquier versión posterior con imagen disponible. Puedes actualizar una por una. Una rama nueva requiere ensayo aislado y confirmación explícita.
+update_select_prompt	¿Qué versión quieres instalar?
+setup_access_title	Configuración del acceso web
+layout_code_conflict	No se puede reemplazar una ruta existente ajena al gestor: %s. Aparta esa carpeta o elige otra raíz de instalación.
+layout_checkout_in_root	Conserva el repositorio descargado fuera de %s o dentro de su subcarpeta manager/. La raíz contiene datos privados; el asistente instala allí el código operativo automáticamente.
+layout_entrypoint	Abre el gestor instalado con: sudo %s
+storage_image_cached	Imagen ya descargada: %s. No necesita espacio adicional de descarga.
+storage_image_estimate_unknown	No se pudo consultar el tamaño de las capas de %s; se estiman 2048 MiB para esta imagen que falta.
+backup_estimate	Datos sin comprimir estimados: %s MiB. Espacio de trabajo y margen: %s MiB. Disponible: %s MiB. El tamaño final depende de la compresión.
+backup_manual_done	✓ Respaldo manual creado y verificado
+backup_transfer_done	✓ Respaldo de traslado creado y verificado
+backup_manual_help	Abre Administrar respaldos para ver detalles, verificar, exportar, restaurar o eliminar este archivo.
+backups_overview	Administrar respaldos · %s archivos · %s MiB
+backups_help	Elige un archivo para ver sus detalles y administrar el respaldo. Los archivos se conservan hasta que elimines uno explícitamente.
+backups_details	Detalles y acciones del respaldo
+backups_detail_help	Elige Verificar, Restaurar, Exportar o Eliminar. Esc regresa a la lista de archivos.
+backups_origin	Origen: %s
+backups_date	Creado (UTC): %s
+backups_size	Tamaño del archivo: %s MiB
+backups_target	Versión de destino de la operación que lo creó: %s
+backups_verified	✓ Contenido y sumas de comprobación verificados: %s
+backups_invalid	La verificación falló o el archivo está dañado. Vuelve a verificarlo antes de restaurar.
+backups_unverified	Pendiente de verificar este archivo.
+backups_recovery_point	Punto de recuperación registrado por el gestor.
+backups_verify	Verificar integridad · sin restaurar
+backups_restore	Restaurar este respaldo
+backups_export	Exportar una copia verificada
+backups_delete	Eliminar este respaldo
+backups_return	Volver a la lista de archivos
+backups_delete_hint	Seleccionado: %s. Escribe DELETE para eliminar este archivo definitivamente. Los datos de GLPI se conservan.
+backups_delete_word	Escribe DELETE exactamente o pulsa Esc para cancelar.
+backups_protected	Este archivo es el punto de recuperación de una operación pendiente. Completa la recuperación antes de eliminarlo.
+backups_export_hint	Escribe la ruta completa del archivo de destino, por ejemplo /mnt/backup/%s. La carpeta debe existir; no se sobrescriben archivos.
+backups_bad_destination	Elige una ruta absoluta nueva dentro de una carpeta existente.
+backups_check_done	La comprobación terminó. Consulta el resultado de integridad a continuación.
+backups_deleted	Se eliminó el archivo seleccionado. Los demás respaldos y los datos de GLPI se conservaron.
+backups_exported	Copia verificada guardada en: %s
+backups_step_inspect	Consultando los detalles del respaldo
+backups_step_verify	Comprobando la estructura del archivo y todas sus sumas
+backups_step_export	Verificando y exportando el respaldo
+backups_step_delete	Eliminando el respaldo seleccionado
+backup_origin_manual	Manual
+backup_origin_update	Antes de actualizar GLPI
+backup_origin_migrate	Antes de cambiar de rama
+backup_origin_db-update	Antes de actualizar MySQL
+backup_origin_refresh-image	Antes de renovar la imagen
+backup_origin_transfer	Traslado de servidor
+backup_origin_unknown	Sin registrar
+update_branch_available	También está disponible GLPI %s en la siguiente rama. Abre Actualizar GLPI / cambiar rama para revisarla con los avisos de migración.

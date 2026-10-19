@@ -1,0 +1,10 @@
+.git
+.state
+.tools
+tests/.runtime
+**/__pycache__
+*.tar.gz
+*.sql
+*.pem
+*.key
+.env
