@@ -8,7 +8,8 @@
 # shellcheck disable=SC2016,SC2034,SC2153
 AUTO_BACKUP_KEEP=5
 PRE_BACKUP_KEEP=3
-LOG_RETENTION_DAYS=30
+# Log rotation: recommended values and the only ones offered (see logs_menu).
+LOG_DEFAULTS='manager_days=30 glpi_mb=20 glpi_days=30 container_mb=10 container_files=3 binlog_days=30'
 GDM_REPOSITORY=${GDM_REPOSITORY:-solqubit/glpi-docker-manager}
 
 # ---------------------------------------------------------------- schedule
@@ -18,13 +19,16 @@ GDM_REPOSITORY=${GDM_REPOSITORY:-solqubit/glpi-docker-manager}
 #   mode=days      every N days, counted from the newest automatic backup
 #   mode=weekdays  on the listed ISO weekdays (1 Monday … 7 Sunday)
 maintenance_settings() {
-    local file="$STATE/maintenance.json" values weekdays='' day
+    local file="$STATE/maintenance.json" values weekdays='' day logs=''
     MAINT_BACKUPS=false MAINT_HOUR=3 MAINT_MINUTE=0 MAINT_MODE=days MAINT_EVERY=1 MAINT_WEEKDAYS=''
+    log_settings_read ''
     [[ -r $file ]] || return 0
     values=$(jq -r '[(if .backups==true then "true" else "false" end), ((.hour // 3)|tostring), ((.minute // 0)|tostring),
         (if .mode=="weekdays" then "weekdays" else "days" end), ((.every // 1)|tostring),
-        ((.weekdays // [])|map(tostring)|join(","))] | join("\t")' "$file" 2>/dev/null) || return 0
-    IFS=$'\t' read -r MAINT_BACKUPS MAINT_HOUR MAINT_MINUTE MAINT_MODE MAINT_EVERY weekdays <<< "$values" || true
+        ((.weekdays // [])|map(tostring)|join(",")),
+        ((.logs // {})|to_entries|map("\(.key)=\(.value)")|join(" "))] | join("\t")' "$file" 2>/dev/null) || return 0
+    IFS=$'\t' read -r MAINT_BACKUPS MAINT_HOUR MAINT_MINUTE MAINT_MODE MAINT_EVERY weekdays logs <<< "$values" || true
+    log_settings_read "$logs"
     [[ $MAINT_BACKUPS == true ]] || MAINT_BACKUPS=false
     [[ $MAINT_HOUR =~ ^([01]?[0-9]|2[0-3])$ ]] || MAINT_HOUR=3
     [[ $MAINT_MINUTE =~ ^[0-5]?[0-9]$ ]] || MAINT_MINUTE=0
@@ -43,11 +47,36 @@ maintenance_write() {
     tmp=$(mktemp "$STATE/.maintenance.XXXXXX")
     jq -n --argjson backups "$MAINT_BACKUPS" --argjson hour "$MAINT_HOUR" --argjson minute "$MAINT_MINUTE" \
         --arg mode "$MAINT_MODE" --argjson every "$MAINT_EVERY" --argjson weekdays "$days" --argjson keep "$AUTO_BACKUP_KEEP" \
-        '{format:2,backups:$backups,hour:$hour,minute:$minute,mode:$mode,every:$every,weekdays:$weekdays,keep:$keep}' > "$tmp"
+        --argjson logs "$(log_settings_json)" \
+        '{format:2,backups:$backups,hour:$hour,minute:$minute,mode:$mode,every:$every,weekdays:$weekdays,keep:$keep,logs:$logs}' > "$tmp"
     mv -- "$tmp" "$STATE/maintenance.json"
 }
 # Compatibility with format 1 callers: maintenance_save BACKUPS HOUR.
 maintenance_save() { maintenance_settings; MAINT_BACKUPS=$1 MAINT_HOUR=$2; maintenance_write; }
+# Sets LOG_* from "key=value" pairs over the defaults; unknown or out-of-range
+# values fall back to the recommended ones.
+log_settings_read() {
+    local pair key value
+    LOG_MANAGER_DAYS=30 LOG_GLPI_MB=20 LOG_GLPI_DAYS=30 LOG_CONTAINER_MB=10 LOG_CONTAINER_FILES=3 LOG_BINLOG_DAYS=30
+    for pair in $1; do
+        key=${pair%%=*} value=${pair#*=}
+        [[ $value =~ ^[0-9]{1,3}$ ]] || continue
+        case $key in
+            manager_days) [[ " 7 14 30 90 " == *" $value "* ]] && LOG_MANAGER_DAYS=$value;;
+            glpi_mb) [[ " 10 20 50 " == *" $value "* ]] && LOG_GLPI_MB=$value;;
+            glpi_days) [[ " 7 14 30 90 " == *" $value "* ]] && LOG_GLPI_DAYS=$value;;
+            container_mb) [[ " 10 20 50 100 " == *" $value "* ]] && LOG_CONTAINER_MB=$value;;
+            container_files) [[ " 3 5 " == *" $value "* ]] && LOG_CONTAINER_FILES=$value;;
+            binlog_days) [[ " 1 3 7 30 " == *" $value "* ]] && LOG_BINLOG_DAYS=$value;;
+        esac
+    done
+    return 0
+}
+log_settings_json() {
+    jq -n --argjson manager_days "$LOG_MANAGER_DAYS" --argjson glpi_mb "$LOG_GLPI_MB" --argjson glpi_days "$LOG_GLPI_DAYS" \
+        --argjson container_mb "$LOG_CONTAINER_MB" --argjson container_files "$LOG_CONTAINER_FILES" --argjson binlog_days "$LOG_BINLOG_DAYS" \
+        '$ARGS.named'
+}
 maintenance_time_text() { printf '%02d:%02d\n' "$MAINT_HOUR" "$MAINT_MINUTE"; }
 # "every day", "every 3 days", "Monday to Friday", "every Monday", "Mon, Wed, Fri".
 maintenance_frequency_text() {
@@ -291,10 +320,10 @@ time_menu() {
     choose minute maint_minute_prompt "$((MAINT_MINUTE/15*15))" "${minutes[@]}" || return 1
     MAINT_HOUR=$hour MAINT_MINUTE=$minute
 }
-# Settings stay on screen with a preview of the next backup dates.
+# Settings in three clear sections with a preview of the next backup dates.
 schedule_menu() {
-    local action state scheduler toggle next=''
-    local -a runs=()
+    local action state toggle next=''
+    local -a runs=() scheduler_row=()
     while :; do
         maintenance_settings
         if [[ $MAINT_BACKUPS == true ]]; then
@@ -306,23 +335,31 @@ schedule_menu() {
             state=$(t maint_off) next='—'
             toggle=$(ui_opt primary "$(t maint_enable)" "$(t opt_maint_enable "$AUTO_BACKUP_KEEP")")
         fi
-        if scheduler_installed; then scheduler=$(t maint_scheduler_on "$(scheduler_kind)"); else scheduler=$(t maint_scheduler_missing); fi
+        # The scheduler row only appears when something is wrong with it.
+        scheduler_row=()
+        scheduler_installed || scheduler_row=("$(t maint_scheduler)"$'\t'"$(t maint_scheduler_missing)")
         ui_panel "$(t maint_title)" \
-            "$(t maint_backups)"$'\t'"$state" \
+            "§$(t maint_section_backups)" \
+            "$(t maint_state)"$'\t'"$state" \
             "$(t maint_frequency)"$'\t'"$(maintenance_frequency_text)" \
-            "$(t maint_time)"$'\t'"$(maintenance_time_text)" \
             "$(t maint_next)"$'\t'"$next" \
-            "$(t maint_keep)"$'\t'"$(t maint_coverage "$AUTO_BACKUP_KEEP" "$(maintenance_coverage_days)")" \
-            "$(t maint_scheduler)"$'\t'"$scheduler" \
-            "$(t maint_body "$AUTO_BACKUP_KEEP")"
+            "$(t maint_kept)"$'\t'"$(t maint_coverage "$AUTO_BACKUP_KEEP" "$(maintenance_coverage_days)")" \
+            "§$(t maint_section_task)" \
+            "$(t maint_time)"$'\t'"$(maintenance_time_text)" \
+            "$(t maint_task_does)"$'\t'"$(t maint_task_list)" \
+            "${scheduler_row[@]}" \
+            "§$(t maint_section_logs)" \
+            "$(t logs_summary_label)"$'\t'"$(t logs_summary "$LOG_GLPI_DAYS" "$LOG_BINLOG_DAYS")"
         choose action maint_prompt toggle toggle "$toggle" \
             frequency "$(ui_opt '' "$(t maint_frequency_option "$(maintenance_frequency_text)")" "$(t opt_maint_frequency)")" \
             time "$(ui_opt '' "$(t maint_time_option "$(maintenance_time_text)")" "$(t opt_maint_time)")" \
+            logs "$(ui_opt '' "$(t maint_logs_option)" "$(t opt_maint_logs)")" \
             run "$(ui_opt ok "$(t maint_run_now)" "$(t opt_maint_run)")" back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
         case $action in
             toggle) if [[ $MAINT_BACKUPS == true ]]; then MAINT_BACKUPS=false; else MAINT_BACKUPS=true; fi;;
             frequency) frequency_menu || continue;;
             time) time_menu || continue;;
+            logs) logs_menu; continue;;
             run) maintenance_run true; return;;
             *) exit 10;;
         esac
@@ -331,14 +368,92 @@ schedule_menu() {
         say maint_saved
     done
 }
+# One row per kind of log: where it lives, current value and the recommended one.
+logs_menu() {
+    local action recommended
+    recommended=$(t logs_recommended)
+    while :; do
+        maintenance_settings
+        ui_panel "$(t logs_title)" \
+            "$(t logs_manager)"$'\t'"$(t logs_days "$LOG_MANAGER_DAYS")$( (( LOG_MANAGER_DAYS == 30 )) && printf ' · %s' "$recommended")" \
+            "$(t logs_glpi)"$'\t'"$(t logs_glpi_value "$LOG_GLPI_MB" "$LOG_GLPI_DAYS")$( (( LOG_GLPI_MB == 20 && LOG_GLPI_DAYS == 30 )) && printf ' · %s' "$recommended")" \
+            "$(t logs_containers)"$'\t'"$(t logs_container_value "$LOG_CONTAINER_MB" "$LOG_CONTAINER_FILES")$( (( LOG_CONTAINER_MB == 10 && LOG_CONTAINER_FILES == 3 )) && printf ' · %s' "$recommended")" \
+            "$(t logs_binlog)"$'\t'"$(t logs_days "$LOG_BINLOG_DAYS")$( (( LOG_BINLOG_DAYS == 30 )) && printf ' · %s' "$recommended")" \
+            "$(t logs_history)"$'\t'"$(t logs_history_value)" \
+            "$(t logs_body)"
+        choose action logs_prompt manager \
+            manager "$(ui_opt '' "$(t logs_manager)" "$(t opt_logs_manager)")" \
+            glpi "$(ui_opt '' "$(t logs_glpi)" "$(t opt_logs_glpi)")" \
+            containers "$(ui_opt warn "$(t logs_containers)" "$(t opt_logs_containers)")" \
+            binlog "$(ui_opt warn "$(t logs_binlog)" "$(t opt_logs_binlog)")" \
+            back "$(ui_opt back "$(t ui_back_menu)")" || return 0
+        case $action in
+            manager) log_days_choice LOG_MANAGER_DAYS logs_days_prompt 30 || continue;;
+            glpi)
+                log_size_choice || continue
+                log_days_choice LOG_GLPI_DAYS logs_days_prompt 30 || continue;;
+            containers) log_container_choice || continue; log_apply_services || continue;;
+            binlog) log_binlog_choice || continue; log_apply_services || continue;;
+            *) return 0;;
+        esac
+        maintenance_write
+        say logs_saved
+    done
+}
+# Days to keep: 7 / 14 / 30 (recommended) / 90.
+log_days_choice() {
+    local variable=$1 prompt=$2 recommended=$3 value days
+    local -a options=()
+    for days in 7 14 30 90; do
+        if (( days == recommended )); then options+=("$days" "$(ui_opt primary "$(t logs_days "$days") · $(t logs_recommended)" "$(t opt_logs_days_default)")")
+        elif (( days < recommended )); then options+=("$days" "$(ui_opt '' "$(t logs_days "$days")" "$(t opt_logs_days_short)")")
+        else options+=("$days" "$(ui_opt '' "$(t logs_days "$days")" "$(t opt_logs_days_long)")"); fi
+    done
+    choose value "$prompt" "${!variable}" "${options[@]}" || return 1
+    printf -v "$variable" '%s' "$value"
+}
+log_size_choice() {
+    local value
+    choose value logs_size_prompt "$LOG_GLPI_MB" \
+        10 "$(ui_opt '' '10 MB' "$(t opt_logs_size_small)")" \
+        20 "$(ui_opt primary "20 MB · $(t logs_recommended)" "$(t opt_logs_size_default)")" \
+        50 "$(ui_opt '' '50 MB' "$(t opt_logs_size_large)")" || return 1
+    LOG_GLPI_MB=$value
+}
+log_container_choice() {
+    local value
+    choose value logs_container_prompt "$LOG_CONTAINER_MB:$LOG_CONTAINER_FILES" \
+        10:3 "$(ui_opt primary "$(t logs_container_value 10 3) · $(t logs_recommended)" "$(t opt_logs_container_default)")" \
+        20:3 "$(ui_opt '' "$(t logs_container_value 20 3)" "$(t opt_logs_container_more)")" \
+        50:5 "$(ui_opt '' "$(t logs_container_value 50 5)" "$(t opt_logs_container_more)")" \
+        100:5 "$(ui_opt warn "$(t logs_container_value 100 5)" "$(t opt_logs_container_large)")" || return 1
+    LOG_CONTAINER_MB=${value%%:*} LOG_CONTAINER_FILES=${value#*:}
+}
+log_binlog_choice() {
+    local value
+    choose value logs_binlog_prompt "$LOG_BINLOG_DAYS" \
+        1 "$(ui_opt '' "$(t logs_days 1)" "$(t opt_binlog_short)")" \
+        3 "$(ui_opt '' "$(t logs_days 3)" "$(t opt_binlog_short)")" \
+        7 "$(ui_opt '' "$(t logs_days 7)" "$(t opt_binlog_week)")" \
+        30 "$(ui_opt primary "$(t logs_days 30) · $(t logs_recommended)" "$(t opt_binlog_default)")" || return 1
+    LOG_BINLOG_DAYS=$value
+}
+# Container and MySQL limits live in the generated Compose file: save, then
+# render a new revision and restart the services (after confirmation).
+log_apply_services() {
+    confirm logs_restart_confirm || return 1
+    maintenance_write
+    ui_run 0 logs_step_apply tls_reapply
+}
 
 # ---------------------------------------------------------------- logs
 # Private stage/maintenance logs and the operation history never grow unbounded.
 logs_rotate() {
     local folder="$STATE/logs" file update
+    maintenance_settings
     if [[ -d $folder && ! -L $folder ]]; then
         find "$folder" -maxdepth 1 -type f \( -name 'install-*.log' -o -name 'install-*.status' -o -name 'maintenance-*.log' \) \
-            -mtime +"$LOG_RETENTION_DAYS" -delete 2>/dev/null || true
+            -mtime +"$LOG_MANAGER_DAYS" -delete 2>/dev/null || true
         find "$folder" -maxdepth 1 -type f -name 'install-*.log' -printf '%T@ %p\n' 2>/dev/null | sort -rn |
             tail -n +201 | cut -d' ' -f2- | while IFS= read -r file; do rm -f -- "$file"; done
     fi
@@ -368,14 +483,15 @@ backup_prune_auto() { backup_prune auto "$AUTO_BACKUP_KEEP"; }
 # events) lives in the database and is not affected.
 glpi_logs_rotate() {
     [[ -n $(dc ps --status running --quiet glpi) ]] || return 0
-    dc exec -T --user www-data glpi sh -c '
+    maintenance_settings
+    dc exec -T --user www-data -e "GDM_LOG_BYTES=$((LOG_GLPI_MB*1048576))" -e "GDM_LOG_DAYS=$LOG_GLPI_DAYS" glpi sh -c '
         stamp=$(date -u +%Y%m%d%H%M%S)
         for file in /var/glpi/_log/*.log; do
             [ -f "$file" ] || continue
-            [ "$(wc -c < "$file")" -gt 20971520 ] || continue
+            [ "$(wc -c < "$file")" -gt "$GDM_LOG_BYTES" ] || continue
             gzip -c "$file" > "$file.$stamp.gz" && : > "$file"
         done
-        find /var/glpi/_log -maxdepth 1 -type f -name "*.log.*.gz" -mtime +30 -delete' || say maint_glpi_logs_failed
+        find /var/glpi/_log -maxdepth 1 -type f -name "*.log.*.gz" -mtime +"$GDM_LOG_DAYS" -delete' || say maint_glpi_logs_failed
 }
 
 # ---------------------------------------------------------------- certificates

@@ -434,14 +434,10 @@ ui_db_unchanged	No change: MySQL access stays as it is.
 firewall_docker	Docker publishes port %s directly in iptables, bypassing ufw/firewalld rules. Restrict access in the DOCKER-USER chain or at your network firewall.
 compose_refresh	Applying container log size limits once; services restart briefly.
 maint_title	Automatic backups and maintenance
-maint_backups	Automatic backups
 maint_on	Enabled
 maint_off	Disabled
-maint_keep	Automatic backups kept
 maint_scheduler	Scheduler
-maint_scheduler_on	Installed (%s)
 maint_scheduler_missing	Not installed
-maint_body	The daily task also rotates logs and renews self-signed certificates, even on days without a backup. Only the %s newest automatic backups are kept; manual ones are never deleted automatically. A missed run (server off) is done at the next start.
 maint_prompt	What do you want to change?
 maint_enable	Enable automatic backups
 maint_disable	Disable automatic backups
@@ -646,11 +642,61 @@ opt_hour_quiet	Few people use GLPI at this time.
 opt_hour_work	Users lose access to GLPI for a few minutes while the backup runs.
 opt_hour_other	Check that nobody depends on GLPI at this time.
 maint_frequency	Frequency
-maint_time	Time
+maint_time	Runs at
 maint_next	Next backups
 maint_coverage	%s backups · about %s days of history
 maint_frequency_option	Frequency: %s
-maint_time_option	Time: %s
+maint_time_option	Time of the daily task: %s
 opt_maint_frequency	Every day, every few days, weekly, Monday to Friday or chosen weekdays.
 opt_maint_time	Hour and minute of the daily task; office hours are marked.
 maint_backup_not_due	No automatic backup due today; next: %s.
+maint_section_backups	Automatic backups
+maint_section_task	Daily maintenance task
+maint_section_logs	Logs
+maint_state	State
+maint_kept	Kept
+maint_task_does	Every day it
+maint_task_list	rotates logs, checks certificates and backs up when due
+logs_summary_label	Rotation
+logs_summary	GLPI %s days · MySQL binlog %s days · details in Log rotation
+maint_logs_option	Log rotation…
+opt_maint_logs	See and change how long each kind of log is kept.
+logs_title	Log rotation
+logs_recommended	recommended
+logs_manager	Manager logs
+logs_glpi	GLPI technical logs
+logs_containers	Container logs
+logs_binlog	MySQL binary logs
+logs_history	Operation history
+logs_days	%s days
+logs_glpi_value	rotate over %s MB · keep %s days
+logs_container_value	%s MB × %s files per service
+logs_history_value	last 1000 operations (fixed)
+logs_body	GLPI's audit history (who changed what) lives in its database and goes into every backup; none of these settings touch it.
+logs_prompt	Which log do you want to change?
+opt_logs_manager	Stage and maintenance logs of this manager (state/logs). Small; they help diagnose failures.
+opt_logs_glpi	PHP/SQL errors, cron and mail logs inside the GLPI volume. They grow fast when GLPI has errors.
+opt_logs_containers	Output of each container (docker logs). Changing it restarts the services for a few seconds.
+opt_logs_binlog	Every database change, inside the MySQL volume; can reach several GB with inventory agents. Changing it restarts the services.
+logs_days_prompt	How many days should be kept?
+opt_logs_days_default	Enough history to investigate an incident from last month.
+opt_logs_days_short	Less disk, but less history to investigate problems.
+opt_logs_days_long	More history, uses more disk.
+logs_size_prompt	Rotate a GLPI log when it exceeds…
+opt_logs_size_small	Smaller files; more compressed copies.
+opt_logs_size_default	Balanced: easy to open, few copies.
+opt_logs_size_large	Fewer copies, but large files are slow to read.
+logs_container_prompt	Log limit per container
+opt_logs_container_default	Up to 30 MB per service; enough for recent problems.
+opt_logs_container_more	More history of container output.
+opt_logs_container_large	Up to 500 MB per service: check that the disk can hold it.
+logs_binlog_prompt	How many days of MySQL binary logs?
+opt_binlog_short	Least disk. Backups are full copies, so restoring loses nothing.
+opt_binlog_week	A week of changes; moderate disk use.
+opt_binlog_default	MySQL default.
+logs_restart_confirm	Apply now? The services restart for a few seconds.
+logs_step_apply	Applying the new log limits
+logs_saved	✓ Log rotation saved
+restore_file	File
+restore_folder	Folder
+restore_section_plan	What will happen

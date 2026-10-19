@@ -100,4 +100,13 @@ touch -d '3 days ago' "$recent"
 backup_due
 [[ $(maintenance_frequency_text) == 'every 2 days' && $(maintenance_coverage_days) == 10 ]]
 [[ $(maintenance_next_runs 3 | wc -l) == 3 ]]
-printf 'PASS: backup rotation by kind, restore cleanup policy, free-space selection and backup schedules\n'
+# Log rotation: recommended defaults, only offered values, round trip.
+log_settings_read ''
+[[ $LOG_MANAGER_DAYS == 30 && $LOG_GLPI_MB == 20 && $LOG_GLPI_DAYS == 30 && $LOG_CONTAINER_MB == 10 && $LOG_CONTAINER_FILES == 3 && $LOG_BINLOG_DAYS == 30 ]]
+log_settings_read 'glpi_mb=50 binlog_days=3 container_mb=999 manager_days=x'
+[[ $LOG_GLPI_MB == 50 && $LOG_BINLOG_DAYS == 3 && $LOG_CONTAINER_MB == 10 && $LOG_MANAGER_DAYS == 30 ]]
+maintenance_write
+maintenance_settings
+[[ $LOG_GLPI_MB == 50 && $LOG_BINLOG_DAYS == 3 && $MAINT_MODE == days && $MAINT_EVERY == 2 ]]
+[[ $(jq -r '.logs.binlog_days' "$STATE/maintenance.json") == 3 ]]
+printf 'PASS: backup rotation by kind, restore cleanup policy, free-space selection, backup schedules and log rotation settings\n'

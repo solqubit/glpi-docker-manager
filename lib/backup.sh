@@ -133,7 +133,9 @@ restore_backup() {
             [[ -z $replaced ]] || note+=" $(t restore_replaces_kept "$replaced")"
         fi
     fi
-    ui_panel "$(t backup_selected)" "$archive" "$(t restore_effect)" "$note"
+    ui_panel "$(t backup_selected)" \
+        "$(t restore_file)"$'\t'"${archive##*/}" "$(t restore_folder)"$'\t'"${archive%/*}" \
+        "§$(t restore_section_plan)" "$(t restore_effect)" "$note"
     typed_confirm RESTORE
     local first=1/2 second=2/2
     if restore_can_backup; then

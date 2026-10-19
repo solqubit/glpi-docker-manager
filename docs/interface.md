@@ -146,7 +146,15 @@ tasks) stay in GLPI.
   lives in the database) are compressed with the date when they exceed 20 MiB
   and the compressed copies are deleted after 30 days. MySQL keeps its own
   30-day binary-log default.
-* **Container logs** are limited to 3 × 10 MiB per service. Older installations
+* **Log rotation** (inside *Automatic backups and maintenance*) lists every kind
+  of log with its current and recommended value, and changes the ones that grow:
+  manager logs (7/14/**30**/90 days), GLPI technical logs (rotate over 10/**20**/50
+  MB, keep 7/14/**30**/90 days), container logs (**10 MB × 3**, 20 × 3, 50 × 5,
+  100 × 5 per service) and MySQL binary logs (1/3/7/**30** days). Container and
+  binary-log changes render a new revision and restart the services after
+  confirmation. The operation history keeps the last 1000 entries. Values are
+  stored under `logs` in `maintenance.json`.
+* **Container logs** are limited to 3 × 10 MiB per service by default. Older installations
   get the limit once from *Start / verify GLPI* (brief restart).
 * **Certificates** shows the expiry date. Self-signed: renew now. Imported:
   replace the PEM files and reload. Let's Encrypt: Caddy renews automatically;

@@ -75,8 +75,17 @@ dotenv_line() {
     printf '%s' "$value" | jq -Rs .
 }
 config_render() {
-    local file=$1 dir=$2 major tls secure source_prefix
+    local file=$1 dir=$2 major tls secure source_prefix log_mb=10 log_files=3 binlog_days=30
     config_validate "$file"
+    # Container and MySQL binary-log limits from the root's maintenance.json
+    # (set in Log rotation); only the values that screen offers are accepted.
+    if [[ -r $STATE/maintenance.json ]]; then
+        read -r log_mb log_files binlog_days < <(jq -r '[(.logs.container_mb // 10), (.logs.container_files // 3),
+            (.logs.binlog_days // 30)] | map(tostring) | join(" ")' "$STATE/maintenance.json" 2>/dev/null) || true
+    fi
+    [[ " 10 20 50 100 " == *" $log_mb "* ]] || log_mb=10
+    [[ " 3 5 " == *" $log_files "* ]] || log_files=3
+    [[ " 1 3 7 30 " == *" $binlog_days "* ]] || binlog_days=30
     mkdir -p -- "$dir"
     cp -- "$file" "$dir/config.json"
     major=$(jq -r .major "$file"); tls=$(jq -r .tls "$file")
@@ -116,7 +125,8 @@ if (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
 EOF
     cp -- "$GDM_ROOT/templates/mysql-user.sh" "$dir/mysql-user.sh"
     cp -- "$GDM_ROOT/templates/wait-for-db.sh" "$dir/wait-for-db.sh"
-    jq -n --slurpfile s "$file" --arg root "$source_prefix" --argjson major "$major" '
+    jq -n --slurpfile s "$file" --arg root "$source_prefix" --argjson major "$major" \
+        --arg log_size "${log_mb}m" --arg log_files "$log_files" --argjson binlog_seconds "$((binlog_days*86400))" '
       $s[0] as $c |
       def mount($src;$dst): {type:"bind",source:$src,target:$dst,read_only:true,bind:{create_host_path:false,selinux:"Z"}};
       {name:$c.project,
@@ -152,8 +162,10 @@ EOF
             volumes:([mount($root+"/Caddyfile";"/etc/caddy/Caddyfile"),"caddy_data:/data","caddy_config:/config"] +
               (if $c.tls=="acme" then [] else [mount($root+"/tls";"/etc/gdm/tls")] end))}
         end
-      # Container logs rotate at 3 x 10 MiB per service instead of growing forever.
-      | .services |= with_entries(.value.logging={driver:"json-file",options:{"max-size":"10m","max-file":"3"}})
+      # Container logs rotate (default 3 x 10 MiB per service); MySQL binary logs
+      # expire after the chosen days (default 30, the MySQL default).
+      | .services |= with_entries(.value.logging={driver:"json-file",options:{"max-size":$log_size,"max-file":$log_files}})
+      | .services.db.command=["--binlog-expire-logs-seconds=\($binlog_seconds)"]
     ' > "$dir/compose.json"
     if [[ $tls != off ]]; then printf '\nauto_prepend_file = /etc/gdm/proxy.php\n' >> "$dir/php-uploads.ini"; fi
     chmod 600 "$dir/config.json" "$dir/compose.json" "$dir/.env"

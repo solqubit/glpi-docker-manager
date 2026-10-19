@@ -78,6 +78,7 @@ grep -q '^GLPI_DB_PORT="3306"$' "$STATE/revisions/unit/.env"
 grep -q '^GLPI_DB_NAME=' "$STATE/revisions/unit/.env"
 grep -q '^GLPI_DB_USER=' "$STATE/revisions/unit/.env"
 jq -e '.services.db.ports==null and .services.glpi.environment.GLPI_SKIP_AUTOUPDATE=="true" and .services.glpi.environment.GLPI_SKIP_AUTOINSTALL=="true" and .services.glpi.environment.MYSQL_ROOT_PASSWORD==null and .services.glpi.volumes[0]=="glpi_data:/var/glpi"' "$STATE/revisions/unit/compose.json" >/dev/null
+jq -e '.services.db.command==["--binlog-expire-logs-seconds=2592000"] and .services.glpi.logging.options["max-size"]=="10m" and .services.db.logging.options["max-file"]=="3"' "$STATE/revisions/unit/compose.json" >/dev/null
 jq '.expose_db=true | .major=10 | .glpi_version="10.0.28" | .glpi_image=(.glpi_image|sub("11.0.11";"10.0.28"))' "$STATE/input.json" > "$STATE/legacy.json"
 config_render "$STATE/legacy.json" "$STATE/revisions/legacy"
 jq -e '.services.db.ports==["3306:3306"] and (.services.glpi.volumes|index("marketplace:/var/www/glpi/marketplace"))!=null' "$STATE/revisions/legacy/compose.json" >/dev/null

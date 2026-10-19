@@ -434,14 +434,10 @@ ui_db_unchanged	Sin cambios: el acceso a MySQL se mantiene igual.
 firewall_docker	Docker publica el puerto %s directamente en iptables y se salta las reglas de ufw/firewalld. Restringe el acceso en la cadena DOCKER-USER o en el firewall de tu red.
 compose_refresh	Aplicando una vez los límites de tamaño de registros; los servicios se reinician brevemente.
 maint_title	Respaldos automáticos y mantenimiento
-maint_backups	Respaldos automáticos
 maint_on	Activados
 maint_off	Desactivados
-maint_keep	Respaldos automáticos guardados
 maint_scheduler	Programador
-maint_scheduler_on	Instalado (%s)
 maint_scheduler_missing	Sin instalar
-maint_body	La tarea diaria también rota registros y renueva certificados autofirmados, incluso los días sin respaldo. Solo se guardan los %s respaldos automáticos más recientes; los manuales nunca se eliminan solos. Si el servidor estaba apagado, la tarea pendiente se hace al arrancar.
 maint_prompt	¿Qué quieres cambiar?
 maint_enable	Activar respaldos automáticos
 maint_disable	Desactivar respaldos automáticos
@@ -646,11 +642,61 @@ opt_hour_quiet	A esta hora pocas personas usan GLPI.
 opt_hour_work	Los usuarios pierden el acceso a GLPI unos minutos mientras se respalda.
 opt_hour_other	Comprueba que nadie dependa de GLPI a esta hora.
 maint_frequency	Frecuencia
-maint_time	Hora
+maint_time	Se ejecuta a las
 maint_next	Próximos respaldos
 maint_coverage	%s respaldos · unos %s días de historia
 maint_frequency_option	Frecuencia: %s
-maint_time_option	Hora: %s
+maint_time_option	Hora de la tarea diaria: %s
 opt_maint_frequency	Cada día, cada pocos días, semanal, de lunes a viernes o días elegidos.
 opt_maint_time	Hora y minuto de la tarea diaria; las horas de oficina aparecen marcadas.
 maint_backup_not_due	Hoy no toca respaldo automático; próximo: %s.
+maint_section_backups	Respaldos automáticos
+maint_section_task	Tarea diaria de mantenimiento
+maint_section_logs	Registros
+maint_state	Estado
+maint_kept	Se conservan
+maint_task_does	Cada día
+maint_task_list	rota registros, revisa certificados y respalda cuando toca
+logs_summary_label	Rotación
+logs_summary	GLPI %s días · binlog MySQL %s días · detalle en Rotación de registros
+maint_logs_option	Rotación de registros…
+opt_maint_logs	Ver y cambiar cuánto se conserva cada tipo de registro.
+logs_title	Rotación de registros
+logs_recommended	recomendado
+logs_manager	Registros del gestor
+logs_glpi	Registros técnicos de GLPI
+logs_containers	Registros de contenedores
+logs_binlog	Binary logs de MySQL
+logs_history	Historial de operaciones
+logs_days	%s días
+logs_glpi_value	rotar al superar %s MB · conservar %s días
+logs_container_value	%s MB × %s archivos por servicio
+logs_history_value	últimas 1000 operaciones (fijo)
+logs_body	El historial de auditoría de GLPI (quién cambió qué) está en su base de datos y va en cada respaldo; ninguno de estos ajustes lo toca.
+logs_prompt	¿Qué registro quieres cambiar?
+opt_logs_manager	Registros de etapas y mantenimiento de este gestor (state/logs). Ocupan poco; ayudan a diagnosticar fallos.
+opt_logs_glpi	Errores PHP/SQL, cron y correo dentro del volumen de GLPI. Crecen rápido cuando GLPI tiene errores.
+opt_logs_containers	Salida de cada contenedor (docker logs). Cambiarlo reinicia los servicios unos segundos.
+opt_logs_binlog	Cada cambio en la base de datos, dentro del volumen de MySQL; puede llegar a varios GB con agentes de inventario. Cambiarlo reinicia los servicios.
+logs_days_prompt	¿Cuántos días se conservan?
+opt_logs_days_default	Historia suficiente para investigar un incidente del último mes.
+opt_logs_days_short	Menos disco, pero menos historia para investigar problemas.
+opt_logs_days_long	Más historia, usa más disco.
+logs_size_prompt	¿Rotar un registro de GLPI al superar…?
+opt_logs_size_small	Archivos más pequeños; más copias comprimidas.
+opt_logs_size_default	Equilibrado: fáciles de abrir, pocas copias.
+opt_logs_size_large	Menos copias, pero los archivos grandes son lentos de leer.
+logs_container_prompt	Límite de registros por contenedor
+opt_logs_container_default	Hasta 30 MB por servicio; suficiente para problemas recientes.
+opt_logs_container_more	Más historia de la salida de los contenedores.
+opt_logs_container_large	Hasta 500 MB por servicio: comprueba que el disco lo soporte.
+logs_binlog_prompt	¿Cuántos días de binary logs de MySQL?
+opt_binlog_short	El menor uso de disco. Los respaldos son copias completas: restaurar no pierde nada.
+opt_binlog_week	Una semana de cambios; uso de disco moderado.
+opt_binlog_default	Valor por defecto de MySQL.
+logs_restart_confirm	¿Aplicar ahora? Los servicios se reinician unos segundos.
+logs_step_apply	Aplicando los nuevos límites de registros
+logs_saved	✓ Rotación de registros guardada
+restore_file	Archivo
+restore_folder	Carpeta
+restore_section_plan	Qué va a pasar

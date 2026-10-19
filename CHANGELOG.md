@@ -29,6 +29,10 @@ history retention) stay in GLPI; the manager handles the host and containers.
   automatic (5 kept). Create backup also offers the final backup for a server move.
 * Daily maintenance (systemd timer or cron): log rotation, GLPI technical logs
   (20 MiB, 30 days), self-signed renewal 30 days before expiry, optional backups.
+* Log rotation screen: each kind of log with current and recommended values;
+  GLPI logs, container logs and MySQL binary logs are adjustable.
+* Information cards align labels of any length (accented text included) and can
+  be split into sections; start-up notices no longer leak into later screens.
 * Backup schedules: every day, every 2/3/N days, Monday to Friday, weekly or any
   weekdays (checkboxes), at a chosen hour and minute, with a preview of the next
   dates and the history covered.

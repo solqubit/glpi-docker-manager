@@ -196,29 +196,49 @@ ui_line() {
     ui_color 35; printf ' │\n' >&2; ui_color 0
     ((UI_DRAW_LINES+=1))
 }
+# "label<TAB>value" rows. The label column fits the longest label of the card
+# (UI_PAIR_COLUMN, set by ui_box); padding counts characters, not bytes, so
+# accented labels never push values or the right border out of line.
 ui_pair() {
-    local ui_label=$1 ui_value=$2 ui_column=24 ui_padding
+    local ui_label=$1 ui_value=$2 ui_column=${UI_PAIR_COLUMN:-24} ui_gap ui_padding
     if ((UI_WIDTH < 40)); then ui_line "$ui_label" 2; ui_line "$ui_value" '1;36'; return; fi
+    ui_label=${ui_label:0:ui_column-2}
+    ui_gap=$((ui_column-${#ui_label}))
     ui_value=${ui_value:0:UI_WIDTH-ui_column}
     ui_padding=$((UI_WIDTH-ui_column-${#ui_value}))
     ui_color 35; printf '  │ ' >&2; ui_color 0
-    ui_color 2; printf '%-*s' "$ui_column" "$ui_label" >&2; ui_color 0
+    ui_color 2; printf '%s%*s' "$ui_label" "$ui_gap" '' >&2; ui_color 0
     ui_color '1;36'; printf '%s' "$ui_value" >&2; ui_color 0
     printf '%*s' "$ui_padding" '' >&2
     ui_color 35; printf ' │\n' >&2; ui_color 0
     ((UI_DRAW_LINES+=1))
 }
 # A titled information card. Titles starting with ✓ become green success cards.
+# Rows: plain text (wrapped), "label<TAB>value" pairs, "§Section" headings.
 ui_box() {
     local ui_title=$1; shift
-    local ui_text ui_part ui_tone=35 ui_mark='[*]'
+    local ui_text ui_part ui_label ui_tone=35 ui_mark='[*]' ui_longest=0 UI_PAIR_COLUMN ui_first=true
     UI_DRAW_LINES=0
     if [[ $ui_title == '✓'* ]]; then ui_tone=32 ui_mark='[+]'; fi
     while [[ $ui_title == '✓ '* ]]; do ui_title=${ui_title#✓ }; done
+    for ui_text in "$@"; do
+        [[ $ui_text == *$'\t'* ]] || continue
+        ui_label=${ui_text%%$'\t'*}
+        (( ${#ui_label} <= ui_longest )) || ui_longest=${#ui_label}
+    done
+    UI_PAIR_COLUMN=$((ui_longest+3))
+    (( UI_PAIR_COLUMN <= UI_WIDTH/2 )) || UI_PAIR_COLUMN=$((UI_WIDTH/2))
+    (( UI_PAIR_COLUMN >= 12 )) || UI_PAIR_COLUMN=12
     ui_color "$ui_tone"; ui_border ╭ ╮; ui_color 0
     ui_line "$ui_mark $ui_title" "1;$ui_tone"
-    (( $# == 0 )) || ui_line
     for ui_text in "$@"; do
+        if [[ $ui_text == '§'* ]]; then
+            ui_line
+            ui_line "${ui_text#§}" '1;35'
+            ui_first=false
+            continue
+        fi
+        if [[ $ui_first == true ]]; then ui_line; ui_first=false; fi
         if [[ $ui_text == *$'\t'* ]]; then ui_pair "${ui_text%%$'\t'*}" "${ui_text#*$'\t'}"
         else while IFS= read -r ui_part; do ui_line "$ui_part"; done < <(ui_wrap "$ui_text" "$UI_WIDTH"); fi
     done

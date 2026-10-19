@@ -655,6 +655,8 @@ dashboard_environment() {
 menu() {
     local command menu_result action_file GDM_IN_MENU=true
     while :; do
+        # Start-up checks and earlier actions must not reappear inside the next action.
+        UI_NOTICES=() UI_CONTEXT=()
         if [[ ! -L $STATE/current ]]; then
             ui_panel "$(t ui_first_title)" "$(t ui_first_body)"
             choose command first_action install install "$(ui_opt primary "$(t ui_install)" "$(t opt_install)")" \
