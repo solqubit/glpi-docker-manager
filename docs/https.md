@@ -20,12 +20,17 @@ signed by it (3072-bit RSA, DNS or IPv4 SAN for the configured address, valid
 
 Clients trust the CA once. The server certificate is renewed automatically 30
 days before it expires, when the address changes or on request, always signed by
-the same CA, so **GLPI Agents and browsers never need to be touched again**.
+the same CA, so clients do not need a trust change for ordinary server renewal.
+Replacing the CA or reaching its expiry requires distributing the new CA to clients.
 *HTTPS and certificates* shows the download URL, path, expiry and SHA-256
 fingerprint of the CA. *Create a NEW local CA* (typed `NEW-CA`) exists only for a
 lost or compromised CA key; every client must then import the new file.
 
 ### GLPI Agent
+
+Before trusting a downloaded CA, compare its SHA-256 fingerprint with the
+*HTTPS and certificates* screen through a trusted server session. HTTP download
+alone does not authenticate the file.
 
 Copy `gdm-ca.pem` to each computer, for example `C:\CA-GLPI\gdm-ca.pem`, before or
 after installing the agent (it is read on every connection, not at install time).

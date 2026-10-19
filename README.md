@@ -6,6 +6,10 @@ An interactive, bilingual Linux CLI for installing and administering GLPI with
 official Docker images. Bash orchestrates GLPI, MySQL and optional Caddy HTTPS;
 you do not need to configure host PHP, Apache or MySQL.
 
+Version **1.0.0**. [Validation results and limits](docs/validation.md): 26 test
+groups, ShellCheck and disposable Docker installation/update/restore tests passed
+on 2026-10-19. This does not certify every distribution, plugin or future release.
+
 ## Quick start
 
 ```bash
@@ -60,7 +64,8 @@ MySQL exposure, the last backup and the automatic backup schedule. A daily
 maintenance task (systemd timer or cron) rotates logs, renews self-signed
 certificates and can create automatic backups (the 5 newest are kept; manual
 backups are never rotated). The manager can also show certificate expiry,
-uninstall GLPI cleanly and update itself from GitHub releases. GLPI's own
+uninstall GLPI cleanly and update itself from GitHub releases (or a fast-forward
+Git pull when run from a checkout). GLPI's own
 settings (mail, plugins, automatic actions) stay in GLPI.
 
 Official release/security/support notices remain visible. Full release notes can
@@ -71,10 +76,11 @@ keyboard controls, monochrome and plain-terminal modes.
 
 * Discover stable GLPI releases from the official paginated GitHub API. Show the
   latest three releases with official images for the server architecture, plus
-  exact-version installation (`./start.sh install 11.0.11`). Future stable majors
+  exact-version installation (`sudo ./start.sh install 11.0.11`). Future stable majors
   are discovered too; image/GLPI requirements still have to pass.
-* Display full upstream release notes, security notices and a separate explicit
-  confirmation for GLPI 10, which is outside ordinary upstream support.
+* Display full upstream release notes and security notices. The new-installation
+  selector excludes GLPI 10; explicit `install 10.x.y` and restoring existing
+  backups remain available, with a separate support warning and confirmation.
 * Pin GLPI, MySQL and Caddy to exact versions and immutable registry digests.
 * Publish MySQL with exactly `3306:3306`, or leave it unpublished. Change this
   choice from the menu later. Publishing makes the database reachable on host
@@ -93,6 +99,12 @@ keyboard controls, monochrome and plain-terminal modes.
   version change first runs a database/schema rehearsal on an isolated restored copy.
 * Independent MySQL patch maintenance within 8.4, with backup and rehearsal.
   `refresh-image` handles a rebuild of the same GLPI application version.
+* Schedule backups daily, every 2/3/N days (up to 30), on weekdays or on selected
+  days, with a time and preview of upcoming runs. Lists distinguish `[M]` manual
+  (never rotated), `[P]` before updates/restores (3 newest kept) and `[A]`
+  automatic backups (5 newest kept).
+* Configure manager/GLPI log retention, container log limits and MySQL binary-log
+  retention. Review sizes before cleaning manager-owned unused resources.
 * Operation journal, advisory process lock, private configuration and atomic
   revisions. Failed migrations remain explicit recovery operations.
 
@@ -146,6 +158,7 @@ certs/                            # self-signed and imported TLS pairs
 backups/                          # archives contain secrets
 logs/                             # private operation logs
 cache/                            # upstream release metadata
+maintenance.json                  # backup schedule and log settings
 history.jsonl                     # completed operations; no passwords
 operation.json                    # present only for an incomplete operation
 ```
@@ -162,6 +175,9 @@ operational code into this root, so deleting the original downloaded checkout
 does not remove the installed manager or GLPI data. Running a new checkout against
 the same root refreshes that code copy. Use backup/transfer for consistent recovery;
 copying a live MySQL data directory is not a consistent backup.
+
+Backups contain secrets and are not encrypted by the manager. Keep private,
+off-server copies using encrypted transport and storage.
 
 Setup marks the standard settings (`db:3306`, database/user `glpi`, HTTP 80,
 HTTPS 443, timezone UTC) and lets you edit them before generating `.env`. The
@@ -187,14 +203,32 @@ accounts are intentionally not changed silently by the manager.
 
 See [HTTPS and exact certificate paths](docs/https.md). Public ACME mode needs a
 domain pointing to this server and reachable ports 80 and 443. Caddy explicitly
-uses Let's Encrypt for issuance and automatic renewal. Self-signed mode
-generates and preserves the certificate/key automatically; trust the certificate
-on each client. Imported certificates use exactly:
+uses Let's Encrypt for issuance and automatic renewal. Self-signed mode creates
+a local CA valid for 20 years and server certificates valid for 825 days, renewed
+automatically 30 days before expiry when scheduled maintenance runs. Trust the
+**CA certificate** on clients, rather than pinning a renewing server fingerprint:
+
+```text
+/opt/glpi-docker-manager/certs/self-signed/ca/gdm-ca.pem
+```
+
+It can also be downloaded at `http://SERVER/gdm-ca.pem` (include the configured
+HTTP port if different from 80). Compare its SHA-256 fingerprint with the
+**HTTPS and certificates** screen before trusting it. In the GLPI Agent installer,
+set **CA Certificate File** to the local copy; leave the CA directory and
+fingerprint fields empty and keep SSL verification enabled. Server renewal keeps
+the same CA; replacing or expiring that CA requires distributing the new CA to
+clients. Never distribute `gdm-ca.key` or the server's private key. See the
+[agent and trust instructions](docs/https.md) for examples.
+
+Imported certificates use exactly:
 
 ```text
 /opt/glpi-docker-manager/certs/custom/fullchain.pem
 /opt/glpi-docker-manager/certs/custom/privkey.pem
 ```
+
+Imported certificates are renewed externally, then reloaded from the manager.
 
 ## Compatibility
 
@@ -221,8 +255,11 @@ are archived. Coordinate any external SQL writers separately. Backups include
 encryption keys, plugins, uploaded files, configuration and TLS/ACME state.
 
 Restore verifies checksums and archive safety **before** stopping existing
-services, then uses new empty volumes and the recorded image versions. Old
-volumes are retained for deliberate recovery. Only restore backups you trust:
+services, then uses new empty volumes and the recorded image versions. A running
+installation is backed up first (`[P]`); once restore checks pass, that replaced
+installation is removed. If it could not be backed up, it stays stopped as a
+return point. The local CA and its signing key are included in backups, preserving
+client trust after restoration. Only restore backups you trust:
 checksums detect corruption, not an attacker's replacement of the entire archive.
 
 An interrupted operation leaves a journal and may leave GLPI stopped. `recover`

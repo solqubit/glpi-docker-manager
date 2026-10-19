@@ -126,8 +126,9 @@ tasks) stay in GLPI.
   backups cover. The task runs daily at that time; in "every N days" mode the
   count starts from the newest automatic backup, and *Run now* backs up
   immediately. They are named `glpi-<version>-<time>-auto-<id>.tar.gz`, shown as
-  `[A]` (manual ones `[M]`), and only the 5 newest are kept. Manual and pre-update
-  backups are never deleted automatically. GLPI stops for a few minutes per backup.
+  `[A]` (manual ones `[M]`), and only the 5 newest are kept. Manual backups are
+  never rotated; pre-update/restore backups keep the 3 newest, as described below.
+  GLPI stops while each backup is created.
 * **Backup kinds** are visible in every list: `[M]` manual (never rotated),
   `[P]` taken automatically before an update or restore (the 3 newest are
   kept) and `[A]` scheduled (the 5 newest are kept).

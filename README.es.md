@@ -6,6 +6,11 @@ Gestor interactivo para instalar y administrar GLPI en Linux mediante imágenes
 oficiales de Docker. La interfaz está disponible en español e inglés; el código y
 la documentación técnica principal están en inglés.
 
+Versión **1.0.0**. Los [resultados y límites de validación](docs/validation.md)
+registran 26 grupos aprobados, ShellCheck sin avisos y pruebas desechables de
+instalación, actualización y restauración en Docker el 2026-10-19. No certifican
+todas las distribuciones, plugins ni versiones futuras.
+
 ## Inicio rápido
 
 ```bash
@@ -32,8 +37,10 @@ imágenes oficiales, incluidas futuras ramas como GLPI 13. Muestra las tres
 versiones instalables más recientes por rama; también admite una versión exacta.
 Las comprobaciones oficiales de requisitos deben pasar para instalar o migrar.
 
-Antes de confirmar verás las notas oficiales, avisos de seguridad y una advertencia
-especial si eliges GLPI 10, fuera del soporte ordinario. Volver a ejecutar el gestor
+Antes de confirmar verás las notas oficiales y avisos de seguridad. El selector de
+instalación nueva excluye GLPI 10; sigue disponible mediante `install 10.x.y` o
+restaurando un respaldo, con advertencia de soporte y confirmación adicional.
+Volver a ejecutar el gestor
 abre el menú y conserva los datos y contraseñas existentes.
 
 ## Interfaz de terminal
@@ -66,7 +73,8 @@ programación de respaldos automáticos. Una tarea diaria (temporizador systemd 
 cron) rota los registros, renueva los certificados autofirmados y puede crear
 respaldos automáticos (se guardan los 5 más recientes; los manuales nunca se
 rotan). El gestor también muestra la caducidad del certificado, desinstala GLPI
-de forma limpia y se actualiza desde las versiones publicadas en GitHub. La
+de forma limpia y se actualiza desde las versiones publicadas en GitHub (o con
+`git pull --ff-only` al ejecutarlo desde un clon). La
 configuración propia de GLPI (correo, plugins, acciones automáticas) se hace en
 GLPI.
 
@@ -94,6 +102,16 @@ HTTPS público solicita y renueva certificados de **Let's Encrypt** mediante Cad
 * Restauración guiada a volúmenes nuevos y traslado a otro servidor.
 * Consulta de credenciales bajo confirmación y mantenimiento independiente de
   parches MySQL dentro de la serie 8.4.
+* Imágenes de GLPI, MySQL y Caddy fijadas por versión exacta y digest del registro.
+* Respaldos programados diariamente, cada 2/3/N días (hasta 30), de lunes a
+  viernes o en días elegidos, con horario y vista de las próximas ejecuciones.
+  Las listas distinguen `[M]` manuales (no se rotan), `[P]` previos a actualizar
+  o restaurar (se conservan los 3 más recientes) y `[A]` automáticos (los 5 últimos).
+* Retención configurable de registros del gestor y GLPI, límites de registros de
+  contenedores y retención de logs binarios de MySQL. La limpieza muestra tamaños
+  y ofrece recursos sin uso administrados por el gestor.
+* Registro de operaciones pendientes, bloqueo entre procesos y revisiones de
+  configuración para guiar la recuperación cuando una operación se interrumpe.
 
 ## Comandos útiles
 
@@ -102,6 +120,8 @@ HTTPS público solicita y renueva certificados de **Let's Encrypt** mediante Cad
 sudo ./start.sh status
 sudo ./start.sh check-updates
 sudo ./start.sh update
+sudo ./start.sh update 11.0.11   # versión posterior exacta
+sudo ./start.sh migrate 12.0.0   # migración a la siguiente rama
 sudo ./start.sh backup
 sudo ./start.sh backups
 sudo ./start.sh restore
@@ -109,6 +129,7 @@ sudo ./start.sh restore /ruta/absoluta/respaldo.tar.gz
 sudo ./start.sh https
 sudo ./start.sh address
 sudo ./start.sh db-exposure
+sudo ./start.sh credentials
 sudo ./start.sh transfer
 sudo ./start.sh certificates     # modo HTTPS, caducidad, renovación y recarga
 sudo ./start.sh schedule         # respaldos automáticos y mantenimiento diario
@@ -116,6 +137,7 @@ sudo ./start.sh cleanup          # liberar espacio
 sudo ./start.sh self-update      # actualizar este gestor
 sudo ./start.sh uninstall
 sudo ./start.sh diagnose
+sudo ./start.sh recover
 ```
 
 En el menú, *Actualizar GLPI* incluye también `check-updates` y `refresh-image`,
@@ -124,7 +146,9 @@ certificados* permite cambiar el modo HTTPS.
 
 Sin comandos se abre el menú interactivo. Las operaciones sensibles solicitan
 confirmación. Las restauraciones y migraciones principales requieren escribir una
-confirmación específica.
+confirmación específica. También están disponibles `start`, `stop`, `logs`,
+`db-update`, `refresh-image`, `language`, `maintenance` (tarea diaria) y `version`.
+No existe una opción general `--yes` para omitir las confirmaciones.
 
 ## Datos y credenciales
 
@@ -142,7 +166,10 @@ repositorio. Toda la instalación queda reunida en esa carpeta:
 ├── certs/                   # certificados y claves
 ├── backups/                 # respaldos disponibles para restaurar
 ├── logs/                    # registros de las operaciones
-└── cache/                   # metadatos de versiones
+├── cache/                   # metadatos de versiones
+├── maintenance.json         # programación y ajustes de registros
+├── history.jsonl            # operaciones completadas, sin contraseñas
+└── operation.json           # solo si hay una operación pendiente
 ```
 
 Después de instalar puedes abrirlo con:
@@ -157,7 +184,14 @@ el código operativo sin reemplazar datos ni credenciales. Docker monta las carp
 de `data/` mediante volúmenes etiquetados; no se eliminan durante actualizaciones.
 Las imágenes y los componentes del motor Docker siguen administrados por Docker
 en el sistema. Los respaldos contienen
-secretos: guarda una copia privada fuera del servidor.
+secretos y el gestor no los cifra: guarda una copia privada fuera del servidor
+mediante transporte y almacenamiento cifrados.
+
+`--state-dir /ruta/absoluta` permite elegir otra raíz completa; úsala siempre
+para esa instalación. Cada raíz tiene datos y un identificador independientes;
+dos instalaciones no pueden publicar los mismos puertos del servidor. Las
+carpetas privadas usan permisos 0700 y los archivos secretos 0600. Quien administra
+Docker también puede inspeccionar las variables de los contenedores.
 
 Las claves de MySQL se generan o se introducen durante el asistente. Son distintas
 de las cuentas web iniciales de GLPI: `glpi/glpi`, `tech/tech`, `normal/normal` y
@@ -205,8 +239,30 @@ Los certificados importados deben estar exactamente en:
 
 `fullchain.pem` contiene el certificado del dominio seguido de sus intermedios;
 `privkey.pem` contiene la clave privada PEM correspondiente sin contraseña. El
-asistente comprueba formato, coincidencia, dominio y caducidad. Los autofirmados
-se generan automáticamente; debes confiar en el certificado desde tus equipos.
+asistente comprueba formato, coincidencia, dominio y caducidad.
+
+El modo autofirmado genera una **CA local de 20 años** y certificados de servidor
+de **825 días**, renovados 30 días antes de caducar cuando se ejecuta el
+mantenimiento programado. Distribuye únicamente este certificado público:
+
+```text
+/opt/glpi-docker-manager/certs/self-signed/ca/gdm-ca.pem
+```
+
+También se descarga en `http://SERVIDOR/gdm-ca.pem` (añade el puerto HTTP si no es
+80). Antes de confiar en él, compara su huella SHA-256 con la pantalla **HTTPS y
+certificados**. En el instalador de GLPI Agent, indica la ruta de la copia local
+en **CA Certificate File**, deja vacíos **CA Certificates Directory** y
+**Fingerprint**, y mantén activa la verificación SSL. Los navegadores deben
+confiar en esa CA como autoridad raíz; en Active Directory puede distribuirse
+mediante GPO. No fijes la huella del certificado de servidor: cambia al renovarse.
+
+La renovación conserva la CA y no exige reconfigurar los agentes. Reemplazarla o
+su caducidad sí exige distribuir la nueva CA. Nunca distribuyas `gdm-ca.key` ni la
+clave privada del servidor. Los respaldos incluyen la CA y su clave para mantener
+la confianza tras restaurar. Consulta los [ejemplos de agentes y HTTPS](docs/https.md).
+Los certificados públicos de Let's Encrypt utilizan la confianza pública habitual;
+los importados deben renovarse externamente y recargarse desde el gestor.
 
 ## Compatibilidad y precauciones operativas
 
@@ -218,7 +274,13 @@ distribución desconocida. Se verifican las imágenes para AMD64 y ARM64.
 Una actualización de GLPI puede migrar sus tablas; una actualización de MySQL
 cambia el motor. Son operaciones independientes. Volver a una imagen anterior no
 garantiza recuperar datos después de una migración. Las restauraciones verifican
-el respaldo y crean volúmenes vacíos, conservando los anteriores.
+el respaldo y crean volúmenes vacíos. Primero se respalda la instalación en
+ejecución (`[P]`); al verificar la restauración se elimina esa instalación
+reemplazada. Si no pudo respaldarse, queda detenida como punto de retorno.
+
+Las nuevas ramas se descubren automáticamente, pero deben superar las
+comprobaciones de imágenes y requisitos. Si necesitan otra serie de MySQL, hará
+falta actualizar la compatibilidad del gestor: no automatiza saltos de 8.4 a 9.x.
 
 Si se interrumpe una operación, consulta los registros y utiliza `recover` o
 restaura un respaldo válido. El ensayo de migración comprueba el esquema, pero
