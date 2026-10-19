@@ -10,7 +10,7 @@ import socket
 import sys
 import tempfile
 
-from terminal_ui import Terminal, translations
+from terminal_ui import SEPARATOR, Terminal, translations
 
 FIELDS = [
     ('hostname', 'setup_host', 'hostname', None),
@@ -164,19 +164,26 @@ class Setup:
             return self.ui.t('ui_db_public' if value else 'ui_db_private')
         return str(value)
 
+    def label_width(self):
+        return max(len(self.ui.t(label).split(' · ')[0]) for _, label, _, _ in self.fields) + 3
+
     def rows(self):
+        """Aligned columns: marker · field · value · state (right-aligned)."""
         rows = []
+        width = self.label_width()
         for key, label, _, _ in self.fields:
             pending = key.endswith('password') and not self.data[key]
             invalid = bool(validate(key, str(self.data[key]), self.data))
             default = not pending and not key.endswith('password') and self.data[key] == self.defaults[key]
             state = self.ui.t('setup_pending' if pending else 'setup_invalid' if invalid else 'setup_default' if default else 'setup_valid')
+            tone = 'warning' if pending else 'error' if invalid else 'ok'
             marker = '[✗]' if invalid and not pending else '[!]' if pending else '[+]'
-            value = self.display(key)
-            # Keep the state before long values so it remains visible on narrow terminals.
-            rows.append((key, f'{marker} {self.ui.t(label).split(" · ")[0]} [{state}]  {value}',
-                         'warning' if pending else 'error' if invalid else 'ok'))
-        rows += [('review', self.ui.t('setup_continue'), 'accent')]
+            name = self.ui.t(label).split(' · ')[0]
+            rows.append((key, [(marker + ' ', tone), (name.ljust(width), ''),
+                               (self.display(key), 'warning' if pending else 'accent'),
+                               ('  ' + state, (tone if pending or invalid else 'dim' if default else 'ok') + '>')], tone))
+        rows.append((SEPARATOR, '', ''))
+        rows.append(('review', '▶ ' + self.ui.t('setup_continue'), 'ok'))
         if not self.access_only:
             rows.append(('version', self.ui.t('setup_version_back'), ''))
         rows += [('ports-default', self.ui.t('setup_standard_ports'), ''),
@@ -282,22 +289,23 @@ class Setup:
         return True
 
     def review(self):
-        secure = self.data['tls'] != 'off'
-        port = self.data['https_port' if secure else 'http_port']
-        suffix = '' if port == (443 if secure else 80) else f':{port}'
-        url = f"{'https' if secure else 'http'}://{self.data['hostname']}{suffix}"
-        details = [f'GLPI {self.data["glpi_version"]} / MySQL {self.data["mysql_version"]}',
-                   self.ui.t('setup_access', url)]
+        url = access(self.data)
+        width = self.label_width()
+        # Field rows in aligned columns; selecting one returns to that field.
+        rows = [('edit', [('GLPI '.ljust(width + 4), 'dim'),
+                          (f'{self.data["glpi_version"]} · MySQL {self.data["mysql_version"]}', 'accent')], ''),
+                ('hostname', [('URL'.ljust(width + 4), 'dim'), (url, 'accent')], '')]
         for key, label, _, _ in self.fields:
-            details.append(self.ui.t(label).split(' · ')[0] + ': ' + self.display(key))
-        rows = [('deploy', self.ui.t('setup_apply' if self.access_only else 'setup_deploy'), 'ok'),
-                ('edit', self.ui.t('setup_return_edit'), 'accent')]
+            name = self.ui.t(label).split(' · ')[0]
+            rows.append((key, [(name.ljust(width + 4), 'dim'), (self.display(key), 'accent')], ''))
+        rows.append((SEPARATOR, '', ''))
+        actions = len(rows)
+        rows += [('deploy', '▶ ' + self.ui.t('setup_apply' if self.access_only else 'setup_deploy'), 'ok'),
+                 ('edit', self.ui.t('setup_return_edit'), 'accent')]
         if not self.access_only:
             rows.append(('version', self.ui.t('setup_version_back'), ''))
         rows.append(('cancel', self.ui.t('setup_cancel'), ''))
-        # The review is scrollable; selecting any data row returns to that field.
-        rows = [(key, line, '') for key, line in zip(['edit', 'hostname'] + [f[0] for f in self.fields], details)] + rows
-        choice = self.ui.menu(self.ui.t('ui_summary'), rows, len(details),
+        choice = self.ui.menu(self.ui.t('ui_summary'), rows, actions,
                               notice=self.ui.t('setup_access', url) + ' · ' + self.ui.t('setup_access_review_hint' if self.access_only else 'setup_review_hint'),
                               help_text=self.ui.t('setup_access_review_keys' if self.access_only else 'setup_review_keys'))
         if choice in {f[0] for f in self.fields}:

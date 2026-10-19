@@ -14,6 +14,12 @@ except ImportError:
 
 
 MARKERS = {'ok': '[+]', 'warning': '[!]', 'error': '[✗]', 'accent': '[*]'}
+SEPARATOR = '\0separator'
+
+
+def plain(label):
+    """Text of a row label given as a string or as [(text, style)] segments."""
+    return ''.join(text for text, _ in label) if isinstance(label, (list, tuple)) else label
 
 
 def translations(root, language):
@@ -131,7 +137,10 @@ class Terminal:
         self.put(3, self.left, '[?]', 'title')
         self.put(3, self.left + 4, title, 'bold')
         marker = MARKERS.get(notice_style, '[*]')
-        lines = textwrap.wrap(clean(notice), self.width - 4)[:max(2, min(5, height - 17))]
+        notice = clean(notice)
+        if notice.startswith('✓ '):
+            notice = notice[2:]
+        lines = textwrap.wrap(notice, self.width - 4)[:max(2, min(5, height - 17))]
         for row, line in enumerate(lines, 4):
             if row == 4:
                 self.put(row, self.left, marker, notice_style)
@@ -175,67 +184,95 @@ class Terminal:
                    '[5~': curses.KEY_PPAGE, '[6~': curses.KEY_NPAGE}.get(sequence, '\x1b')
         return key
 
+    def draw_label(self, y, label, style, active):
+        """A row is plain text or segments [(text, style)]; a style ending in
+        '>' right-aligns that segment. The active row is one selection bar."""
+        if active:
+            self.put(y, self.left, ('> ' + plain(label)).ljust(self.width), 'selected')
+            return
+        if not isinstance(label, (list, tuple)):
+            self.put(y, self.left, '  ' + label, style)
+            return
+        x = self.left + 2
+        for text, part_style in label:
+            if part_style.endswith('>'):
+                self.put(y, max(x, self.left + self.width - len(text)), text, part_style[:-1])
+            else:
+                self.put(y, x, text, part_style)
+                x += len(text)
+
     def menu(self, title, rows, selected=0, notice='', help_text='', search=False,
              notice_style='accent'):
-        """Rows are (value, label, semantic color); return a value or None on Back."""
+        """Rows are (value, label, semantic color); return a value or None on Back.
+        Rows whose value is SEPARATOR are drawn as a rule and never selected."""
         selected = min(selected, len(rows) - 1)
         if self.screen is None:
+            choices = [row for row in rows if row[0] != SEPARATOR]
+            current = rows[selected][0]
             print('\n[?] ' + title, file=sys.stderr)
             if notice:
                 print(notice, file=sys.stderr)
-            for number, (_, label, _) in enumerate(rows, 1):
-                print(f'  {number}) {label}', file=sys.stderr)
+            for number, (_, label, _) in enumerate(choices, 1):
+                print(f'  {number}) {plain(label)}', file=sys.stderr)
             while True:
                 answer = input(self.t('setup_plain_choice'))
                 if answer.lower() in ('b', 'back', 'volver'):
                     return None
                 if answer == '':
-                    return rows[selected][0]
-                if answer.isdigit() and 1 <= int(answer) <= len(rows):
-                    return rows[int(answer) - 1][0]
-                matches = [row for row in rows if answer.casefold() in row[1].casefold()]
+                    return current
+                if answer.isdigit() and 1 <= int(answer) <= len(choices):
+                    return choices[int(answer) - 1][0]
+                matches = [row for row in choices if answer.casefold() in plain(row[1]).casefold()]
                 if len(matches) == 1:
                     return matches[0][0]
                 print(self.t('ui_invalid_choice'), file=sys.stderr)
         query = ''
+        step = 1
         while True:
-            filtered = [row for row in rows if query.casefold() in row[1].casefold()]
+            filtered = [row for row in rows if row[0] == SEPARATOR and not query
+                        or row[0] != SEPARATOR and query.casefold() in plain(row[1]).casefold()]
             selected = max(0, min(selected, len(filtered) - 1))
+            if any(row[0] != SEPARATOR for row in filtered):
+                while filtered[selected][0] == SEPARATOR:
+                    selected = (selected + step) % len(filtered)
             note = self.t('setup_search', query) if search and query else notice
             top, height = self.frame(title, note, notice_style)
             visible = max(1, height - top - 5)
             offset = max(0, min(selected - visible // 2, len(filtered) - visible))
             for index in range(offset, min(offset + visible, len(filtered))):
-                _, label, style = filtered[index]
-                active = index == selected
-                label = ('> ' if active else '  ') + label
-                self.put(top + index - offset, self.left, label.ljust(self.width),
-                         'selected' if active else style)
+                value, label, style = filtered[index]
+                if value == SEPARATOR:
+                    self.put(top + index - offset, self.left + 2, '┄' * (self.width - 4), 'dim')
+                    continue
+                self.draw_label(top + index - offset, label, style, index == selected)
             if not filtered:
                 self.put(top, self.left, self.t('setup_no_matches'), 'warning')
             self.put(height - 4, self.left, '─' * self.width, 'accent')
             for row, line in enumerate(textwrap.wrap(help_text, self.width)[:2], height - 3):
                 self.put(row, self.left, line)
+            choices = [i for i, row in enumerate(filtered) if row[0] != SEPARATOR]
+            position = choices.index(selected) + 1 if selected in choices else 0
             self.put(height - 1, self.left,
-                     f'{selected + 1}/{len(filtered)} · ' + self.t('setup_search_keys' if search else 'setup_keys'), 'accent')
+                     f'{position}/{len(choices)} · ' + self.t('setup_search_keys' if search else 'setup_keys'), 'accent')
             self.screen.refresh()
             key = self.key()
-            if key in ('\n', '\r', curses.KEY_ENTER) and filtered:
+            step = 1
+            if key in ('\n', '\r', curses.KEY_ENTER) and choices:
                 return filtered[selected][0]
             if key == '\x1b':
                 return None
             if key in (curses.KEY_DOWN, '\t'):
                 selected = (selected + 1) % max(1, len(filtered))
             elif key in (curses.KEY_UP, curses.KEY_BTAB):
-                selected = (selected - 1) % max(1, len(filtered))
+                selected = (selected - 1) % max(1, len(filtered)); step = -1
             elif key == curses.KEY_HOME:
                 selected = 0
             elif key == curses.KEY_END:
-                selected = len(filtered) - 1
+                selected = len(filtered) - 1; step = -1
             elif key == curses.KEY_NPAGE:
                 selected = min(len(filtered) - 1, selected + visible)
             elif key == curses.KEY_PPAGE:
-                selected = max(0, selected - visible)
+                selected = max(0, selected - visible); step = -1
             elif search and key in (curses.KEY_BACKSPACE, '\x7f', '\b'):
                 query = query[:-1]
             elif search and isinstance(key, str) and key.isprintable():
