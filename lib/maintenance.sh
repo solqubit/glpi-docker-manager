@@ -26,8 +26,9 @@ maintenance_settings() {
     values=$(jq -r '[(if .backups==true then "true" else "false" end), ((.hour // 3)|tostring), ((.minute // 0)|tostring),
         (if .mode=="weekdays" then "weekdays" else "days" end), ((.every // 1)|tostring),
         ((.weekdays // [])|map(tostring)|join(",")),
-        ((.logs // {})|to_entries|map("\(.key)=\(.value)")|join(" "))] | join("\t")' "$file" 2>/dev/null) || return 0
-    IFS=$'\t' read -r MAINT_BACKUPS MAINT_HOUR MAINT_MINUTE MAINT_MODE MAINT_EVERY weekdays logs <<< "$values" || true
+        ((.logs // {})|to_entries|map("\(.key)=\(.value)")|join(" "))] | join("|")' "$file" 2>/dev/null) || return 0
+    # A non-whitespace separator preserves the empty weekday field of daily schedules.
+    IFS='|' read -r MAINT_BACKUPS MAINT_HOUR MAINT_MINUTE MAINT_MODE MAINT_EVERY weekdays logs <<< "$values" || true
     log_settings_read "$logs"
     [[ $MAINT_BACKUPS == true ]] || MAINT_BACKUPS=false
     [[ $MAINT_HOUR =~ ^([01]?[0-9]|2[0-3])$ ]] || MAINT_HOUR=3
@@ -477,21 +478,25 @@ backup_prune() {
         done
 }
 backup_prune_auto() { backup_prune auto "$AUTO_BACKUP_KEEP"; }
-# GLPI never rotates its technical logs in /var/glpi/_log (PHP/SQL errors,
-# cron, mail). Files over 20 MiB are compressed with the date and emptied;
-# compressed copies are kept 30 days. GLPI's audit trail (item history and
-# events) lives in the database and is not affected.
+# GLPI never rotates its technical logs (PHP/SQL errors, cron, mail). The
+# official image keeps them in /var/glpi/logs (GLPI_LOG_DIR); /var/glpi/_log is
+# the classic layout. Files over the limit are compressed with the date and
+# emptied; compressed copies are kept the chosen days. GLPI's audit trail (item
+# history and events) lives in the database and is not affected.
 glpi_logs_rotate() {
     [[ -n $(dc ps --status running --quiet glpi) ]] || return 0
     maintenance_settings
     dc exec -T --user www-data -e "GDM_LOG_BYTES=$((LOG_GLPI_MB*1048576))" -e "GDM_LOG_DAYS=$LOG_GLPI_DAYS" glpi sh -c '
         stamp=$(date -u +%Y%m%d%H%M%S)
-        for file in /var/glpi/_log/*.log; do
-            [ -f "$file" ] || continue
-            [ "$(wc -c < "$file")" -gt "$GDM_LOG_BYTES" ] || continue
-            gzip -c "$file" > "$file.$stamp.gz" && : > "$file"
-        done
-        find /var/glpi/_log -maxdepth 1 -type f -name "*.log.*.gz" -mtime +"$GDM_LOG_DAYS" -delete' || say maint_glpi_logs_failed
+        for folder in "${GLPI_LOG_DIR:-/var/glpi/logs}" /var/glpi/logs /var/glpi/_log; do
+            [ -d "$folder" ] || continue
+            for file in "$folder"/*.log; do
+                [ -f "$file" ] || continue
+                [ "$(wc -c < "$file")" -gt "$GDM_LOG_BYTES" ] || continue
+                gzip -c "$file" > "$file.$stamp.gz" && : > "$file"
+            done
+            find "$folder" -maxdepth 1 -type f -name "*.log.*.gz" -mtime +"$GDM_LOG_DAYS" -delete
+        done' || say maint_glpi_logs_failed
 }
 
 # ---------------------------------------------------------------- certificates

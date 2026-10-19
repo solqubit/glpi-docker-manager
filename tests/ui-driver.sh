@@ -25,6 +25,13 @@ case ${1:-select} in
         choose choice ui_menu_prompt 1 "${options[@]}"
         printf 'RESULT=%s\n' "$choice";;
     ask) ask choice port_prompt 8080; printf 'RESULT=%s\n' "$choice";;
+    ask-cancel)
+        choice=unchanged
+        if ask choice port_prompt 8080; then exit 1; fi
+        [[ $choice == unchanged ]]
+        printf 'CANCELLED\n';;
+    typed) typed_confirm RESTORE; printf 'CONFIRMED\n';;
+    pause) ui_pause ui_continue; printf 'PAUSE_DONE\n';;
     valid-port) ask_value choice port_prompt 8080 port; printf 'RESULT=%s\n' "$choice";;
     secret|secret-hidden|secret-toggle|secret-long)
         secret_prompt choice

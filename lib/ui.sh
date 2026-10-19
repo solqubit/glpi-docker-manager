@@ -486,7 +486,8 @@ ui_draw_choices() {
         while IFS= read -r ui_part && (( ui_count < 2 )); do
             if (( ui_count == 0 )); then printf '  ' >&2; ui_color 2; printf '[*] ' >&2; ui_color 0
             else printf '      ' >&2; fi
-            [[ -z $UI_KIND_TONE || ${ui_kinds[ui_selected]} == back ]] && ui_color 0 || ui_color "${UI_KIND_TONE#1;}"
+            if [[ -z $UI_KIND_TONE || ${ui_kinds[ui_selected]} == back ]]; then ui_color 0
+            else ui_color "${UI_KIND_TONE#1;}"; fi
             printf '%s' "$ui_part" >&2; ui_color 0; printf '\033[K\n' >&2
             ((ui_count+=1)); ((UI_DRAW_LINES+=1))
         done < <(ui_wrap "${ui_helps[ui_selected]:- }" "$((UI_WIDTH-4))")
@@ -719,7 +720,7 @@ ui_status() {
     printf '      · %s\n' "$*" >&2
 }
 ui_pause() {
-    local ui_pause_input
+    local ui_pause_input ui_pause_next
     [[ -t 0 ]] || return 0
     printf '\n  ' >&2; ui_color 2; printf '%s' "$(t "${1:-ui_continue}")" >&2; ui_color 0
     if ui_interactive; then
@@ -727,9 +728,19 @@ ui_pause() {
         UI_TTY_STATE=$(stty -g)
         stty -echo -icanon min 1 time 0
         while IFS= read -rsn 1 ui_pause_input; do
-            [[ -n $ui_pause_input && $ui_pause_input != $'\e' ]] || break
+            [[ -n $ui_pause_input ]] || break
+            if [[ $ui_pause_input == $'\e' ]]; then
+                # A lone Escape accepts; an arrow's complete escape sequence does not.
+                if ! IFS= read -rsn 1 -t 0.1 ui_pause_next; then break; fi
+                case $ui_pause_next in
+                    '') break;;
+                    '['|O)
+                        while IFS= read -rsn 1 -t 0.1 ui_pause_next; do
+                            [[ ! $ui_pause_next =~ [@-~] ]] || break
+                        done;;
+                esac
+            fi
         done
-        if [[ $ui_pause_input == $'\e' ]]; then IFS= read -rsn 8 -t 0.05 ui_pause_input || true; fi
         ui_restore
     else
         IFS= read -rs ui_pause_input || true

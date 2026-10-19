@@ -16,7 +16,8 @@ root = Path(__file__).resolve().parents[1]
 
 
 def terminal_case(mode, keys, expected, language='es', columns=80, rows=24,
-                  extra_env=None, expected_code=0, interrupt=False, followups=()):
+                  extra_env=None, expected_code=0, interrupt=False, followups=(),
+                  ready=None, remain_open=False):
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', rows, columns, 0, 0))
     original = termios.tcgetattr(slave)
@@ -37,7 +38,8 @@ def terminal_case(mode, keys, expected, language='es', columns=80, rows=24,
         while time.monotonic() < deadline:
             if select.select([master], [], [], 0.1)[0]:
                 captured.extend(os.read(master, 65536))
-            if b'\x1b[?25l' in captured or b'> ' in captured or b'[1] ' in captured or mode == 'fail':
+            if (b'\x1b[?25l' in captured or b'> ' in captured or b'[1] ' in captured
+                    or mode == 'fail' or ready and ready in captured):
                 break
             if process.poll() is not None:
                 break
@@ -47,6 +49,10 @@ def terminal_case(mode, keys, expected, language='es', columns=80, rows=24,
             os.write(master, b'\x03')
         elif keys:
             os.write(master, keys)
+        if remain_open:
+            time.sleep(.2)
+            assert process.poll() is None, 'A navigation key accepted the pause'
+            os.write(master, b'\n')
         follow_index = 0
         follow_offset = len(captured)
         while process.poll() is None:
@@ -66,7 +72,7 @@ def terminal_case(mode, keys, expected, language='es', columns=80, rows=24,
         assert process.returncode == expected_code, captured.decode(errors='replace')
         assert expected in captured, captured.decode(errors='replace')
         assert termios.tcgetattr(slave) == original, 'Terminal settings leaked'
-        if mode not in ('ask', 'valid-port', 'fail', 'root-secret') and not mode.startswith('secret') and not extra_env:
+        if mode not in ('ask', 'ask-cancel', 'typed', 'pause', 'valid-port', 'fail', 'root-secret') and not mode.startswith('secret') and not extra_env:
             assert b'\x1b[?25h' in captured, 'Cursor remained hidden'
         return bytes(captured)
     finally:
@@ -91,6 +97,13 @@ uncolored = terminal_case('select', b'\x1b[B\n', b'RESULT=production', extra_env
 assert re.search(rb'\x1b\[[0-9;]*m', uncolored) is None
 terminal_case('select', b'production\n', b'RESULT=production', extra_env={'TERM': 'dumb'})
 terminal_case('ask', b'1808\x1b[D0\n', b'RESULT=18008')
+terminal_case('ask', b'12\t3\x1b[H\x1b[3~\x1b[F4\x01x\x05y\n', b'RESULT=x234y')
+terminal_case('ask', b'old\x15new\n', b'RESULT=new')
+terminal_case('ask-cancel', b'edited\x1b', b'CANCELLED')
+terminal_case('typed', b'RESTORE\n', b'CONFIRMED')
+terminal_case('typed', b'\x1b', b'Cancelado.', expected_code=1)
+terminal_case('pause', b'\x1b[B', b'PAUSE_DONE', ready=b'Pulsa Enter', remain_open=True)
+terminal_case('pause', b'\x1b', b'PAUSE_DONE', ready=b'Pulsa Enter')
 terminal_case('valid-port', b'bad\n18080\n', b'RESULT=18080')
 visible = terminal_case('secret', b'abc\n', b'SECRET_OK')
 assert b'abc' in visible and b'\r\x1b[2K' in visible

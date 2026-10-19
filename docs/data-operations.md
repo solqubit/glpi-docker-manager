@@ -20,6 +20,8 @@ The archive contains:
   marketplace volume.
 * `caddy_data.tar.gz` and `caddy_config.tar.gz`: persisted ACME/proxy state.
 * `tls/fullchain.pem` and `tls/privkey.pem` when using a local/imported pair.
+* `tls/gdm-ca.pem` and `tls/gdm-ca.key` when using the local CA, preserving its
+  identity and ability to sign renewed server certificates after restoration.
 * `checksums.sha256`: coverage of every payload file.
 
 Backups are private, unencrypted archives. Store off-server copies using an
@@ -93,10 +95,11 @@ Docker startup still determine whether a different architecture is usable. Do no
 assume third-party plugin binaries are portable. Exact images can disappear from
 a registry; retain private image exports separately for long-term recovery.
 
-If replacing an active installation, old containers are stopped and old volumes
-are retained. There is no merge of writes made after the backup. Old volumes can
-contain sensitive data and consume disk; their retirement is a deliberate manual
-administration task, outside routine updates/restores.
+If replacing an active installation, old containers are stopped before restoring
+the backup into fresh volumes. Once the restored services are verified, the
+replaced installation is removed if its pre-restore backup succeeded; otherwise
+it is kept stopped as the return point described above. Writes made after the
+selected backup are not merged into the restored database.
 
 ## Application updates and major migrations
 

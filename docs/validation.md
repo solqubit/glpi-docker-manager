@@ -1,126 +1,119 @@
-# Validation evidence
+# Validation evidence for 1.0.0
 
-> The evidence below was recorded for 0.1.0 on 2026-10-18. Release 1.0.0 adds
-> maintenance, cleanup, restore and update changes; re-run `bash tests/run.sh`,
-> ShellCheck and the opt-in integration tests and record the new results here
-> before publishing 1.0.0.
+Validated on **2026-10-19 (America/Guayaquil)** from a Windows development host
+using Docker Desktop's Linux engine. These results apply to the 1.0.0 working
+tree with the fixes described below; no commit or release was created by this
+validation run.
 
-Local verification on 2026-10-18 used Docker Desktop's Linux engine from a Windows
-development host. The Ubuntu 24.04 test runner accessed the local Docker socket
-and the repository at the same path seen by the daemon. This validates the Linux
-manager inside that environment; the manager is not a native Windows installer.
+## Environment
 
-## Automated checks
+* Test image built from `tests/Dockerfile`, Ubuntu 24.04.5 LTS, x86_64, UID 0.
+* Bash 5.2.21, Python 3.12.3, ShellCheck 0.9.0, OpenSSL 3.0.13.
+* Docker Engine 29.8.2; the test image's Compose client is 2.40.3.
+* Unit tests mount the checkout read-only, copy it into `/tmp/w`, and remove
+  `tests/.runtime` from that copy. No Docker socket is mounted for this suite.
+  Existing private test data is hidden by an empty read-only tmpfs mount to
+  avoid copying gigabytes of old data only to discard it.
 
-* All 24 unit/negative test groups passed, covering stable numeric versions,
-  paginated official release discovery, image filtering, a future GLPI 13 fixture,
-  distribution parsing, configuration validation, Compose password escaping,
-  certificate checks, hostile/corrupt archives, bilingual prompts and interrupted
-  database initialization.
-* Bootstrap regression cases cover an unavailable service, plugin installation,
-  package/service retry, systemd/OpenRC/service dispatch, early administrative
-  access checks, custom/remote endpoints and opaque bearer-token punctuation.
-  Service and package mutations are mocked in these regression cases.
-* Dependency tests confirm that only missing packages are requested and that
-  existing coreutils are not implicitly upgraded. Storage fixtures cover free
-  capacity, exhausted inodes, temporary filesystems, EIO/ENOSPC/read-only errors
-  and cleanup failure preserving the original exit status. Host disk failures
-  are simulated; no real disk is disconnected or damaged in these tests.
-* ShellCheck passed for the entrypoint, modules, templates and Bash tests.
-* Real PTYs exercise Up/Down, Home/End, PageDown, long scrolling menus, English and
-  Spanish choices, editable text, invalid-field retry, Escape, Ctrl+C, NO_COLOR,
-  narrow terminals and TERM=dumb. They also cover short passwords, automatic
-  generation, visible/masked input, toggling, editing and replacing wizard pages.
-  Terminal settings/cursor are restored. A nested
-  step failure stops immediately, shows its private log path and never announces
-  success. Cancelling an operation returns to the menu and removes temporary secrets.
-  Resource Back returns immediately, configuration cards retain their styling,
-  and a simulated spinner or Docker I/O failure stops the manager with status 74.
-* Editable curses forms cover searchable IANA regions/cities, retained values on
-  review Back, cancellation, version Back, pending credentials, private atomic
-  draft writes and the complete two-column 80×24 dashboard. Address detection
-  excludes Docker bridges. Fixtures prove that intermediate patch versions remain
-  selectable and missing image tags are excluded. Status parses both Compose
-  JSON arrays and JSONL without exposing long digests or credentials.
-* Root-layout cases check the installed entry point, independent operational code,
-  repeatable code installation, local-volume device paths and rejection of
-  symlinks that redirect the managed data directories.
-* Capacity fixtures reproduce an 8 GiB free filesystem, shared engine/data
-  budgets, cached versus missing images, and insufficient backup space before
-  any service stop. Staging cleanup preserves saved data and rejects symlinks.
-  Backup tests cover streaming nested checksums, redacted inventory metadata,
-  verified export, overwrite refusal, corruption and pending-recovery protection.
-* Distribution-detection smoke tests ran in Ubuntu 24.04, Debian 12, Fedora 44 and
-  Rocky Linux 9.3 containers. RHEL, AlmaLinux and unknown distribution IDs were
-  covered by fixtures. These are not real-machine Docker installation tests.
+## Reproducing the clean unit run
+
+From the repository root in a shell supporting the following syntax:
+
+```bash
+docker build -t gdm-tests -f tests/Dockerfile tests
+docker run --rm -v "$PWD:/workspace:ro" \
+  --tmpfs /workspace/tests/.runtime:ro gdm-tests bash -c \
+  'cp -r /workspace /tmp/w && rm -rf /tmp/w/tests/.runtime && cd /tmp/w && shellcheck -x start.sh lib/*.sh templates/*.sh tests/*.sh && bash tests/run.sh && python3 -m compileall -q tools tests'
+```
+
+Final results:
+
+```text
+ShellCheck: exit 0, no diagnostics
+tests/run.sh: 26 tests passed
+Python compilation: exit 0
+```
+
+The 26 groups cover numeric release selection and future-branch fixtures;
+permissive OS detection; mocked dependency/Docker bootstrap; capacity and I/O
+failure handling; network address detection; the single-root layout;
+configuration and Compose credential escaping; database exposure; local-CA and
+server-certificate generation, hostname checks, renewal and CA replacement;
+archive/checksum/link/traversal rejection; backup export and deletion protection;
+maintenance retention, schedules and log settings; English/Spanish key and
+format parity; real PTY keyboard interaction and curses setup/dashboard/backup
+views; interrupted installation; and unprivileged help/version.
+
+New regressions additionally check that daily schedules with an empty weekday
+field retain custom log settings, that navigation keys do not accept a pause,
+and that text editing, Tab handling, Escape cancellation and typed confirmations
+restore terminal settings without accepting unintended input.
+
+## Failures found and corrections
+
+* `lib/maintenance.sh`: tab-separated parsing collapsed an empty weekday field
+  into the following log-settings field. Daily schedules silently reverted
+  custom log limits to defaults. A non-whitespace separator preserves the empty
+  field; `tests/maintenance-cases.sh` covers the failing round trip.
+* `lib/ui.sh`: the pause accepted the Escape prefix of an arrow key. It now
+  consumes complete navigation sequences and accepts a lone Escape or Enter.
+  The PTY regression first reproduced the premature return, then passed.
+* `lib/ui.sh`: ShellCheck SC2015 rejected an `A && B || C` color-selection
+  expression. An explicit `if/else` makes its behavior unambiguous.
+* `lib/operations.sh`: ShellCheck SC2016 flagged intentional variables inside
+  the container's shell command. A narrowly scoped annotation documents why
+  expansion must remain inside the container, keeping database credentials out
+  of host command arguments.
+* `tests/integration.sh`: the new CA-download probe used the Docker Desktop bridge
+  hostname as its HTTP Host, which did not match Caddy's configured site. The
+  probe now uses `--connect-to` to retain the configured hostname. Teardown in
+  both integration scripts attempts all owned resources even if an individual
+  removal fails, so subsequent runs can release their fixed test ports.
+
+No test was removed and no certificate, credential or archive validation was
+weakened. The CA integration checks were extended to include a CA download,
+leaf renewal and recovery of the backed-up CA after deliberate replacement.
 
 ## Actual Docker lifecycle
 
-The integration run used official GLPI 10.0.28, 11.0.11 and 12.0.0 images and
-official MySQL 8.4.10 and 8.4.11 images. The engine reported Docker 29.8.2 and
-Compose 5.6.0. Exact image digests are recorded in private test state.
+Integration tests run as root in separate disposable Compose projects, with the
+checkout mounted at the same absolute path used by the Docker daemon. They use
+the Docker socket, official images pinned by digest, and private state beneath
+`tests/.runtime`. Scheduling is disabled with `GDM_INTEGRATION=1` and
+`GDM_SCHEDULER=off`; unrelated running containers are preserved.
 
-The following completed with actual containers and database/file markers:
+`GDM_INTEGRATION=1 bash tests/update-integration.sh` completed successfully using
+GLPI 11.0.10 and 11.0.11 with MySQL 8.4.11. It verified installation, a quiesced
+pre-update backup, an isolated restored rehearsal, application of the selected
+patch, backup integrity/origin, and restoration of the original GLPI version,
+SQL marker and file marker. Start/verify also succeeded after restoration.
 
-* Installation, authenticated SQL, GLPI requirements/schema and HTTP checks.
-* Persistence after recreating the application container.
-* A quiesced backup, followed by deliberately changed data, then restoration into
-  fresh volumes with the original file and SQL values recovered.
-* Automatic self-signed HTTPS with certificate verification.
-* Publishing MySQL on `3306:3306` and removing that publication afterward.
-* Independent MySQL 8.4.10-to-8.4.11 maintenance after an isolated rehearsal.
-* GLPI 10-to-11 and 11-to-12 migrations, each rehearsed on an isolated restored
-  database before applying the production operation path.
-* GLPI 11.0.10-to-11.0.11 patch upgrade, followed by restoration of its automatic
-  pre-update backup. Original application version, SQL marker and file marker
-  were recovered; already-running Start remained idempotent.
+`GDM_INTEGRATION=1 bash tests/integration.sh` also completed successfully. It
+verified GLPI 11.0.11 installation, authenticated SQL/schema/HTTP, public CA
+download, trusted HTTPS, leaf renewal without changing the CA, container
+recreation, a quiesced backup, MySQL exposure on/off, and restoration into fresh
+volumes. Before restoring, the test deliberately replaced the live CA; the
+archive recovered the original CA and key and could sign another valid server
+certificate. SQL/file markers survived. The 11-to-12.0.0 migration then passed
+both its isolated rehearsal and the actual apply/readiness path.
 
-The patch/restore scenario also runs with free-space reporting fixed to 8192 MiB
-while using actual containers. This simulates the reported capacity without
-filling or resizing disks; it does not certify an exact 8 GiB VM. The Bash/curses
-backup browser was exercised through a PTY for inspection, verification, export,
-cancelled deletion and confirmed single-file deletion using disposable archives.
+MySQL stayed on 8.4.11; no newer patch was available for the optional independent
+database-update branch. The resolved Caddy image was 2.11.7. Exact image
+references remain in private test configurations; credentials and backups are
+not published.
 
-Two separate actual terminal tests exercised the first-run Spanish installation
-wizard using arrow keys, from Install through branch/version selection, typed
-fields, settings review, all eight stages and the verified success panel. They used
-GLPI 11, short manually entered passwords, default and customized settings,
-self-signed HTTPS, service status and a repeated installation attempt that
-preserved configuration bytes. Both confirmed `transfer` through the real terminal, verified its archive,
-checked that GLPI/cron and the proxy remained stopped while MySQL stayed running,
-and successfully resumed services through the explicit `start` command.
+Local evidence files (ignored by Git):
 
-The updated wizard runs verified both standard host ports 80/443 and custom ports
-18081/18444, a detected IPv4 address, certificate-verified HTTPS without SNI and
-the correct HTTP-to-HTTPS redirect (including a custom HTTPS port). Existing
-configuration and service volumes stay outside the Git checkout. Terminal views
-were captured from actual PTYs and checked at 80×24 for readability.
-
-The single-root wizard verifies that the installed manager entry point and code,
-configuration, certificates and actual GLPI/MySQL volume devices are under its
-selected root. The extended keyboard run also edits access settings, selects a
-saved archive, types `RESTORE` and recovers a file marker into fresh data folders.
-
-The administrative preflight was also executed as UID 65534 in an isolated
-network-disabled container: help worked and an administrative command stopped
-with the Spanish warning and exact sudo command before touching state or Docker.
-The elevated diagnostic path passed against the actual local engine.
-
-Test resources use unique project IDs and ownership labels. Cleanup removes only
-those projects and their known test volumes. Existing unrelated services are
-preserved. Evidence and backups remain under ignored, private `tests/.runtime/`;
-they contain credentials and must not be published.
+* `tests/.runtime/validation-100-unit.log`
+* `tests/.runtime/validation-100-integration.log`
+* `tests/.runtime/validation-100-update.log`
 
 ## Limits
 
-Public ACME issuance/renewal requires a real domain and reachable public ports;
-it was not exercised against a live certificate authority. The generated public
-Caddyfile was adapted successfully by the official Caddy image with networking
-disabled; its automation policy contained only the explicit Let's Encrypt issuer.
-Imported-certificate
-validation was tested locally, not with every provider's certificate chain.
-ARM64 deployment, host package bootstrap, reboot behavior, SELinux on enforcing
-hosts, external SQL writers, third-party plugins and business integrations need
-validation in the target environment. Validation is run locally; no GitHub Actions
-workflow is included. A rehearsal validates database/schema operations,
-not every application workflow or future upstream release.
+Public Let's Encrypt issuance/renewal, Windows/macOS trust-store deployment,
+ARM64 hardware, real-machine package bootstrap, systemd/cron execution across
+reboots, SELinux enforcement, manager self-update and host uninstallation were
+not exercised against production hosts. A successful database rehearsal does
+not certify every plugin, application workflow or future upstream version.
+The clean unit suite uses fixtures for external failures and host mutations;
+these results do not represent a native Windows installation of the manager.

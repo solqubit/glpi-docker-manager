@@ -147,7 +147,7 @@ tasks) stay in GLPI.
 * **Updates** check that the new image is already local before GLPI is
   stopped, list the plugins registered in GLPI before a branch migration, and
   offer to restore the pre-update backup at once if the apply stage fails.
-* **GLPI technical logs** (`/var/glpi/_log`, not the audit history, which
+* **GLPI technical logs** (`/var/glpi/logs` in the official image, `/var/glpi/_log` in the classic layout; not the audit history, which
   lives in the database) are compressed with the date when they exceed 20 MiB
   and the compressed copies are deleted after 30 days. MySQL keeps its own
   30-day binary-log default.

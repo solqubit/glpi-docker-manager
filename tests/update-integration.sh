@@ -34,8 +34,9 @@ test_cleanup() {
     local id role
     [[ ! -r ${CONFIG:-/nonexistent} ]] || TEST_PROJECTS+=("$(cfg id)")
     for id in "${TEST_PROJECTS[@]}"; do
-        docker ps -aq --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker rm -f >/dev/null
-        docker network ls -q --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker network rm >/dev/null
+        # An individual cleanup failure must not leave later owned resources behind.
+        docker ps -aq --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker rm -f >/dev/null || true
+        docker network ls -q --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker network rm >/dev/null || true
         for role in glpi_data db_data plugins marketplace caddy_data caddy_config; do
             docker volume rm "gdm_${id}_$role" >/dev/null 2>&1 || true
         done

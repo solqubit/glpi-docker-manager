@@ -26,8 +26,9 @@ test_cleanup() {
     local id role
     if [[ -r ${CONFIG:-/nonexistent} ]]; then TEST_PROJECTS+=("$(cfg id)"); fi
     for id in "${TEST_PROJECTS[@]}"; do
-        docker ps -aq --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker rm -f >/dev/null
-        docker network ls -q --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker network rm >/dev/null
+        # An individual cleanup failure must not leave later owned resources behind.
+        docker ps -aq --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker rm -f >/dev/null || true
+        docker network ls -q --filter "label=com.docker.compose.project=gdm_$id" | xargs -r docker network rm >/dev/null || true
         for role in glpi_data db_data plugins marketplace caddy_data caddy_config; do
             docker volume rm "gdm_${id}_$role" >/dev/null 2>&1 || true
         done
@@ -55,6 +56,20 @@ installation_finish
 [[ $(docker volume inspect -f '{{index .Options "device"}}' "$(volume_name db_data)") == "$STATE/data/$(cfg id)/db_data" ]]
 printf '%s\n' 'PASS: official image installation, authenticated database, GLPI schema and HTTP'
 
+# Exercise the local CA before backing up, so restore must preserve its identity.
+jq '.tls="self-signed"' "$CONFIG" > "$STATE/https.json"
+apply_settings "$STATE/https.json"
+verify_services
+ca_before=$(sha256sum < "$CERT_ROOT/self-signed/ca/gdm-ca.pem")
+curl --fail --silent --show-error \
+    --connect-to "$(cfg hostname):$(cfg http_port):${GDM_PROBE_HOST:-127.0.0.1}:$(cfg http_port)" \
+    "http://$(cfg hostname):$(cfg http_port)/gdm-ca.pem" > "$STATE/downloaded-ca.pem"
+cmp "$STATE/downloaded-ca.pem" "$CERT_ROOT/self-signed/ca/gdm-ca.pem"
+tls_force_renew
+[[ $(sha256sum < "$CERT_ROOT/self-signed/ca/gdm-ca.pem") == "$ca_before" ]]
+verify_services
+printf '%s\n' 'PASS: local CA download, server renewal without changing the CA and trusted HTTPS'
+
 # Prove persistence across a container recreation, and recovery of actual user data.
 dc exec -T glpi sh -c 'printf persistent-data > /var/glpi/files/gdm-integration-marker'
 dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql -u"$GDM_DB_USER" "$MYSQL_DATABASE"' <<'SQL'
@@ -72,11 +87,6 @@ UPDATE glpi_configs SET value='changed-after-backup' WHERE context='gdm_integrat
 SQL
 printf '%s\n' 'PASS: recreation persistence and verified quiesced backup'
 
-jq '.tls="self-signed"' "$CONFIG" > "$STATE/https.json"
-apply_settings "$STATE/https.json"
-verify_services
-printf '%s\n' 'PASS: automatic self-signed HTTPS and trusted TLS probe'
-
 if [[ ${GDM_TEST_EXPOSURE:-1} == 1 ]]; then
     jq '.expose_db=true' "$CONFIG" > "$STATE/expose.json"
     apply_settings "$STATE/expose.json"
@@ -88,9 +98,17 @@ if [[ ${GDM_TEST_EXPOSURE:-1} == 1 ]]; then
     printf '%s\n' 'PASS: MySQL exposure on and off after installation'
 fi
 
-# Restore uses a new installation id and retains the previous test volumes.
+# Restore uses a new installation ID and backs up the replaced one before cleanup.
+# Replace the live CA first: restore must recover the archive's CA and signing key.
+tls_new_ca
+[[ $(sha256sum < "$CERT_ROOT/self-signed/ca/gdm-ca.pem") != "$ca_before" ]]
 restore_backup "$backup"
 TEST_PROJECTS+=("$(cfg id)")
+[[ $(sha256sum < "$CERT_ROOT/self-signed/ca/gdm-ca.pem") == "$ca_before" ]]
+openssl verify -CAfile "$CERT_ROOT/self-signed/ca/gdm-ca.pem" "$STATE/current/tls/fullchain.pem" >/dev/null
+tls_force_renew
+[[ $(sha256sum < "$CERT_ROOT/self-signed/ca/gdm-ca.pem") == "$ca_before" ]]
+openssl verify -CAfile "$CERT_ROOT/self-signed/ca/gdm-ca.pem" "$STATE/current/tls/fullchain.pem" >/dev/null
 [[ $(dc exec -T glpi cat /var/glpi/files/gdm-integration-marker) == persistent-data ]]
 actual=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Ns' <<'SQL'
 SELECT value FROM glpi_configs WHERE context='gdm_integration' AND name='marker';

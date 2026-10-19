@@ -109,4 +109,9 @@ maintenance_write
 maintenance_settings
 [[ $LOG_GLPI_MB == 50 && $LOG_BINLOG_DAYS == 3 && $MAINT_MODE == days && $MAINT_EVERY == 2 ]]
 [[ $(jq -r '.logs.binlog_days' "$STATE/maintenance.json") == 3 ]]
+# Daily schedules have no weekdays; that empty field must not swallow log settings.
+MAINT_WEEKDAYS=''
+maintenance_write
+maintenance_settings
+[[ -z $MAINT_WEEKDAYS && $LOG_GLPI_MB == 50 && $LOG_BINLOG_DAYS == 3 ]]
 printf 'PASS: backup rotation by kind, restore cleanup policy, free-space selection, backup schedules and log rotation settings\n'

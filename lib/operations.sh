@@ -357,6 +357,8 @@ update_choices_scan() {
 plugins_panel() {
     local target_major=$1 rows directory version state label
     local -a lines=()
+    # Expand credentials inside the container, never in host command arguments.
+    # shellcheck disable=SC2016
     rows=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Nse "SELECT directory, version, state FROM glpi_plugins ORDER BY state, directory"' 2>/dev/null) || rows=''
     while IFS=$'\t' read -r directory version state; do
         [[ -n $directory ]] || continue
