@@ -60,6 +60,16 @@ descarga, salud de un servicio, intento de comprobación web). La lista de
 versiones de GLPI se guarda 15 minutos y las imágenes se consultan en paralelo, de
 modo que las pantallas de versiones y actualización abren mucho más rápido.
 
+El panel agrupa las acciones por categoría y muestra HTTPS y los días que le
+quedan al certificado, si MySQL está expuesto, el último respaldo y la
+programación de respaldos automáticos. Una tarea diaria (temporizador systemd o
+cron) rota los registros, renueva los certificados autofirmados y puede crear
+respaldos automáticos (se guardan los 5 más recientes; los manuales nunca se
+rotan). El gestor también muestra la caducidad del certificado, desinstala GLPI
+de forma limpia y se actualiza desde las versiones publicadas en GitHub. La
+configuración propia de GLPI (correo, plugins, acciones automáticas) se hace en
+GLPI.
+
 Las notas completas de una versión pueden abrirse desde el selector; los avisos
 de seguridad y soporte se muestran siempre. El detalle de instalación se guarda
 en registros privados y se indica su ruta si una etapa falla. Hay un modo sencillo

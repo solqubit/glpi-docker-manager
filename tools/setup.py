@@ -37,6 +37,30 @@ def timezones():
     return sorted(result)
 
 
+def server_timezone():
+    """The host's configured IANA zone, when it is a real zone other than UTC."""
+    zone = ''
+    try:
+        zone = Path('/etc/timezone').read_text(encoding='utf-8').strip()
+    except OSError:
+        try:
+            target = os.readlink('/etc/localtime')
+            zone = target.split('zoneinfo/', 1)[1] if 'zoneinfo/' in target else ''
+        except OSError:
+            pass
+    valid = re.fullmatch(r'[A-Za-z0-9_+/-]+', zone) and '..' not in zone
+    if not valid or zone in ('UTC', 'Etc/UTC') or not (Path('/usr/share/zoneinfo') / zone).is_file():
+        return ''
+    return zone
+
+
+def access(data):
+    secure = data['tls'] != 'off'
+    port = data['https_port' if secure else 'http_port']
+    suffix = '' if port == (443 if secure else 80) else f':{port}'
+    return f"{'https' if secure else 'http'}://{data['hostname']}{suffix}"
+
+
 def validate(field, value, data):
     if field in ('db_password', 'root_password'):
         if any(ord(char) < 32 or ord(char) == 127 for char in value):
@@ -161,13 +185,18 @@ class Setup:
 
     def timezone(self):
         zones = timezones()
+        server = server_timezone()
         while True:
             areas = sorted({zone.split('/')[0] for zone in zones if '/' in zone})
+            # The server's own zone is offered first when it is not UTC.
+            suggested = [('=' + server, '★ ' + self.ui.t('setup_timezone_server', server), 'ok')] if server else []
             area = self.ui.menu(self.ui.t('setup_timezone_area'),
-                                [('UTC', 'UTC', 'accent')] + [(a, a, '') for a in areas],
+                                suggested + [('UTC', 'UTC', 'accent')] + [(a, a, '') for a in areas],
                                 search=True, help_text=self.ui.t('setup_timezone_help'))
             if area is None or area == 'UTC':
                 return area
+            if area.startswith('='):
+                return area[1:]
             choices = [(zone, zone, '') for zone in zones if zone.startswith(area + '/')]
             current = next((i for i, row in enumerate(choices) if row[0] == self.data['timezone']), 0)
             zone = self.ui.menu(self.ui.t('setup_timezone_city'), choices, current,
@@ -179,6 +208,7 @@ class Setup:
         field = next(row for row in self.fields if row[0] == key)
         _, label, kind, _ = field
         value = None
+        generated = False
         if kind == 'timezone':
             value = self.timezone()
         elif kind == 'tls':
@@ -198,20 +228,32 @@ class Setup:
             def validator(text):
                 error = validate(key, text, self.data)
                 return self.ui.t(error) if error else ''
+            preview = None
+            if key in ('hostname', 'http_port', 'https_port'):
+                def preview(text):
+                    # Live resulting URL while a port or address is typed.
+                    if validate(key, text, self.data):
+                        return ''
+                    candidate = dict(self.data, **{key: int(text) if kind == 'port' else text})
+                    return self.ui.t('setup_access', access(candidate))
             hint = self.ui.t('password_prompt' if kind == 'secret' else 'setup_edit_hint')
             if key == 'hostname':
                 hint = self.ui.t('setup_network_hint', self.data.get('_detected_host', 'localhost'))
-            value = self.ui.edit(self.ui.t(label), self.data[key], hint, validator, kind == 'secret')
+            value = self.ui.edit(self.ui.t(label), self.data[key], hint, validator, kind == 'secret',
+                                 default=None if kind == 'secret' else self.defaults.get(key), preview=preview)
             if value is not None:
                 if kind == 'port':
                     value = int(value)
                 elif kind == 'secret' and not value:
                     value = secrets.token_hex(24)
+                    generated = True
         if value is not None:
             self.data[key] = value
             self.save()
             self.notice = self.ui.t('setup_saved', self.ui.t(label).split(' · ')[0])
             self.notice_style = 'ok'
+            if generated:
+                self.notice = self.ui.t('setup_password_generated', self.ui.t(label).split(' · ')[0])
             if key == 'tls' and value == 'custom':
                 folder = Path(self.data['cert_dir']) / 'custom'
                 self.notice = self.ui.t('cert_instructions', str(folder / 'fullchain.pem'), str(folder / 'privkey.pem'))

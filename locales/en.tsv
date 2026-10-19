@@ -15,21 +15,21 @@ bad_root_password	The official MySQL root initialization does not safely accept 
 destructive	This changes existing data. Type exactly %s to continue:
 cancelled	Cancelled.
 dependencies	Missing dependencies:%s
-install_dependencies	Install the listed dependencies using the detected package manager? [y/N]
+install_dependencies	Install the listed dependencies using the detected package manager?
 manual_dependencies	Install curl, jq, openssl, tar, gzip, coreutils, util-linux and iproute2 manually, then run again.
 docker_service_stopped	The local Docker engine is not responding. Starting its existing service and checking again; sudo may request your password.
-docker_retry_confirm	After reviewing the instructions, retry and continue this wizard? [y/N]
+docker_retry_confirm	After reviewing the instructions, retry and continue this wizard?
 docker_start_failed	Docker could not be started or is still unavailable. On systemd, inspect: sudo systemctl status docker --no-pager ; sudo journalctl -u docker -n 50 --no-pager . With service, inspect: sudo service docker status . Resolve the reported daemon/socket problem and run the manager again.
 docker_context_help	The current endpoint is %s. For rootless Docker, try: systemctl --user start docker ; docker info . For Docker Desktop, start Desktop and verify its Linux integration/context. The manager cannot start the host's default service for a custom socket. See https://docs.docker.com/engine/security/rootless/
 docker_plugins_missing	Docker works, but Compose V2 or Buildx is missing. The manager can install available plugin packages from your configured repositories.
-docker_plugins_confirm	Install the missing Docker plugins using the detected package manager? [y/N]
+docker_plugins_confirm	Install the missing Docker plugins using the detected package manager?
 docker_plugins_manual	Compatible plugin packages were not found in the configured repositories. Follow https://docs.docker.com/compose/install/linux/ and https://docs.docker.com/build/install/buildx/ ; verify docker compose version and docker buildx version, then run again.
 plugin_packages	Plugin packages: %s
 compose_missing	Install the Docker Compose V2 plugin. See https://docs.docker.com/compose/install/linux/
 buildx_missing	Install the Docker Buildx plugin to verify image digests and architectures: https://docs.docker.com/build/install/buildx/
 manual_docker	Automatic Docker installation is not documented for this distribution. Install Docker Engine, Buildx and Compose using your distribution's instructions: https://docs.docker.com/engine/install/ . Then run again; unlisted distributions are allowed.
 docker_plan	Docker Engine, Buildx and Compose will be installed for %s. Procedure: %s . Existing competing packages will not be removed.
-install_docker	Install Docker using the procedure shown above? [y/N]
+install_docker	Install Docker using the procedure shown above?
 repository_exists	A manager Docker repository file already exists. Inspect it before retrying bootstrap.
 daemon_manual	Start the Docker daemon using your init system, then run the manager again.
 linux_only	Run this manager on Linux with Bash 4.4+.
@@ -43,9 +43,9 @@ release_limit	Release pagination exceeded its safety limit. No release list was 
 support_unknown	Support status could not be verified automatically. Review https://github.com/glpi-project/glpi/security/policy
 release_notes	Official release notes for GLPI %s: %s
 security_release	SECURITY RELEASE: upstream recommends upgrading. Review the security fixes and any important notices in the official release notes below.
-production_http_warning	Production HTTP was selected. Configure HTTPS or a trusted external TLS proxy before exposing users' sessions. Continue with HTTP? [y/N]
+production_http_warning	Production HTTP was selected. Configure HTTPS or a trusted external TLS proxy before exposing users' sessions. Continue with HTTP?
 glpi10_warning	WARNING: GLPI 10 is outside ordinary upstream support following GLPI 12. Version 10.0.28 was announced as the final 10.0 release. No further ordinary bug/security fixes are expected. See https://www.glpi-project.org/en/glpi-12/ . Release notes above may describe the policy at their publication date.
-unsupported_confirm	Keep using this unsupported branch after reviewing the warning? [y/N]
+unsupported_confirm	Keep using this unsupported branch after reviewing the warning?
 older_release	A newer stable release exists in this branch: %s. Older patches may lack security fixes.
 choose_version	Which GLPI version would you like to install?
 more_versions	Another stable version…
@@ -75,11 +75,11 @@ db_user_prompt	Database application user:
 expose_prompt	Expose the database port for external connections?
 storage_notice	Application and database data stays inside the installation root, mounted through labelled persistent Docker volumes.
 root_password	Choose the separate MySQL administrator password.
-install_confirm	Create the configuration and deploy this installation? [y/N]
+install_confirm	Create the configuration and deploy this installation?
 ready	Open GLPI in your browser: %s
 port_busy	A required host port is already in use: %s
 install_exists	An installation already exists. Configuration and credentials were not changed.
-install_resume	Configuration exists but installation did not complete. Resume the original installation without regenerating credentials? [y/N]
+install_resume	Configuration exists but installation did not complete. Resume the original installation without regenerating credentials?
 backup_started	Stopping GLPI and its cron worker for a consistent backup. Access is interrupted during this operation.
 backup_ready	Backup completed and checksums verified: %s . It contains secrets; store an off-server copy privately.
 backup_invalid	The backup failed validation. No restore was attempted.
@@ -88,23 +88,23 @@ backup_path	Absolute path to the backup archive:
 restore_effect	Restore creates fresh volumes using the backup's original image versions. Existing volumes are retained. Current services will stop; newer writes are not merged.
 restore_done	Restore verified. Previous volumes are retained. Review URL, HTTPS/DNS and all integrations before switching traffic.
 transfer	Source GLPI and its cron worker remain STOPPED at this backup's snapshot. Copy %s privately to the destination, clone this repository there and run ./start.sh restore. Verify URL, certificates, users, data and integrations before changing DNS. Keep the source stopped while the destination is active. To cancel the transfer, run ./start.sh start on the source.
-transfer_confirm	Prepare the final transfer backup and leave source GLPI stopped to prevent divergent writes or duplicate background jobs? [y/N]
+transfer_confirm	Prepare the final transfer backup and leave source GLPI stopped to prevent divergent writes or duplicate background jobs?
 backup_space	Not enough free space for a backup and verification. Free space or move the state directory to a larger filesystem.
 update_current	Installed GLPI: %s → selected target: %s.
 update_none	No later stable release exists in this branch.
-update_confirm	Create a fresh backup and update GLPI to the selected release? [y/N]
+update_confirm	Create a fresh backup and update GLPI to the selected release?
 migration_warning	Major migration requires reviewing plugins, inventory, API integrations and release notes. GLPI 12 changes knowledge-base permissions and reverse-proxy handling. A rehearsal uses isolated volumes, no published ports and no external network; cron is disabled. Functional review is still required.
-migration_review	Have you reviewed plugin compatibility and the target release's migration requirements? [y/N]
+migration_review	Have you reviewed plugin compatibility and the target release's migration requirements?
 rehearsal_ok	The isolated database migration and schema check succeeded. This does not certify plugins or integrations.
 updated	Update verified. Current GLPI: %s.
 db_update_warning	MySQL maintenance is limited to the recorded 8.4 series. Test the target on a backup first and schedule downtime. Changing engine images can alter database files.
-db_update_confirm	Back up and apply the selected MySQL patch? [y/N]
-config_confirm	Apply this configuration change? Services may briefly restart. [y/N]
+db_update_confirm	Back up and apply the selected MySQL patch?
+config_confirm	Apply this configuration change? Services may briefly restart.
 config_restored	Previous configuration restored after validation failed. Inspect logs before trying again.
-credentials_warning	Database credentials are hidden. Reveal them in this terminal? [y/N]
+credentials_warning	Database credentials are hidden. Reveal them in this terminal?
 credentials_note	These are database credentials, not GLPI web account passwords. Editing .env does not rotate existing MySQL accounts.
 menu	\n  GLPI Docker Manager\n  1) Status                 2) Start                3) Stop\n  4) Logs                   5) Check updates        6) Update GLPI\n  7) Backup                 8) Restore              9) HTTPS\n 10) MySQL exposure        11) Credentials         12) Transfer\n 13) Major migration       14) MySQL patch         15) Language\n 16) Diagnose              17) Refresh GLPI image   18) Recovery\n  0) Exit\n
-stop_confirm	Stop GLPI and MySQL? [y/N]
+stop_confirm	Stop GLPI and MySQL?
 diagnose_note	Diagnostics do not print passwords. Raw Docker/GLPI logs may contain sensitive application data; review before sharing.
 recover_prompt	An operation was interrupted. Inspect operation.json and logs. Restore a known-good backup, or type RESUME only after validating the current image/schema to retry readiness checks. Automatic database rollback is not attempted.
 recover_done	Current services and schema verified; the operation journal was closed.
@@ -293,11 +293,11 @@ menu_address	Access IP / ports / time zone
 menu_https	HTTPS and certificates
 menu_exposure	Expose / close MySQL port
 menu_credentials	View database credentials
-menu_transfer	Move to another server
+menu_transfer	Move to another server (stops GLPI)
 menu_database_update	Update MySQL patches
 menu_language	Change language
 menu_diagnose	Diagnose installation
-menu_refresh	Refresh current image
+menu_refresh	Re-download the same GLPI version
 menu_recover	Recover interrupted operation
 menu_backups	Manage backups
 setup_access_intro	Edit a field with Enter. Return to this screen after each change. Services restart only when you apply the reviewed configuration.
@@ -413,3 +413,125 @@ status_release_page	GitHub page %s
 status_resolving	checking %s
 db_updated	MySQL update verified. Current MySQL: %s.
 registry_rate_limited	Docker Hub rejected some lookups because of its rate limit (HTTP 429). Wait a few minutes or run docker login, then try again.
+menu_certificates	Certificates: status and renewal
+menu_schedule	Automatic backups and maintenance
+menu_self_update	Update this manager
+menu_uninstall	Uninstall GLPI
+help_group_manager	Manager
+help_cmd_maintenance	Run the daily maintenance now
+desc_status	Services, health, versions and published ports.
+desc_start	Start GLPI if stopped and verify database, schema and web access.
+desc_stop	Stop GLPI and MySQL; data is kept.
+desc_logs	Recent container logs, scrollable.
+desc_update	Install a later GLPI release; a backup and a rehearsal run first.
+desc_check-updates	Show the latest GLPI releases without changing anything.
+desc_refresh-image	Pull a newer image digest of the installed GLPI version.
+desc_db-update	Apply the latest MySQL 8.4 patch with backup and rehearsal.
+desc_diagnose	System, Docker, disk and configuration summary without passwords.
+desc_self-update	Download the latest release of this manager; GLPI is not touched.
+desc_uninstall	Remove GLPI containers, volumes and data (asks for UNINSTALL).
+desc_quit	Close the manager; GLPI keeps running.
+desc_backup	Create a verified manual backup; manual backups are never rotated.
+desc_backups	Browse, verify, export, restore or delete backups.
+desc_restore	Restore GLPI from a backup archive.
+desc_schedule	Daily automatic backups (5 kept), log rotation and certificate renewal.
+desc_transfer	Final backup for another server; GLPI stays stopped afterwards.
+desc_address	Server address, web ports and time zone.
+desc_https	HTTP only, self-signed, Let's Encrypt or your own certificate.
+desc_certificates	Expiry date, renewal and reload of the HTTPS certificate.
+desc_db-exposure	Publish MySQL on port 3306 or keep it internal.
+desc_credentials	Show the database credentials after confirmation.
+desc_language	Interface language of this manager.
+dash_age_days	%s d ago
+dash_age_hours	%s h ago
+dash_age_minutes	%s min ago
+dash_tls_off	HTTPS: off
+dash_tls	HTTPS: %s
+dash_tls_days	HTTPS: %s (%s d left)
+ui_tls_short_self-signed	self-signed
+ui_tls_short_acme	Let's Encrypt
+ui_tls_short_custom	own certificate
+dash_db_public	MySQL: exposed :3306
+dash_db_private	MySQL: internal
+dash_backup	Backup: %s (%s)
+dash_backup_none	No backups yet
+dash_auto_on	Auto backup %s:00
+dash_auto_off	Auto backups off
+dash_maintenance_missing	Maintenance not scheduled
+backup_origin_auto	Automatic
+backups_counts	%s manual · %s automatic.
+ui_db_current	Current state
+ui_db_unchanged	No change: MySQL access stays as it is.
+firewall_docker	Docker publishes port %s directly in iptables, bypassing ufw/firewalld rules. Restrict access in the DOCKER-USER chain or at your network firewall.
+compose_refresh	Applying container log size limits once; services restart briefly.
+maint_title	Automatic backups and maintenance
+maint_backups	Automatic backups
+maint_on	Enabled
+maint_off	Disabled
+maint_hour	Daily at
+maint_keep	Automatic backups kept
+maint_scheduler	Scheduler
+maint_scheduler_on	Installed (%s)
+maint_scheduler_missing	Not installed
+maint_body	The daily task also rotates logs and renews self-signed certificates. GLPI stops for a few minutes during each backup. Only the %s newest automatic backups are kept; manual backups are never deleted automatically.
+maint_prompt	What do you want to change?
+maint_enable	Enable automatic backups
+maint_disable	Disable automatic backups
+maint_change_hour	Change the time
+maint_run_now	Run maintenance now
+maint_hour_prompt	At what time should maintenance run?
+maint_saved	✓ Maintenance schedule saved
+maint_no_scheduler	Automatic maintenance could not be scheduled (no systemd or cron). Run ./start.sh maintenance periodically.
+maint_skipped	Maintenance skipped: the installation is not ready or an operation is pending.
+maint_services_stopped	Automatic backup skipped: GLPI is not running.
+maint_done	Maintenance completed
+backups_prune_skipped	Old automatic backup kept because it is protected: %s
+cert_title	HTTPS certificate
+cert_mode	Mode
+cert_expiry	Expires
+cert_days	in %s days (%s)
+cert_expired	EXPIRED %s days ago (%s)
+cert_unknown	Unknown: the certificate could not be read
+cert_checking	Reading the HTTPS certificate
+cert_off	HTTPS is disabled; there is no certificate to renew.
+cert_prompt	What do you want to do?
+cert_enable_https	Configure HTTPS
+cert_help_self-signed	Self-signed certificates are renewed automatically by the daily maintenance 30 days before they expire. Renew now to issue a new one immediately; clients must trust the new certificate again.
+cert_help_custom	Imported certificates are not renewed by the manager. Replace %s and %s with the new files, then choose Reload.
+cert_help_acme	Caddy renews Let's Encrypt certificates automatically about 30 days before expiry. Keep the domain pointed here and TCP 80/443 reachable from the Internet.
+cert_renew_now	Renew now (new certificate, services restart)
+cert_reload	Reload the PEM files (services restart)
+cert_restart_proxy	Restart the HTTPS proxy to retry the renewal
+cert_step_apply	Applying the certificate
+cert_step_restart	Restarting the HTTPS proxy
+cert_applied	✓ Certificate applied
+cert_expiring	The HTTPS certificate expires in %s days. Open Certificates to renew it.
+cert_auto_renewing	The self-signed certificate expires in %s days; renewing it.
+cert_custom_expiring	The imported certificate expires in %s days; replace the PEM files and reload them.
+cert_acme_expiring	The Let's Encrypt certificate expires in %s days; restarting the proxy to retry. Check that ports 80/443 are reachable.
+uninstall_title	Uninstall GLPI
+uninstall_body	This removes the GLPI containers, Docker volumes, data folders, configuration revisions, logs and scheduled maintenance under %s.
+uninstall_images	Docker and its images stay installed; remove unused images with: docker image prune -a
+uninstall_prompt	What do you want to remove?
+uninstall_keep	Remove GLPI, keep backups and certificates
+uninstall_all	Remove everything, including backups and this manager
+uninstall_step_services	Removing containers and volumes
+uninstall_step_data	Removing data and configuration
+uninstall_step_scheduler	Removing the scheduled maintenance
+uninstall_done	✓ GLPI was uninstalled
+uninstall_kept	Backups kept in: %s
+uninstall_all_done	Everything under %s was removed.
+self_update_checking	Checking the latest manager release
+self_update_unavailable	Could not read the manager releases on GitHub. Try again later.
+self_update_none	The manager is up to date (%s).
+self_update_title	Manager update available
+self_update_versions	Installed: %s → available: %s
+self_update_help	Only the manager code is replaced. GLPI, its data and backups are not touched; the previous version stays in manager-releases.
+self_update_confirm	Download and install this manager version?
+self_update_downloading	Downloading the manager
+self_update_invalid	The downloaded manager is incomplete or invalid; nothing was changed.
+self_update_git	This manager runs from a Git checkout (%s). Update it with: git pull
+self_update_restart	Restarting with the new manager version…
+setup_timezone_server	Server time zone: %s
+setup_field_values	Current: %s · Default: %s
+setup_password_generated	%s: a random 48-character password was generated. View it later in View database credentials.

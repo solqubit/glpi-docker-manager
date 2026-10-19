@@ -10,7 +10,7 @@ export GDM_ROOT
 GDM_STATE_DIR="$GDM_ROOT/tests/.runtime/integration-$(openssl rand -hex 8)"
 GDM_CERT_DIR="$GDM_STATE_DIR/certs"
 export GDM_STATE_DIR GDM_CERT_DIR
-for module in core system releases config docker tls backup operations; do
+for module in core system releases config docker tls backup maintenance operations; do
     # shellcheck source=/dev/null
     source "$GDM_ROOT/lib/$module.sh"
 done

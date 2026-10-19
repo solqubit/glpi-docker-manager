@@ -108,12 +108,18 @@ class Terminal:
             except curses.error:
                 pass
 
-    def frame(self, title, notice='', notice_style='accent'):
-        """Header shared with lib/ui.sh; returns the first free row and height."""
-        self.screen.erase()
+    def measure(self):
+        """Set left/width for the current terminal size; returns (height, width).
+        Callers that size content before frame() must call this first."""
         height, width = self.screen.getmaxyx()
         self.left = max(2, (width - 104) // 2)
         self.width = max(12, min(100, width - self.left - 2))
+        return height, width
+
+    def frame(self, title, notice='', notice_style='accent'):
+        """Header shared with lib/ui.sh; returns the first free row and height."""
+        self.screen.erase()
+        height, width = self.measure()
         name = 'GLPI Docker Manager'
         tagline = f' v{self.version} · {self.t("ui_subtitle")}'
         if len(name) + len(tagline) > self.width:
@@ -236,7 +242,9 @@ class Terminal:
                 query += key
                 selected = 0
 
-    def edit(self, title, value, hint, validator, secret=False):
+    def edit(self, title, value, hint, validator, secret=False, default=None, preview=None):
+        """Framed text field. default is shown for reference; preview(text)
+        returns a live line such as the resulting URL."""
         visible = os.environ.get('GDM_PASSWORD_VISIBILITY') != 'hidden'
         if self.screen is None:
             print('\n' + title + '\n' + hint, file=sys.stderr)
@@ -255,14 +263,31 @@ class Terminal:
         while True:
             top, height = self.frame(title, error or hint, 'error' if error else 'accent')
             display = text if not secret or visible else '*' * len(text)
-            start = max(0, position - self.width + 5)
-            self.put(top, self.left, '> ' + display[start:start + self.width - 3])
-            self.put(height - 2, self.left, self.t('setup_edit_keys'), 'accent')
+            inner = max(8, self.width - 6)
+            start = max(0, position - inner + 1)
+            # ╭──╮ / │ > value │ / ╰──╯ input box, then reference lines.
+            self.put(top, self.left, '╭' + '─' * (inner + 4) + '╮', 'title')
+            self.put(top + 1, self.left, '│', 'title')
+            self.put(top + 1, self.left + 2, '>', 'accent')
+            self.put(top + 1, self.left + 4, display[start:start + inner], 'bold')
+            self.put(top + 1, self.left + inner + 5, '│', 'title')
+            self.put(top + 2, self.left, '╰' + '─' * (inner + 4) + '╯', 'title')
+            row = top + 3
             if secret:
-                self.put(height - 3, self.left, self.t('ui_password_keys'))
+                marker = self.t('ui_password_visible' if visible else 'ui_password_hidden')
+                self.put(row, self.left, f'[{marker}] ' + self.t('ui_password_keys'), 'dim')
+                row += 1
+            elif default not in (None, ''):
+                self.put(row, self.left, self.t('setup_field_values', value, default), 'dim')
+                row += 1
+            if preview is not None:
+                line = preview(text)
+                if line:
+                    self.put(row, self.left, '[*] ' + line, 'accent')
+            self.put(height - 2, self.left, self.t('setup_edit_keys'), 'accent')
             self.cursor(True)
-            self.screen.move(min(top, height - 1), min(self.left + 2 + position - start,
-                                                       self.screen.getmaxyx()[1] - 2))
+            self.screen.move(min(top + 1, height - 1), min(self.left + 4 + position - start,
+                                                           self.screen.getmaxyx()[1] - 2))
             self.screen.refresh()
             key = self.key()
             self.cursor(False)

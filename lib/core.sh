@@ -99,7 +99,8 @@ init_state() {
     chmod 700 "$STATE"
     mkdir -p -- "$STATE/revisions" "$STATE/backups" "$STATE/cache"
     exec {GDM_LOCK_FD}>"$STATE/manager.lock"
-    flock -n "$GDM_LOCK_FD" || die locked
+    if (( ${GDM_LOCK_WAIT:-0} > 0 )); then flock -w "$GDM_LOCK_WAIT" "$GDM_LOCK_FD" || die locked
+    else flock -n "$GDM_LOCK_FD" || die locked; fi
 }
 cleanup() {
     local rc=$? path

@@ -29,8 +29,10 @@ tls_prepare() {
     mkdir -p -- "$source" || die permissions "$source"
     chmod 700 "$source"
     if [[ $mode == self-signed ]]; then
-        if [[ ! -f $source/fullchain.pem || ! -f $source/privkey.pem ]]; then regenerate=true
-        elif ! openssl x509 -in "$source/fullchain.pem" -noout -checkend 86400 >/dev/null 2>&1; then regenerate=true
+        # Renewed 30 days before expiry (daily maintenance) or on request.
+        if [[ ${GDM_TLS_FORCE_RENEW:-} == 1 ]]; then regenerate=true
+        elif [[ ! -f $source/fullchain.pem || ! -f $source/privkey.pem ]]; then regenerate=true
+        elif ! openssl x509 -in "$source/fullchain.pem" -noout -checkend 2592000 >/dev/null 2>&1; then regenerate=true
         elif [[ $host =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             openssl x509 -in "$source/fullchain.pem" -noout -checkip "$host" 2>/dev/null | grep -q 'does match' || regenerate=true
         else openssl x509 -in "$source/fullchain.pem" -noout -checkhost "$host" 2>/dev/null | grep -q 'does match' || regenerate=true; fi

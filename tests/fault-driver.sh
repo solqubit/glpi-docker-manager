@@ -4,7 +4,7 @@ set -Eeuo pipefail
 GDM_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 GDM_STATE_DIR=${GDM_FAULT_DIR:?}
 export GDM_ROOT GDM_STATE_DIR
-for module in core system releases config docker tls backup operations; do
+for module in core system releases config docker tls backup maintenance operations; do
     # shellcheck source=/dev/null
     source "$GDM_ROOT/lib/$module.sh"
 done

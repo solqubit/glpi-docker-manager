@@ -57,14 +57,17 @@ ui_level_of() {
         failed|invalid|unhealthy|docker_start_failed|host_io_error|host_readonly|host_no_space|port_busy|\
         storage_insufficient|storage_inodes|storage_temporary|backup_invalid|backup_space|low_resources|\
         foreign_resource|bad_path|locked|permissions|image_missing|remote_docker|linux_only|architecture|\
-        update_boundary|unknown_command|services_required|not_installed|need_sudo|ui_interrupted)
+        update_boundary|unknown_command|services_required|not_installed|need_sudo|ui_interrupted|\
+        self_update_invalid)
             UI_LEVEL=error;;
         *warning*|*notice*|*unknown*|*required*|*manual*|*_failed|cancelled|cleanup_deferred|config_restored|\
         destructive|older_release|security_release|resource_reference|bad_password|bad_root_password|\
         ui_bad_*|ui_invalid_choice|ui_error_log|docker_service_stopped|docker_storage_unavailable|\
         docker_plugins_missing|update_images_unavailable|update_no_patches|credentials_note|diagnose_note|\
         host_storage_steps|acme_requirements|cert_instructions|releases_stale|install_exists|admin_command|registry_rate_limited|\
-        docker_context_help)
+        docker_context_help|maint_no_scheduler|maint_skipped|maint_services_stopped|backups_prune_skipped|\
+        cert_expiring|cert_custom_expiring|cert_acme_expiring|cert_auto_renewing|firewall_docker|\
+        self_update_git|self_update_unavailable)
             UI_LEVEL=warning;;
         ready|updated|detected|*_done|*_ok|*_ready|*_saved|*_cached|self_signed)
             UI_LEVEL=success;;
@@ -622,9 +625,9 @@ ui_help() {
         "help_group_options;--lang en|es=help_opt_lang;--state-dir PATH=help_opt_state;-h, --help=help_opt_help;--version=help_opt_version"
         "help_group_service;status=menu_status;start=menu_start;stop=menu_stop;logs=menu_logs"
         "help_group_updates;install [x.y.z]=help_cmd_install;check-updates=menu_versions;update [x.y.z]=menu_update;migrate [x.y.z]=help_cmd_migrate;refresh-image=menu_refresh;db-update=menu_database_update"
-        "help_group_data;backup=menu_backup;backups=menu_backups;restore [file]=menu_restore;transfer=menu_transfer"
-        "help_group_settings;address=menu_address;https=menu_https;db-exposure=menu_exposure;credentials=menu_credentials;language=menu_language"
-        "help_group_support;diagnose=menu_diagnose;recover=menu_recover;version=help_opt_version;help=help_opt_help"
+        "help_group_data;backup=menu_backup;backups=menu_backups;restore [file]=menu_restore;schedule=menu_schedule;transfer=menu_transfer"
+        "help_group_settings;address=menu_address;https=menu_https;certificates=menu_certificates;db-exposure=menu_exposure;credentials=menu_credentials;language=menu_language"
+        "help_group_manager;diagnose=menu_diagnose;recover=menu_recover;maintenance=help_cmd_maintenance;self-update=menu_self_update;uninstall=menu_uninstall;version=help_opt_version;help=help_opt_help"
     )
     local -a entries=()
     local out line yellow='' blue='' purple='' bold='' reset=''

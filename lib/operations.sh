@@ -27,6 +27,9 @@ installation_finish() {
     ui_run 8/8 ui_step_verify verify_services
     config_set_status ready
     journal_done
+    [[ -f $STATE/maintenance.json ]] || maintenance_save false 3
+    if ! scheduler_install; then say maint_no_scheduler; fi
+    [[ $(cfg expose_db) != true ]] || say firewall_docker 3306
     ui_panel "$(t ui_install_success)" "$(t ready "$(installation_url)")" \
         "GLPI $(cfg glpi_version) · MySQL $(cfg mysql_version)" \
         "$(t ui_initial_account)" "$(t ui_next_steps)" "$(t layout_entrypoint "$STATE/start.sh")"
@@ -49,13 +52,18 @@ service_logs() {
 }
 service_start_action() { data_ownership_repair; dc up -d; verify_services; }
 service_check_action() { data_ownership_repair; verify_services; }
+service_refresh_action() { data_ownership_repair; tls_reapply; }
 recover_services() { dc up -d; verify_services; config_set_status ready; journal_done; }
 service_start() {
     [[ $(cfg status) == ready && ! -f $STATE/operation.json ]] || die ui_pending_body
     service_snapshot
     local current
     current=$(python3 "$GDM_ROOT/tools/service_view.py" "$CONFIG" "$SERVICE_DATA" "$LANGUAGE" state false)
-    if [[ $current == running ]]; then ui_run 0 ui_service_checking service_check_action
+    if ! jq -e '.services.glpi.logging' "$STATE/current/compose.json" >/dev/null 2>&1; then
+        # Revisions from older versions lack container log limits: re-render once.
+        say compose_refresh
+        ui_run 0 ui_service_starting service_refresh_action
+    elif [[ $current == running ]]; then ui_run 0 ui_service_checking service_check_action
     else ui_run 0 ui_service_starting service_start_action; fi
     ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")" "$(t ui_next_steps)"
 }
@@ -416,9 +424,13 @@ apply_settings() {
     fi
 }
 db_exposure_prompt() {
-    local exposure_choice
-    ui_panel "$(t ui_db_access_title)" "$(t ui_db_access_body)" "$(t ui_db_access_later)"
-    choose exposure_choice expose_prompt no yes "$(t ui_db_expose_yes)" no "$(t ui_db_expose_no)" || exit 10
+    local exposure_choice current=no state
+    [[ $(cfg expose_db) != true ]] || current=yes
+    if [[ $current == yes ]]; then state=$(t ui_db_public); else state=$(t ui_db_private); fi
+    ui_panel "$(t ui_db_access_title)" "$(t ui_db_current)"$'\t'"$state" "$(t ui_db_access_body)" "$(t ui_db_access_later)"
+    choose exposure_choice expose_prompt "$current" yes "$(t ui_db_expose_yes)" no "$(t ui_db_expose_no)" || exit 10
+    if [[ $exposure_choice == "$current" ]]; then say ui_db_unchanged; exit 10; fi
+    [[ $exposure_choice != yes ]] || say firewall_docker 3306
     [[ $exposure_choice == yes ]]
 }
 settings_command() {
@@ -473,12 +485,20 @@ diagnose() {
 dispatch() {
     local command=$1 argument=${2:-} tmp backup_title
     if [[ -f $STATE/operation.json ]]; then
-        case $command in status|logs|diagnose|recover|restore|install|backups) ;; *) die recovery_notice "$STATE/operation.json";; esac
+        case $command in status|logs|diagnose|recover|restore|install|backups|maintenance|uninstall|self-update) ;; *) die recovery_notice "$STATE/operation.json";; esac
     fi
     case $command in
         install) install_wizard "$argument";;
         restore) restore_backup "$argument";;
         diagnose) diagnose;;
+        maintenance) maintenance_command;;
+        uninstall) uninstall_command;;
+        self-update)
+            manager_self_update
+            if [[ -f $STATE/cache/manager-update.pending ]]; then
+                # The menu shell owns the lock and performs the handover (75).
+                if [[ ${GDM_IN_MENU:-false} == true ]]; then exit 75; else manager_handover; fi
+            fi;;
         backups) if [[ -t 0 && -t 1 ]]; then backup_manage; else backup_list; fi;;
         *)
             config_load
@@ -504,6 +524,8 @@ dispatch() {
                     ui_panel "$(t "$backup_title")" "$LAST_BACKUP" "$(t backup_manual_help)"
                     [[ $command != transfer ]] || say transfer "$LAST_BACKUP";;
                 https|db-exposure|address) settings_command "$command";;
+                certificates) certificates_menu;;
+                schedule) schedule_menu;;
                 credentials)
                     say credentials_note
                     if confirm credentials_warning; then
@@ -525,6 +547,16 @@ dispatch() {
             esac;;
     esac
 }
+# Read by tools/main_menu.py: certificate days and maintenance state.
+dashboard_environment() {
+    local CERT_DAYS='' CERT_END_DATE=''
+    GDM_DASH_CERT_DAYS='' GDM_DASH_MAINTENANCE=$(maintenance_summary)
+    if [[ $(cfg tls) == self-signed || $(cfg tls) == custom ]] && cert_days "$STATE/current/tls/fullchain.pem"; then
+        GDM_DASH_CERT_DAYS=$CERT_DAYS
+        (( CERT_DAYS >= 30 )) || say cert_expiring "$CERT_DAYS"
+    fi
+    export GDM_DASH_CERT_DAYS GDM_DASH_MAINTENANCE
+}
 menu() {
     local command menu_result action_file GDM_IN_MENU=true
     while :; do
@@ -536,9 +568,11 @@ menu() {
             if [[ $(cfg status) != ready || -f $STATE/operation.json ]]; then
                 ui_panel "$(t ui_pending_title)" "$(t ui_pending_body)"
                 choose command ui_menu_prompt install install "$(t ui_resume_install)" recover "$(t ui_recover)" \
-                    restore "$(t ui_restore_backup)" logs "$(t ui_logs)" diagnose "$(t ui_diagnose)" quit "$(t ui_exit)" || return 0
+                    restore "$(t ui_restore_backup)" logs "$(t ui_logs)" diagnose "$(t ui_diagnose)" \
+                    uninstall "$(t menu_uninstall)" quit "$(t ui_exit)" || return 0
             else
                 service_snapshot
+                dashboard_environment
                 action_file=$(mktemp "$STATE/.action.XXXXXX"); CLEANUP_PATHS+=("$action_file")
                 if python3 "$GDM_ROOT/tools/main_menu.py" "$CONFIG" "$SERVICE_DATA" "$LANGUAGE" "$action_file"; then :
                 else menu_result=$?; [[ $menu_result != 130 ]] || ui_interrupted; return 0; fi
@@ -563,6 +597,8 @@ menu() {
         set -e
         [[ $menu_result != 130 ]] || return 0
         [[ $menu_result != 10 ]] || continue
+        [[ $menu_result != 75 ]] || manager_handover
+        if [[ $command == uninstall && $menu_result == 0 ]]; then return 0; fi
         if [[ $menu_result == 74 ]]; then GDM_STORAGE_FAILURE=true; exit 74; fi
         if [[ $command == language && $menu_result == 0 ]]; then
             LANGUAGE_OVERRIDE=''
@@ -601,11 +637,14 @@ main() {
     # Used by require_admin in system.sh to display the exact resume command.
     # shellcheck disable=SC2034
     GDM_COMMAND_ARGS=("$@")
+    # The daily job waits for an open interactive session instead of failing.
+    [[ ${1:-} != maintenance ]] || GDM_LOCK_WAIT=${GDM_LOCK_WAIT:-900}
     ui_welcome
     ui_log info "$(t ui_checking)"
     require_runtime
     init_state
     layout_install_code
+    logs_rotate
     say ui_prerequisites_done
     if (( $# == 0 )); then menu; else dispatch "$@"; fi
 }

@@ -55,6 +55,14 @@ elapsed time and the current detail (image being downloaded, service health,
 web check attempt). The GLPI release list is cached for 15 minutes and image
 lookups run in parallel, so update and version screens open much faster.
 
+The dashboard groups actions by category and shows HTTPS/certificate days,
+MySQL exposure, the last backup and the automatic backup schedule. A daily
+maintenance task (systemd timer or cron) rotates logs, renews self-signed
+certificates and can create automatic backups (the 5 newest are kept; manual
+backups are never rotated). The manager can also show certificate expiry,
+uninstall GLPI cleanly and update itself from GitHub releases. GLPI's own
+settings (mail, plugins, automatic actions) stay in GLPI.
+
 Official release/security/support notices remain visible. Full release notes can
 be opened from their selector. See [interface behavior](docs/interface.md) for
 keyboard controls, monochrome and plain-terminal modes.

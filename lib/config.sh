@@ -152,6 +152,8 @@ EOF
             volumes:([mount($root+"/Caddyfile";"/etc/caddy/Caddyfile"),"caddy_data:/data","caddy_config:/config"] +
               (if $c.tls=="acme" then [] else [mount($root+"/tls";"/etc/gdm/tls")] end))}
         end
+      # Container logs rotate at 3 x 10 MiB per service instead of growing forever.
+      | .services |= with_entries(.value.logging={driver:"json-file",options:{"max-size":"10m","max-file":"3"}})
     ' > "$dir/compose.json"
     if [[ $tls != off ]]; then printf '\nauto_prepend_file = /etc/gdm/proxy.php\n' >> "$dir/php-uploads.ini"; fi
     chmod 600 "$dir/config.json" "$dir/compose.json" "$dir/.env"

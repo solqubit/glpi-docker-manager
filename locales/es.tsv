@@ -15,21 +15,21 @@ bad_root_password	La inicialización root oficial de MySQL no admite de forma se
 destructive	Esta operación cambia datos existentes. Escribe exactamente %s para continuar:
 cancelled	Cancelado.
 dependencies	Faltan dependencias:%s
-install_dependencies	¿Instalar las dependencias indicadas con el gestor de paquetes detectado? [s/N]
+install_dependencies	¿Instalar las dependencias indicadas con el gestor de paquetes detectado?
 manual_dependencies	Instala curl, jq, openssl, tar, gzip, coreutils, util-linux e iproute2 manualmente y vuelve a ejecutar.
 docker_service_stopped	El motor local de Docker no responde. Se iniciará su servicio existente y se volverá a comprobar; sudo puede pedir tu contraseña.
-docker_retry_confirm	Después de revisar las instrucciones, ¿reintentar y continuar este asistente? [s/N]
+docker_retry_confirm	Después de revisar las instrucciones, ¿reintentar y continuar este asistente?
 docker_start_failed	Docker no pudo iniciarse o sigue sin estar disponible. Con systemd, revisa: sudo systemctl status docker --no-pager ; sudo journalctl -u docker -n 50 --no-pager . Con service, revisa: sudo service docker status . Resuelve el problema del motor/socket indicado y vuelve a ejecutar el gestor.
 docker_context_help	El endpoint actual es %s. Para Docker rootless, prueba: systemctl --user start docker ; docker info . Para Docker Desktop, inicia Desktop y verifica su integración/contexto Linux. El gestor no puede iniciar el servicio predeterminado del anfitrión para un socket personalizado. Consulta https://docs.docker.com/engine/security/rootless/
 docker_plugins_missing	Docker funciona, pero falta Compose V2 o Buildx. El gestor puede instalar los paquetes de plugins disponibles en tus repositorios configurados.
-docker_plugins_confirm	¿Instalar los plugins Docker que faltan mediante el gestor de paquetes detectado? [s/N]
+docker_plugins_confirm	¿Instalar los plugins Docker que faltan mediante el gestor de paquetes detectado?
 docker_plugins_manual	No se encontraron paquetes de plugins compatibles en los repositorios configurados. Sigue https://docs.docker.com/compose/install/linux/ y https://docs.docker.com/build/install/buildx/ ; comprueba docker compose version y docker buildx version y vuelve a ejecutar.
 plugin_packages	Paquetes de plugins: %s
 compose_missing	Instala el plugin Docker Compose V2. Consulta https://docs.docker.com/compose/install/linux/
 buildx_missing	Instala el plugin Docker Buildx para verificar digests y arquitecturas: https://docs.docker.com/build/install/buildx/
 manual_docker	La instalación automática de Docker no está documentada para esta distribución. Instala Docker Engine, Buildx y Compose siguiendo las instrucciones de tu distribución: https://docs.docker.com/engine/install/ . Después vuelve a ejecutar; se permiten distribuciones fuera de la lista.
 docker_plan	Se instalarán Docker Engine, Buildx y Compose para %s. Procedimiento: %s . No se eliminarán paquetes existentes que entren en conflicto.
-install_docker	¿Instalar Docker mediante el procedimiento mostrado? [s/N]
+install_docker	¿Instalar Docker mediante el procedimiento mostrado?
 repository_exists	Ya existe un archivo de repositorio Docker del gestor. Revísalo antes de reintentar.
 daemon_manual	Inicia el servicio Docker con el sistema de inicio de tu distribución y vuelve a ejecutar.
 linux_only	Ejecuta este gestor en Linux con Bash 4.4 o posterior.
@@ -43,9 +43,9 @@ release_limit	La paginación de versiones superó el límite de seguridad. No se
 support_unknown	No se pudo verificar automáticamente el soporte. Revisa https://github.com/glpi-project/glpi/security/policy
 release_notes	Notas oficiales de GLPI %s: %s
 security_release	VERSIÓN DE SEGURIDAD: el proyecto recomienda actualizar. Revisa las correcciones de seguridad y los avisos importantes en las notas oficiales que aparecen a continuación.
-production_http_warning	Elegiste HTTP para producción. Configura HTTPS o un proxy TLS externo de confianza antes de exponer las sesiones de los usuarios. ¿Continuar con HTTP? [s/N]
+production_http_warning	Elegiste HTTP para producción. Configura HTTPS o un proxy TLS externo de confianza antes de exponer las sesiones de los usuarios. ¿Continuar con HTTP?
 glpi10_warning	ADVERTENCIA: GLPI 10 está fuera del soporte ordinario tras GLPI 12. Se anunció 10.0.28 como última versión de la rama 10.0. No se esperan más correcciones ordinarias de errores o seguridad. Consulta https://www.glpi-project.org/en/glpi-12/ . Las notas anteriores pueden describir la política en su fecha de publicación.
-unsupported_confirm	¿Seguir utilizando esta rama sin soporte después de revisar la advertencia? [s/N]
+unsupported_confirm	¿Seguir utilizando esta rama sin soporte después de revisar la advertencia?
 older_release	Existe una versión estable posterior en esta rama: %s. Los parches antiguos pueden carecer de correcciones de seguridad.
 choose_version	¿Qué versión de GLPI quieres instalar?
 more_versions	Otra versión estable…
@@ -75,11 +75,11 @@ db_user_prompt	Usuario de aplicación de la base de datos:
 expose_prompt	¿Exponer el puerto de la base de datos para conexiones externas?
 storage_notice	Los datos de GLPI y MySQL quedan dentro de la carpeta de instalación, montados mediante volúmenes Docker persistentes etiquetados.
 root_password	Elige la contraseña independiente del administrador de MySQL.
-install_confirm	¿Crear la configuración y desplegar esta instalación? [s/N]
+install_confirm	¿Crear la configuración y desplegar esta instalación?
 ready	Abre GLPI en tu navegador: %s
 port_busy	Un puerto necesario del servidor ya está ocupado: %s
 install_exists	Ya existe una instalación. Se conservaron configuración y credenciales.
-install_resume	La configuración existe pero la instalación no terminó. ¿Reanudarla sin regenerar credenciales? [s/N]
+install_resume	La configuración existe pero la instalación no terminó. ¿Reanudarla sin regenerar credenciales?
 backup_started	Se detendrán GLPI y sus tareas automáticas para un respaldo consistente. El acceso estará interrumpido durante esta operación.
 backup_ready	Respaldo terminado y sumas verificadas: %s . Contiene secretos; guarda una copia privada fuera del servidor.
 backup_invalid	El respaldo no pasó la validación. No se intentó restaurarlo.
@@ -88,23 +88,23 @@ backup_path	Ruta absoluta al archivo de respaldo:
 restore_effect	La restauración crea volúmenes vacíos con las versiones originales del respaldo. Conserva los volúmenes anteriores. Se detendrán los servicios actuales; las escrituras posteriores no se combinarán.
 restore_done	Restauración verificada. Se conservaron los volúmenes anteriores. Revisa dirección, HTTPS/DNS e integraciones antes de cambiar el tráfico.
 transfer	GLPI y sus tareas automáticas del origen quedan DETENIDOS en el momento de este respaldo. Copia %s de forma privada al destino, clona allí el repositorio y ejecuta ./start.sh restore. Verifica dirección, certificados, usuarios, datos e integraciones antes de cambiar DNS. Conserva el origen detenido mientras el destino esté activo. Para cancelar el traslado, ejecuta ./start.sh start en el origen.
-transfer_confirm	¿Preparar el respaldo final de traslado y dejar GLPI detenido para evitar escrituras divergentes o tareas duplicadas? [s/N]
+transfer_confirm	¿Preparar el respaldo final de traslado y dejar GLPI detenido para evitar escrituras divergentes o tareas duplicadas?
 backup_space	No hay espacio suficiente para respaldar y verificar. Libera espacio o traslada el directorio de estado a un disco mayor.
 update_current	GLPI instalado: %s → versión seleccionada: %s.
 update_none	No existe una versión estable posterior en esta rama.
-update_confirm	¿Crear un respaldo nuevo y actualizar GLPI a la versión seleccionada? [s/N]
+update_confirm	¿Crear un respaldo nuevo y actualizar GLPI a la versión seleccionada?
 migration_warning	Una migración principal exige revisar plugins, inventario, integraciones API y notas de versión. GLPI 12 cambia permisos de la base de conocimiento y manejo del proxy. El ensayo usa volúmenes aislados, sin puertos publicados ni red exterior; las tareas automáticas están desactivadas. Aún es necesaria una revisión funcional.
-migration_review	¿Revisaste la compatibilidad de plugins y los requisitos de migración de la versión destino? [s/N]
+migration_review	¿Revisaste la compatibilidad de plugins y los requisitos de migración de la versión destino?
 rehearsal_ok	La migración de base de datos y comprobación del esquema en la copia aislada fueron correctas. Esto no certifica plugins ni integraciones.
 updated	Actualización verificada. GLPI actual: %s.
 db_update_warning	El mantenimiento MySQL se limita a la serie 8.4 registrada. Prueba el destino sobre un respaldo y programa una interrupción. Cambiar la imagen del motor puede modificar sus archivos de datos.
-db_update_confirm	¿Respaldar y aplicar el parche MySQL seleccionado? [s/N]
-config_confirm	¿Aplicar este cambio de configuración? Los servicios pueden reiniciarse brevemente. [s/N]
+db_update_confirm	¿Respaldar y aplicar el parche MySQL seleccionado?
+config_confirm	¿Aplicar este cambio de configuración? Los servicios pueden reiniciarse brevemente.
 config_restored	Se restauró la configuración anterior al fallar la validación. Revisa registros antes de reintentar.
-credentials_warning	Las credenciales de base están ocultas. ¿Mostrarlas en esta terminal? [s/N]
+credentials_warning	Las credenciales de base están ocultas. ¿Mostrarlas en esta terminal?
 credentials_note	Son credenciales de base de datos, distintas de las cuentas web GLPI. Editar .env no cambia las contraseñas existentes en MySQL.
 menu	\n  GLPI Docker Manager\n  1) Estado                 2) Iniciar              3) Detener\n  4) Registros              5) Buscar versiones     6) Actualizar GLPI\n  7) Respaldo               8) Restaurar            9) HTTPS\n 10) Publicación MySQL     11) Credenciales         12) Traslado\n 13) Migración principal   14) Parche MySQL         15) Idioma\n 16) Diagnóstico           17) Renovar imagen GLPI  18) Recuperación\n  0) Salir\n
-stop_confirm	¿Detener GLPI y MySQL? [s/N]
+stop_confirm	¿Detener GLPI y MySQL?
 diagnose_note	El diagnóstico no muestra contraseñas. Los registros originales de Docker/GLPI pueden contener datos sensibles; revísalos antes de compartirlos.
 recover_prompt	Se interrumpió una operación. Revisa operation.json y los registros. Restaura un respaldo válido o escribe RESUME para comprobar la imagen/esquema actuales y reintentar la verificación. No se intentará revertir automáticamente la base de datos.
 recover_done	Se verificaron servicios y esquema actuales y se cerró el diario de operación.
@@ -293,11 +293,11 @@ menu_address	IP / puertos / zona horaria
 menu_https	HTTPS y certificados
 menu_exposure	Exponer / cerrar puerto MySQL
 menu_credentials	Ver credenciales de la base
-menu_transfer	Trasladar a otro servidor
+menu_transfer	Trasladar a otro servidor (detiene GLPI)
 menu_database_update	Actualizar parches MySQL
 menu_language	Cambiar idioma
 menu_diagnose	Diagnosticar instalación
-menu_refresh	Renovar imagen actual
+menu_refresh	Volver a descargar la misma versión
 menu_recover	Recuperar operación pendiente
 menu_backups	Administrar respaldos
 setup_access_intro	Edita un campo con Enter y regresa aquí tras cada cambio. Los servicios se reinician solo al aplicar la configuración revisada.
@@ -413,3 +413,125 @@ status_release_page	página %s de GitHub
 status_resolving	comprobando %s
 db_updated	Actualización de MySQL verificada. MySQL actual: %s.
 registry_rate_limited	Docker Hub rechazó algunas consultas por su límite de peticiones (HTTP 429). Espera unos minutos o ejecuta docker login y vuelve a intentarlo.
+menu_certificates	Certificados: estado y renovación
+menu_schedule	Respaldos automáticos y mantenimiento
+menu_self_update	Actualizar este gestor
+menu_uninstall	Desinstalar GLPI
+help_group_manager	Gestor
+help_cmd_maintenance	Ejecutar ahora el mantenimiento diario
+desc_status	Servicios, salud, versiones y puertos publicados.
+desc_start	Inicia GLPI si está detenido y verifica base, esquema y acceso web.
+desc_stop	Detiene GLPI y MySQL; los datos se conservan.
+desc_logs	Registros recientes de los contenedores, con desplazamiento.
+desc_update	Instala una versión posterior de GLPI; antes se respalda y se ensaya.
+desc_check-updates	Muestra las últimas versiones de GLPI sin cambiar nada.
+desc_refresh-image	Descarga una imagen más reciente de la misma versión instalada.
+desc_db-update	Aplica el último parche de MySQL 8.4 con respaldo y ensayo.
+desc_diagnose	Resumen de sistema, Docker, disco y configuración, sin contraseñas.
+desc_self-update	Descarga la última versión de este gestor; GLPI no se modifica.
+desc_uninstall	Elimina contenedores, volúmenes y datos de GLPI (pide UNINSTALL).
+desc_quit	Cierra el gestor; GLPI sigue funcionando.
+desc_backup	Crea un respaldo manual verificado; los manuales nunca se rotan.
+desc_backups	Explora, verifica, exporta, restaura o elimina respaldos.
+desc_restore	Restaura GLPI desde un archivo de respaldo.
+desc_schedule	Respaldos automáticos diarios (se guardan 5), rotación de registros y renovación de certificados.
+desc_transfer	Respaldo final para otro servidor; GLPI queda detenido después.
+desc_address	Dirección del servidor, puertos web y zona horaria.
+desc_https	Solo HTTP, autofirmado, Let's Encrypt o certificado propio.
+desc_certificates	Caducidad, renovación y recarga del certificado HTTPS.
+desc_db-exposure	Publica MySQL en el puerto 3306 o lo mantiene interno.
+desc_credentials	Muestra las credenciales de la base tras confirmar.
+desc_language	Idioma de la interfaz de este gestor.
+dash_age_days	hace %s d
+dash_age_hours	hace %s h
+dash_age_minutes	hace %s min
+dash_tls_off	HTTPS: no
+dash_tls	HTTPS: %s
+dash_tls_days	HTTPS: %s (quedan %s d)
+ui_tls_short_self-signed	autofirmado
+ui_tls_short_acme	Let's Encrypt
+ui_tls_short_custom	certificado propio
+dash_db_public	MySQL: expuesto :3306
+dash_db_private	MySQL: interno
+dash_backup	Respaldo: %s (%s)
+dash_backup_none	Aún sin respaldos
+dash_auto_on	Respaldo auto %s:00
+dash_auto_off	Respaldos auto: no
+dash_maintenance_missing	Mantenimiento sin programar
+backup_origin_auto	Automático
+backups_counts	%s manuales · %s automáticos.
+ui_db_current	Estado actual
+ui_db_unchanged	Sin cambios: el acceso a MySQL se mantiene igual.
+firewall_docker	Docker publica el puerto %s directamente en iptables y se salta las reglas de ufw/firewalld. Restringe el acceso en la cadena DOCKER-USER o en el firewall de tu red.
+compose_refresh	Aplicando una vez los límites de tamaño de registros; los servicios se reinician brevemente.
+maint_title	Respaldos automáticos y mantenimiento
+maint_backups	Respaldos automáticos
+maint_on	Activados
+maint_off	Desactivados
+maint_hour	Cada día a las
+maint_keep	Respaldos automáticos guardados
+maint_scheduler	Programador
+maint_scheduler_on	Instalado (%s)
+maint_scheduler_missing	Sin instalar
+maint_body	La tarea diaria también rota registros y renueva certificados autofirmados. GLPI se detiene unos minutos durante cada respaldo. Solo se guardan los %s respaldos automáticos más recientes; los manuales nunca se eliminan automáticamente.
+maint_prompt	¿Qué quieres cambiar?
+maint_enable	Activar respaldos automáticos
+maint_disable	Desactivar respaldos automáticos
+maint_change_hour	Cambiar la hora
+maint_run_now	Ejecutar el mantenimiento ahora
+maint_hour_prompt	¿A qué hora debe ejecutarse el mantenimiento?
+maint_saved	✓ Programación del mantenimiento guardada
+maint_no_scheduler	No se pudo programar el mantenimiento automático (sin systemd ni cron). Ejecuta ./start.sh maintenance periódicamente.
+maint_skipped	Mantenimiento omitido: la instalación no está lista o hay una operación pendiente.
+maint_services_stopped	Respaldo automático omitido: GLPI no está en ejecución.
+maint_done	Mantenimiento completado
+backups_prune_skipped	Se conserva un respaldo automático antiguo porque está protegido: %s
+cert_title	Certificado HTTPS
+cert_mode	Modo
+cert_expiry	Caduca
+cert_days	en %s días (%s)
+cert_expired	CADUCADO hace %s días (%s)
+cert_unknown	Desconocido: no se pudo leer el certificado
+cert_checking	Leyendo el certificado HTTPS
+cert_off	HTTPS está desactivado; no hay certificado que renovar.
+cert_prompt	¿Qué quieres hacer?
+cert_enable_https	Configurar HTTPS
+cert_help_self-signed	Los certificados autofirmados se renuevan automáticamente en el mantenimiento diario 30 días antes de caducar. Renuévalo ahora para emitir uno nuevo; los clientes deberán volver a confiar en él.
+cert_help_custom	El gestor no renueva certificados importados. Sustituye %s y %s por los archivos nuevos y elige Recargar.
+cert_help_acme	Caddy renueva automáticamente los certificados de Let's Encrypt unos 30 días antes de caducar. Mantén el dominio apuntando aquí y TCP 80/443 accesibles desde Internet.
+cert_renew_now	Renovar ahora (certificado nuevo, los servicios se reinician)
+cert_reload	Recargar los archivos PEM (los servicios se reinician)
+cert_restart_proxy	Reiniciar el proxy HTTPS para reintentar la renovación
+cert_step_apply	Aplicando el certificado
+cert_step_restart	Reiniciando el proxy HTTPS
+cert_applied	✓ Certificado aplicado
+cert_expiring	El certificado HTTPS caduca en %s días. Abre Certificados para renovarlo.
+cert_auto_renewing	El certificado autofirmado caduca en %s días; se renueva ahora.
+cert_custom_expiring	El certificado importado caduca en %s días; sustituye los archivos PEM y recárgalos.
+cert_acme_expiring	El certificado de Let's Encrypt caduca en %s días; se reinicia el proxy para reintentarlo. Comprueba que los puertos 80/443 sean accesibles.
+uninstall_title	Desinstalar GLPI
+uninstall_body	Se eliminan los contenedores de GLPI, los volúmenes Docker, las carpetas de datos, las revisiones de configuración, los registros y el mantenimiento programado de %s.
+uninstall_images	Docker y sus imágenes se conservan; elimina las que no uses con: docker image prune -a
+uninstall_prompt	¿Qué quieres eliminar?
+uninstall_keep	Eliminar GLPI y conservar respaldos y certificados
+uninstall_all	Eliminar todo, incluidos respaldos y este gestor
+uninstall_step_services	Eliminando contenedores y volúmenes
+uninstall_step_data	Eliminando datos y configuración
+uninstall_step_scheduler	Eliminando el mantenimiento programado
+uninstall_done	✓ GLPI se desinstaló
+uninstall_kept	Respaldos conservados en: %s
+uninstall_all_done	Se eliminó todo el contenido de %s.
+self_update_checking	Consultando la última versión del gestor
+self_update_unavailable	No se pudieron consultar las versiones del gestor en GitHub. Inténtalo más tarde.
+self_update_none	El gestor está actualizado (%s).
+self_update_title	Actualización del gestor disponible
+self_update_versions	Instalada: %s → disponible: %s
+self_update_help	Solo se reemplaza el código del gestor. GLPI, sus datos y respaldos no se tocan; la versión anterior queda en manager-releases.
+self_update_confirm	¿Descargar e instalar esta versión del gestor?
+self_update_downloading	Descargando el gestor
+self_update_invalid	El gestor descargado está incompleto o no es válido; no se cambió nada.
+self_update_git	Este gestor se ejecuta desde un repositorio Git (%s). Actualízalo con: git pull
+self_update_restart	Reiniciando con la nueva versión del gestor…
+setup_timezone_server	Zona horaria del servidor: %s
+setup_field_values	Actual: %s · Predeterminado: %s
+setup_password_generated	%s: se generó una contraseña aleatoria de 48 caracteres. Puedes verla después en Ver credenciales de la base.

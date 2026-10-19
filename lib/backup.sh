@@ -19,9 +19,9 @@ snapshot_restore() {
 backup_create() {
     assert_running
     local resume=${1:-true} origin=${2:-manual} target=${3:-} work archive role size free volume_size was_proxy=false required database_size
-    local usage measured=0
+    local usage measured=0 tag
     local -a mounts=() paths=()
-    case $origin in manual|update|migrate|db-update|refresh-image|transfer) ;; *) die invalid backup_origin;; esac
+    case $origin in manual|auto|update|migrate|db-update|refresh-image|transfer) ;; *) die invalid backup_origin;; esac
     ui_status "$(t status_measure)"
     # Use uncompressed volume usage plus database size as a conservative budget.
     database_size=$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT COALESCE(SUM(data_length+index_length),0) FROM information_schema.tables"')
@@ -45,7 +45,9 @@ backup_create() {
     ui_progress_note backup_estimate "$(((size+1048575)/1048576))" "$((required+512))" "$free"
     storage_preflight 0 "$required"
     work=$(mktemp -d "$STATE/backups/.work-XXXXXX"); CLEANUP_DIRECTORIES+=("$work")
-    archive="$STATE/backups/glpi-$(cfg glpi_version)-$(date -u +%Y%m%dT%H%M%S)-$(openssl rand -hex 3).tar.gz"
+    # Automatic backups carry "-auto-" in the name: retention never touches manual ones.
+    tag=""; [[ $origin != auto ]] || tag=auto-
+    archive="$STATE/backups/glpi-$(cfg glpi_version)-$(date -u +%Y%m%dT%H%M%S)-$tag$(openssl rand -hex 3).tar.gz"
     CLEANUP_PATHS+=("$archive.partial")
     say backup_started
     if [[ $(cfg tls) != off && -n $(dc ps --status running --quiet proxy) ]]; then was_proxy=true; dc stop proxy; fi

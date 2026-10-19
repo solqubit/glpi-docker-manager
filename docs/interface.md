@@ -81,6 +81,51 @@ the same inline spinner. Detailed output goes to private
 `state/logs/install-*.log` files; failures name the failed stage and show the
 relevant path. Ctrl+C restores the terminal and prints `[!] Exiting...`.
 
+## Dashboard
+
+Actions are grouped in two columns: Service, Updates, Manager (left) and Data,
+Settings (right). Up/Down moves within a column, Left/Right jumps to the closest
+action of the other column, Tab follows reading order, End selects Exit. The
+status line shows the access URL, HTTPS mode and remaining certificate days,
+whether MySQL is exposed, the age and kind of the last backup and the automatic
+backup schedule; it turns yellow when a certificate expires within 30 days, no
+backup exists or maintenance is not scheduled. The bottom line describes the
+selected action. Forms show a framed input, the current and default values and,
+for the address and ports, the resulting URL while typing. The server's own time
+zone is suggested first.
+
+## Maintenance, certificates and lifecycle
+
+The manager only handles infrastructure; GLPI settings (mail, plugins, cron
+tasks) stay in GLPI.
+
+* **Daily maintenance** (`./start.sh maintenance`) is scheduled with a systemd
+  timer, or `/etc/cron.d` when systemd is absent, right after installation. It
+  rotates private logs (30 days, at most 200 stage logs, 1000 history entries),
+  renews self-signed certificates 30 days before expiry and, when enabled, creates
+  an automatic backup. It waits up to 15 minutes for an open interactive session.
+  Output goes to `state/logs/maintenance-YYYYMMDD.log`.
+* **Automatic backups** are enabled and timed from *Automatic backups and
+  maintenance*. They are named `glpi-<version>-<time>-auto-<id>.tar.gz`, shown as
+  `[A]` (manual ones `[M]`), and only the 5 newest are kept. Manual and pre-update
+  backups are never deleted automatically. GLPI stops for a few minutes per backup.
+* **Container logs** are limited to 3 × 10 MiB per service. Older installations
+  get the limit once from *Start / verify GLPI* (brief restart).
+* **Certificates** shows the expiry date. Self-signed: renew now. Imported:
+  replace the PEM files and reload. Let's Encrypt: Caddy renews automatically;
+  the proxy can be restarted to retry. Expiring certificates are flagged on the
+  dashboard and in the daily log.
+* **Uninstall** (`./start.sh uninstall`, typed `UNINSTALL`) removes containers,
+  labelled volumes of every installation ID under the root, data, revisions,
+  logs and the scheduled maintenance. It keeps backups and certificates, or
+  removes everything including the manager. Docker and its images stay.
+* **Update this manager** (`./start.sh self-update`) downloads the latest GitHub
+  release of `GDM_REPOSITORY` (default `solqubit/glpi-docker-manager`), checks
+  it and restarts with it; GLPI and its data are not touched and the previous
+  version stays in `manager-releases`. A Git checkout is updated with `git pull`.
+* The daily job is not scheduled for test roots (`GDM_INTEGRATION`) or with
+  `GDM_SCHEDULER=off`.
+
 ## Network lookups and caching
 
 * The GitHub release list (several paginated requests) is cached for 15 minutes.

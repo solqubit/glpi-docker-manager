@@ -13,14 +13,14 @@ import tempfile
 
 from archive import members, verify_archive
 
-ORIGINS = {'manual', 'update', 'migrate', 'db-update', 'refresh-image', 'transfer'}
+ORIGINS = {'manual', 'auto', 'update', 'migrate', 'db-update', 'refresh-image', 'transfer'}
 
 
 def managed(root, path):
     root, path = Path(root), Path(path)
     folder = root / 'backups'
     if (folder.is_symlink() or not path.is_absolute() or path.parent != folder
-            or not re.fullmatch(r'glpi-[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}T[0-9]{6}-[a-f0-9]+\.tar\.gz', path.name)
+            or not re.fullmatch(r'glpi-[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}T[0-9]{6}-(?:auto-)?[a-f0-9]+\.tar\.gz', path.name)
             or not stat.S_ISREG(path.lstat().st_mode)):
         raise ValueError('Unmanaged backup path')
     return path

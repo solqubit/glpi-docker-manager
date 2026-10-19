@@ -18,7 +18,10 @@ def main():
         date = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
         match = re.fullmatch(r'glpi-([0-9]+\.[0-9]+\.[0-9]+)-.*-([a-f0-9]+)\.tar\.gz', path.name)
         label = f'GLPI {match[1]} · {match[2]}' if match else path.name
-        rows.append((str(path), f'{date} · {label} · {path.stat().st_size / 1048576:.1f} MiB', ''))
+        automatic = '-auto-' in path.name
+        kind = '[A] ' + ui.t('backup_origin_auto') if automatic else '[M] ' + ui.t('backup_origin_manual')
+        rows.append((str(path), f'{date} · {label} · {path.stat().st_size / 1048576:.1f} MiB · {kind}',
+                     'info' if automatic else ''))
     rows += [('other', ui.t('backup_choose_other'), 'accent'), ('back', ui.t('ui_status_back'), '')]
     def choose():
         notice = (ui.t('backup_none') + ' ' if not archives else '') + ui.t('backup_choose_help')
