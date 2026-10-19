@@ -60,12 +60,17 @@ backup_create() {
     for role in "${SNAPSHOT_ROLES[@]}"; do ui_status "$(t status_snapshot "$role")"; snapshot_save "$role" "$work/$role.tar.gz"; done
     if [[ -f $STATE/current/tls/fullchain.pem ]]; then
         mkdir "$work/tls"; cp -- "$STATE/current/tls/"*.pem "$work/tls/"
+        # The local CA key travels with the backup: a restored server keeps the
+        # same CA, so GLPI Agents and browsers keep trusting it.
+        if [[ $(cfg tls) == self-signed && -f $(cfg cert_dir)/self-signed/ca/gdm-ca.key ]]; then
+            cp -- "$(cfg cert_dir)/self-signed/ca/gdm-ca.key" "$work/tls/gdm-ca.key"
+        fi
     fi
     jq -n --arg now "$(date -u +%FT%TZ)" --arg glpi "$(cfg glpi_version)" \
         --arg mysql "$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT VERSION()"')" \
         --arg arch "$ARCH" --arg origin "$origin" --arg target "$target" \
         '{format:1,created_at:$now,glpi_version:$glpi,mysql_server_version:$mysql,architecture:$arch,origin:$origin,target_version:$target}' > "$work/metadata.json"
-    (cd "$work" && for name in config.json metadata.json mysql.sql ./*.tar.gz tls/*.pem; do
+    (cd "$work" && for name in config.json metadata.json mysql.sql ./*.tar.gz tls/*.pem tls/*.key; do
         [[ -f $name ]] || continue
         name=${name#./}
         sha256sum -- "$name"
@@ -176,11 +181,19 @@ restore_selected_backup() {
     new_id=$(openssl rand -hex 8)
     jq --arg id "$new_id" --arg cert_dir "$CERT_ROOT" '.id=$id | .project=("gdm_"+$id) | .cert_dir=$cert_dir | .storage="directory" | .status="configured"' "$EXTRACTED/config.json" > "$tmp"
     if [[ -d $EXTRACTED/tls ]]; then
-        local cert_mode
+        local cert_mode name
         cert_mode=$(jq -r .tls "$tmp")
         mkdir -p "$CERT_ROOT/$cert_mode"
-        cp -- "$EXTRACTED/tls/"*.pem "$CERT_ROOT/$cert_mode/"
+        for name in fullchain.pem privkey.pem; do
+            [[ ! -f $EXTRACTED/tls/$name ]] || cp -- "$EXTRACTED/tls/$name" "$CERT_ROOT/$cert_mode/"
+        done
         chmod 600 "$CERT_ROOT/$cert_mode/"*.pem
+        # Same local CA as the source server: GLPI Agents need no change.
+        if [[ $cert_mode == self-signed && -f $EXTRACTED/tls/gdm-ca.pem && -f $EXTRACTED/tls/gdm-ca.key ]]; then
+            mkdir -p "$CERT_ROOT/self-signed/ca"; chmod 700 "$CERT_ROOT/self-signed/ca"
+            cp -- "$EXTRACTED/tls/gdm-ca.pem" "$EXTRACTED/tls/gdm-ca.key" "$CERT_ROOT/self-signed/ca/"
+            chmod 600 "$CERT_ROOT/self-signed/ca/gdm-ca.key"; chmod 644 "$CERT_ROOT/self-signed/ca/gdm-ca.pem"
+        fi
     fi
     config_stage "$tmp"
     [[ $had_install != true ]] || dc stop

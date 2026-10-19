@@ -29,9 +29,12 @@ installation_finish() {
     journal_done
     maintenance_ensure
     [[ $(cfg expose_db) != true ]] || say firewall_docker 3306
+    # Self-signed HTTPS: what to give GLPI Agents (CA file, URL, fingerprint).
+    local -a ca_rows=()
+    [[ $(cfg tls) != self-signed ]] || ca_rows_build
     ui_panel "$(t ui_install_success)" "$(t ready "$(installation_url)")" \
         "GLPI $(cfg glpi_version) · MySQL $(cfg mysql_version)" \
-        "$(t ui_initial_account)" "$(t ui_next_steps)" "$(t layout_entrypoint "$STATE/start.sh")"
+        "$(t ui_initial_account)" "$(t ui_next_steps)" "$(t layout_entrypoint "$STATE/start.sh")" "${ca_rows[@]}"
 }
 start_database() { dc up -d db; wait_healthy db; }
 service_snapshot() {

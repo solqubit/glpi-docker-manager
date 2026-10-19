@@ -12,7 +12,8 @@ VOLUMES = ('glpi_data', 'plugins', 'marketplace', 'caddy_data', 'caddy_config')
 REQUIRED = {'config.json', 'metadata.json', 'mysql.sql', 'checksums.sha256'} | {
     f'{v}.tar.gz' for v in VOLUMES
 }
-ALLOWED = REQUIRED | {'tls/fullchain.pem', 'tls/privkey.pem'}
+# tls/gdm-ca.* carry the local CA of self-signed HTTPS (see lib/tls.sh).
+ALLOWED = REQUIRED | {'tls/fullchain.pem', 'tls/privkey.pem', 'tls/gdm-ca.pem', 'tls/gdm-ca.key'}
 
 
 def members(archive, outer=False, max_size=None):

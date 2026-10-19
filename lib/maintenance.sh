@@ -531,6 +531,22 @@ tls_reapply() {
     apply_settings "$file" true
 }
 tls_force_renew() { GDM_TLS_FORCE_RENEW=1 tls_reapply; }
+# Only when the CA key is lost or compromised: every client must import the new one.
+tls_new_ca() { GDM_TLS_NEW_CA=1 GDM_TLS_FORCE_RENEW=1 tls_reapply; }
+# Card rows describing the local CA for GLPI Agents (fills the caller's ca_rows).
+ca_rows_build() {
+    local ca fingerprint CERT_DAYS='' CERT_END_DATE=''
+    ca="$(cfg cert_dir)/self-signed/ca/gdm-ca.pem"
+    [[ -f $ca ]] || return 0
+    fingerprint=$(openssl x509 -in "$ca" -noout -fingerprint -sha256 2>/dev/null) || fingerprint=''
+    cert_days "$ca" || true
+    ca_rows=("§$(t ca_section)"
+        "$(t ca_download)"$'\t'"$(tls_ca_url "$(cfg hostname)" "$(cfg http_port)")"
+        "$(t ca_path)"$'\t'"$ca"
+        "$(t ca_expiry)"$'\t'"${CERT_END_DATE:-?}"
+        "$(t ca_fingerprint)"$'\t'"${fingerprint#*=}"
+        "$(t ca_agent_help)")
+}
 # Daily: self-signed certificates are renewed 30 days before expiry; imported
 # and Let's Encrypt certificates produce warnings (Caddy renews the latter).
 tls_auto_renew() {
@@ -562,10 +578,13 @@ certificates_menu() {
     [[ -z $CERT_DAYS ]] || (( CERT_DAYS >= 30 )) || say cert_expiring "$CERT_DAYS"
     if [[ $mode == custom ]]; then help=$(t cert_help_custom "$(cfg cert_dir)/custom/fullchain.pem" "$(cfg cert_dir)/custom/privkey.pem")
     else help=$(t "cert_help_$mode"); fi
+    local -a ca_rows=()
+    [[ $mode != self-signed ]] || ca_rows_build
     ui_panel "$(t cert_title)" "$(t cert_mode)"$'\t'"$(t "ui_tls_$mode")" "$(t ui_host)"$'\t'"$(cfg hostname)" \
-        "$(t cert_expiry)"$'\t'"$expiry" "$help"
+        "$(t cert_expiry)"$'\t'"$expiry" "$help" "${ca_rows[@]}"
     case $mode in
         self-signed) choose action cert_prompt back renew "$(ui_opt warn "$(t cert_renew_now)" "$(t opt_cert_renew)")" \
+            newca "$(ui_opt danger "$(t cert_new_ca)" "$(t opt_cert_new_ca)")" \
             mode "$(ui_opt '' "$(t cert_change_mode)" "$(t opt_cert_mode)")" back "$(ui_opt back "$(t ui_back_menu)")" || exit 10;;
         custom) choose action cert_prompt back reload "$(ui_opt warn "$(t cert_reload)" "$(t opt_cert_reload)")" \
             mode "$(ui_opt '' "$(t cert_change_mode)" "$(t opt_cert_mode)")" back "$(ui_opt back "$(t ui_back_menu)")" || exit 10;;
@@ -575,6 +594,7 @@ certificates_menu() {
     if [[ $action == mode ]]; then settings_command https; return; fi
     case $action in
         renew) ui_run 0 cert_step_apply tls_force_renew;;
+        newca) typed_confirm NEW-CA; ui_run 0 cert_step_apply tls_new_ca;;
         reload) ui_run 0 cert_step_apply tls_reapply;;
         restart) ui_run 0 cert_step_restart dc restart proxy;;
         *) exit 10;;

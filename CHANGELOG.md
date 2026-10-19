@@ -29,6 +29,9 @@ history retention) stay in GLPI; the manager handles the host and containers.
   automatic (5 kept). Create backup also offers the final backup for a server move.
 * Daily maintenance (systemd timer or cron): log rotation, GLPI technical logs
   (20 MiB, 30 days), self-signed renewal 30 days before expiry, optional backups.
+* Self-signed HTTPS uses a local CA (20 years) that signs 825-day server
+  certificates renewed automatically; GLPI Agents and browsers trust the CA once
+  (`gdm-ca.pem`, served at `http://SERVER/gdm-ca.pem`, included in backups).
 * Log rotation screen: each kind of log with current and recommended values;
   GLPI logs, container logs and MySQL binary logs are adjustable.
 * Information cards align labels of any length (accented text included) and can

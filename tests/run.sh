@@ -119,6 +119,26 @@ tls_validate_pair "$STATE/revisions/tls/tls" localhost
 grep -q 'default_sni 192.0.2.30' "$STATE/revisions/ip-tls/Caddyfile"
 grep -q 'https://192.0.2.30:18443{uri}' "$STATE/revisions/ip-tls/Caddyfile"
 ok 'Self-signed address changes regenerate IP SAN certificates while preserving prior revision keys and custom-port redirects'
+# Local CA: 20-year CA, 825-day server certificate signed by it, the same CA
+# across address changes, and gdm-ca.pem published while the key stays private.
+ca_dir="$CERT_ROOT/self-signed/ca"
+[[ -f $ca_dir/gdm-ca.pem && -f $ca_dir/gdm-ca.key ]]
+[[ $(stat -c %a "$ca_dir/gdm-ca.key") == 600 ]]
+openssl x509 -in "$ca_dir/gdm-ca.pem" -noout -checkend $((19*365*86400)) >/dev/null
+openssl x509 -in "$CERT_ROOT/self-signed/fullchain.pem" -noout -checkend $((800*86400)) >/dev/null
+if openssl x509 -in "$CERT_ROOT/self-signed/fullchain.pem" -noout -checkend $((826*86400)) >/dev/null; then exit 1; fi
+openssl x509 -in "$STATE/revisions/ip-tls/tls/fullchain.pem" | openssl verify -CAfile "$ca_dir/gdm-ca.pem" >/dev/null
+openssl x509 -in "$STATE/revisions/tls/tls/fullchain.pem" | openssl verify -CAfile "$ca_dir/gdm-ca.pem" >/dev/null
+cmp -s "$ca_dir/gdm-ca.pem" "$STATE/revisions/ip-tls/public/gdm-ca.pem"
+[[ ! -e $STATE/revisions/ip-tls/public/gdm-ca.key ]]
+grep -q 'handle /gdm-ca.pem' "$STATE/revisions/ip-tls/Caddyfile"
+ca_before=$(sha256sum < "$ca_dir/gdm-ca.pem")
+GDM_TLS_FORCE_RENEW=1 tls_prepare "$STATE/ip-tls.json" "$STATE/revisions/ip-tls"
+[[ $(sha256sum < "$ca_dir/gdm-ca.pem") == "$ca_before" ]]
+GDM_TLS_NEW_CA=1 tls_prepare "$STATE/ip-tls.json" "$STATE/revisions/ip-tls"
+[[ $(sha256sum < "$ca_dir/gdm-ca.pem") != "$ca_before" ]]
+openssl x509 -in "$STATE/revisions/ip-tls/tls/fullchain.pem" | openssl verify -CAfile "$ca_dir/gdm-ca.pem" >/dev/null
+ok 'Local CA: 20-year authority, 825-day server certificates, same CA across renewals and address changes, public gdm-ca.pem'
 
 python3 "$GDM_ROOT/tests/test_archive.py"
 ok 'Backup checksums, traversal, links, duplicate members and tampering'

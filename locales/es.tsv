@@ -56,7 +56,7 @@ services_required	GLPI y MySQL deben estar ejecutándose para esta operación.
 cert_instructions	Coloca el certificado PEM seguido de los certificados intermedios en %s y su clave privada PEM correspondiente, sin contraseña, en %s. El directorio es privado; no guardes claves en Git. Después vuelve a configurar HTTPS. Convierte primero los PFX/PKCS12; consulta docs/https.md.
 acme_ports	El modo ACME automático requiere los puertos 80 y 443 del servidor. Para otros puertos utiliza certificados importados.
 acme_requirements	Para %s: apunta los registros DNS públicos A/AAAA a este servidor; permite TCP 80/443 entrante y HTTPS saliente; elimina registros AAAA incorrectos. Caddy gestiona la emisión y renovación.
-self_signed	Se generó automáticamente un certificado autofirmado: %s. Importa solo este certificado en la confianza de tus equipos; conserva la clave privada en secreto.
+self_signed	Certificado del servidor emitido por la CA local: %s. Los agentes GLPI y navegadores que confían en la CA lo aceptan sin cambios.
 tls_prompt	¿Cómo quieres proteger el acceso a GLPI?
 hostname_prompt	Dominio público o dirección IPv4 (sin protocolo, ruta ni puerto):
 language_prompt	Idioma / Language: en / es:
@@ -133,7 +133,7 @@ ui_recover	Ayuda · Recuperar una operación interrumpida
 ui_mode_test	Pruebas
 ui_mode_production	Producción
 ui_tls_off	Solo HTTP
-ui_tls_self-signed	HTTPS autofirmado · generar automáticamente
+ui_tls_self-signed	HTTPS con CA local · se genera automáticamente
 ui_tls_acme	HTTPS público · Let's Encrypt · renovación automática
 ui_tls_custom	HTTPS · importar mis certificados PEM
 ui_releases_loading	Consultando las versiones oficiales de GLPI…
@@ -459,17 +459,17 @@ cert_checking	Leyendo el certificado HTTPS
 cert_off	HTTPS está desactivado; no hay certificado que renovar.
 cert_prompt	¿Qué quieres hacer?
 cert_enable_https	Configurar HTTPS
-cert_help_self-signed	Los certificados autofirmados se renuevan automáticamente en el mantenimiento diario 30 días antes de caducar. Renuévalo ahora para emitir uno nuevo; los clientes deberán volver a confiar en él.
+cert_help_self-signed	El certificado del servidor (825 días) está firmado por la CA local (20 años) y se renueva solo 30 días antes de caducar o al cambiar la dirección. Los equipos que confían en la CA no necesitan cambios.
 cert_help_custom	El gestor no renueva certificados importados. Sustituye %s y %s por los archivos nuevos y elige Recargar.
 cert_help_acme	Caddy renueva automáticamente los certificados de Let's Encrypt unos 30 días antes de caducar. Mantén el dominio apuntando aquí y TCP 80/443 accesibles desde Internet.
-cert_renew_now	Renovar ahora (certificado nuevo, los servicios se reinician)
+cert_renew_now	Renovar ahora el certificado del servidor (los servicios se reinician)
 cert_reload	Recargar los archivos PEM (los servicios se reinician)
 cert_restart_proxy	Reiniciar el proxy HTTPS para reintentar la renovación
 cert_step_apply	Aplicando el certificado
 cert_step_restart	Reiniciando el proxy HTTPS
 cert_applied	✓ Certificado aplicado
 cert_expiring	El certificado HTTPS caduca en %s días. Abre Certificados para renovarlo.
-cert_auto_renewing	El certificado autofirmado caduca en %s días; se renueva ahora.
+cert_auto_renewing	El certificado del servidor caduca en %s días; se renueva con la CA local (no afecta a los equipos).
 cert_custom_expiring	El certificado importado caduca en %s días; sustituye los archivos PEM y recárgalos.
 cert_acme_expiring	El certificado de Let's Encrypt caduca en %s días; se reinicia el proxy para reintentarlo. Comprueba que los puertos 80/443 sean accesibles.
 uninstall_title	Desinstalar GLPI
@@ -523,14 +523,14 @@ opt_resume	Continúa las etapas pendientes con la configuración guardada.
 opt_recover	Vuelve a comprobar los servicios y cierra la operación pendiente. Úsalo solo tras revisar los registros.
 opt_resources_continue	Por debajo de la RAM o el disco recomendados GLPI puede ir lento o quedarse sin espacio.
 opt_tls_off	Sin cifrado. Aceptable solo dentro de una red de confianza.
-opt_tls_self_signed	Cifrado al instante; los navegadores avisan hasta que los equipos confíen en el certificado generado.
+opt_tls_self_signed	Cifrado al instante. Instala la CA local (gdm-ca.pem) una vez en los agentes GLPI y navegadores; las renovaciones nunca obligan a tocarlos de nuevo.
 opt_tls_acme	Dominio público que apunte aquí con puertos 80/443 abiertos: certificado de confianza renovado solo.
 opt_tls_custom	Usa archivos PEM de tu propia autoridad certificadora o la de tu empresa.
 opt_release_notes	Lee las notas oficiales de la versión antes de continuar.
 opt_maint_enable	Un respaldo al día a la hora elegida; se guardan los %s automáticos más recientes.
 opt_maint_disable	Dejan de crearse respaldos automáticos; los existentes se conservan. La rotación de registros continúa.
 opt_maint_run	Rota registros, revisa certificados y, si están activados, respalda ahora mismo.
-opt_cert_renew	Emite un certificado nuevo y reinicia los servicios unos segundos; los equipos deberán volver a confiar en él.
+opt_cert_renew	Certificado de servidor nuevo firmado por la misma CA; los agentes GLPI y navegadores siguen funcionando.
 opt_cert_reload	Valida los archivos PEM sustituidos y reinicia los servicios unos segundos.
 opt_cert_restart	Caddy reintenta la renovación de Let's Encrypt al arrancar; GLPI no responde durante unos segundos.
 opt_uninstall_keep	Borra contenedores, volúmenes y datos de GLPI. Los respaldos y certificados quedan para restaurar después.
@@ -702,3 +702,12 @@ restore_folder	Carpeta
 restore_section_plan	Qué va a pasar
 ui_field_keys	Enter aceptar · Esc volver · ←/→ editar · Ctrl+U borrar
 ui_typed_keys	Escribe la palabra exacta y pulsa Enter · Esc cancela
+ca_created	Se creó la autoridad certificadora local (válida 20 años): %s. Entrega este archivo (gdm-ca.pem) una sola vez a los agentes GLPI y navegadores.
+cert_new_ca	Crear una CA local NUEVA
+opt_cert_new_ca	Solo si la clave de la CA se perdió o se vio comprometida: todos los agentes GLPI y navegadores deberán importar el nuevo gdm-ca.pem. Pide escribir NEW-CA.
+ca_section	Para agentes GLPI y navegadores
+ca_download	Descarga
+ca_path	En el servidor
+ca_expiry	CA válida hasta
+ca_fingerprint	SHA-256 de la CA
+ca_agent_help	Agente GLPI: copia gdm-ca.pem en cada equipo (por ejemplo C:\CA-GLPI\gdm-ca.pem) y pon esa ruta en "CA Certificate File"; deja "Fingerprint" vacío. Navegadores: importa gdm-ca.pem como entidad raíz de confianza.

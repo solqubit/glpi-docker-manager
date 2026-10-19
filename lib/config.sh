@@ -160,7 +160,8 @@ EOF
             ports:[($c.http_port|tostring)+":80",($c.https_port|tostring)+":443"],
             networks:["proxy"],
             volumes:([mount($root+"/Caddyfile";"/etc/caddy/Caddyfile"),"caddy_data:/data","caddy_config:/config"] +
-              (if $c.tls=="acme" then [] else [mount($root+"/tls";"/etc/gdm/tls")] end))}
+              (if $c.tls=="acme" then [] else [mount($root+"/tls";"/etc/gdm/tls")] end) +
+              (if $c.tls=="self-signed" then [mount($root+"/public";"/etc/gdm/public")] else [] end))}
         end
       # Container logs rotate (default 3 x 10 MiB per service); MySQL binary logs
       # expire after the chosen days (default 30, the MySQL default).
