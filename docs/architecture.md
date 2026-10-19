@@ -34,8 +34,12 @@ state directory remains private, and credentials/key files remain 0600.
 * `lib/config.sh`: validation, atomic revisions and generated Compose/PHP files.
 * `lib/docker.sh`: service ownership, readiness and explicit database operations.
 * `lib/tls.sh`: generated self-signed, ACME and imported PEM certificates.
-* `lib/backup.sh`: quiesced backups, integrity, guided restore and transfer.
-* `lib/operations.sh`: installation, updates, migrations and administration.
+* `lib/backup.sh`: quiesced backups, integrity, guided restore (with pre-restore
+  backup and cleanup of the replaced installation) and transfer.
+* `lib/maintenance.sh`: daily maintenance and scheduler, backup rotation, log
+  rotation, certificates, free disk space, uninstall and manager self-update.
+* `lib/operations.sh`: installation, updates, migrations, rollback offer and
+  administration dispatch.
 * `tools/terminal_ui.py`: optional standard-library curses widgets and plain fallback.
 * `tools/setup.py`: private editable draft, field validation, timezone selection and review.
 * `tools/main_menu.py`, `service_view.py`, `backup_picker.py`: dashboard and focused views.

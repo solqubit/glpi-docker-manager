@@ -25,8 +25,6 @@ docker_plugins_missing	Docker works, but Compose V2 or Buildx is missing. The ma
 docker_plugins_confirm	Install the missing Docker plugins using the detected package manager?
 docker_plugins_manual	Compatible plugin packages were not found in the configured repositories. Follow https://docs.docker.com/compose/install/linux/ and https://docs.docker.com/build/install/buildx/ ; verify docker compose version and docker buildx version, then run again.
 plugin_packages	Plugin packages: %s
-compose_missing	Install the Docker Compose V2 plugin. See https://docs.docker.com/compose/install/linux/
-buildx_missing	Install the Docker Buildx plugin to verify image digests and architectures: https://docs.docker.com/build/install/buildx/
 manual_docker	Automatic Docker installation is not documented for this distribution. Install Docker Engine, Buildx and Compose using your distribution's instructions: https://docs.docker.com/engine/install/ . Then run again; unlisted distributions are allowed.
 docker_plan	Docker Engine, Buildx and Compose will be installed for %s. Procedure: %s . Existing competing packages will not be removed.
 install_docker	Install Docker using the procedure shown above?
@@ -43,7 +41,6 @@ release_limit	Release pagination exceeded its safety limit. No release list was 
 support_unknown	Support status could not be verified automatically. Review https://github.com/glpi-project/glpi/security/policy
 release_notes	Official release notes for GLPI %s: %s
 security_release	SECURITY RELEASE: upstream recommends upgrading. Review the security fixes and any important notices in the official release notes below.
-production_http_warning	Production HTTP was selected. Configure HTTPS or a trusted external TLS proxy before exposing users' sessions. Continue with HTTP?
 glpi10_warning	WARNING: GLPI 10 is outside ordinary upstream support following GLPI 12. Version 10.0.28 was announced as the final 10.0 release. No further ordinary bug/security fixes are expected. See https://www.glpi-project.org/en/glpi-12/ . Release notes above may describe the policy at their publication date.
 unsupported_confirm	Keep using this unsupported branch after reviewing the warning?
 older_release	A newer stable release exists in this branch: %s. Older patches may lack security fixes.
@@ -62,18 +59,13 @@ acme_requirements	For %s: point public DNS A/AAAA records to this server; allow 
 self_signed	A self-signed certificate was generated automatically: %s. Import only this certificate into your clients' trust stores; keep the private key secret.
 tls_prompt	How would you like to secure access to GLPI?
 hostname_prompt	Public hostname or IPv4 address (no scheme, path or port):
-welcome	GLPI Docker Manager
 language_prompt	Language / Idioma: en / es:
 first_action	What would you like to do?
 major_prompt	Choose the GLPI branch:
 mode_prompt	What will this installation be used for?
 port_prompt	HTTP host port:
-https_port_prompt	HTTPS host port:
-timezone_prompt	IANA timezone, for example America/Guayaquil:
 db_name_prompt	Database name:
-db_user_prompt	Database application user:
 expose_prompt	Expose the database port for external connections?
-storage_notice	Application and database data stays inside the installation root, mounted through labelled persistent Docker volumes.
 root_password	Choose the separate MySQL administrator password.
 install_confirm	Create the configuration and deploy this installation?
 ready	Open GLPI in your browser: %s
@@ -85,8 +77,8 @@ backup_ready	Backup completed and checksums verified: %s . It contains secrets; 
 backup_invalid	The backup failed validation. No restore was attempted.
 backup_list	Available backups:
 backup_path	Absolute path to the backup archive:
-restore_effect	Restore creates fresh volumes using the backup's original image versions. Existing volumes are retained. Current services will stop; newer writes are not merged.
-restore_done	Restore verified. Previous volumes are retained. Review URL, HTTPS/DNS and all integrations before switching traffic.
+restore_effect	The backup is restored into new volumes with its original versions. Writes made after that backup are not merged.
+restore_done	Restore verified. Check address, HTTPS/DNS and integrations before sending users here.
 transfer	Source GLPI and its cron worker remain STOPPED at this backup's snapshot. Copy %s privately to the destination, clone this repository there and run ./start.sh restore. Verify URL, certificates, users, data and integrations before changing DNS. Keep the source stopped while the destination is active. To cancel the transfer, run ./start.sh start on the source.
 transfer_confirm	Prepare the final transfer backup and leave source GLPI stopped to prevent divergent writes or duplicate background jobs?
 backup_space	Not enough free space for a backup and verification. Free space or move the state directory to a larger filesystem.
@@ -128,26 +120,15 @@ ui_menu_prompt	Choose an action:
 ui_pending_title	An operation needs attention
 ui_pending_body	The installation is not ready yet. Resume setup or review its logs before continuing.
 ui_resume_install	Resume installation
-ui_dashboard	Your GLPI installation
 ui_status_running	Running
 ui_status_stopped	Stopped
 ui_status_unknown	Status unavailable
 ui_status	Service · View status
 ui_start	Service · Start
-ui_stop	Service · Stop
 ui_logs	Service · View logs
-ui_check_updates	Updates · Check available versions
-ui_update	Updates · Update GLPI
-ui_backup	Data · Create a backup
-ui_https	Configuration · HTTPS and certificates
-ui_db_exposure	Configuration · Publish or close MySQL port
-ui_credentials	Configuration · View database credentials
-ui_transfer	Data · Move to another server
-ui_migrate	Updates · Migrate to a new GLPI branch
 ui_db_update	Updates · Update MySQL patches
 ui_language	Configuration · Language
 ui_diagnose	Help · Diagnose the installation
-ui_refresh	Updates · Refresh the same GLPI image
 ui_recover	Help · Recover an interrupted operation
 ui_mode_test	Testing
 ui_mode_production	Production
@@ -157,7 +138,6 @@ ui_tls_acme	Public HTTPS · Let's Encrypt · automatic renewal
 ui_tls_custom	HTTPS · import my PEM certificates
 ui_releases_loading	Looking up official GLPI versions…
 ui_summary	Review your installation
-ui_environment	Environment
 ui_host	Server address
 ui_database	Database / user
 ui_db_public	Published on 3306:3306
@@ -174,8 +154,6 @@ ui_step_install	Installing the GLPI database
 ui_step_requirements	Checking GLPI requirements
 ui_step_services	Starting GLPI and web access
 ui_step_verify	Verifying services, database and access
-ui_working	Working…
-ui_step_done	Completed
 ui_error_log	Details for this step: %s
 ui_continue	Press Enter to return to the menu…
 ui_bad_port	Enter a port number between 1 and 65535.
@@ -267,9 +245,6 @@ setup_loading_images	Resolving official MySQL and proxy images before opening se
 ui_service_ready	✓ GLPI is running and verified
 ui_service_starting	Starting and checking your GLPI installation
 ui_service_checking	Checking services, database and web access
-ui_service_stopped	GLPI is stopped. How would you like to continue?
-ui_service_start_now	Start and verify GLPI
-ui_service_keep_stopped	Keep stopped and open the menu
 ui_service_health	Health
 ui_service_ports	Published ports
 ui_service_internal	Internal network only
@@ -324,8 +299,6 @@ backup_recovery_help	To return to this backup, open Restore a backup in the main
 update_step_backup	Creating a recovery backup
 update_step_rehearsal	Rehearsing the update on an isolated restored copy
 update_loading	Checking available official update images
-update_same_branch	Same branch
-update_new_branch	New branch · migration warning and rehearsal
 update_select_title	Available GLPI updates
 update_select_help	Choose any later installed-image version. You can update one release at a time. A new branch requires an isolated rehearsal and explicit confirmation.
 update_select_prompt	Which version would you like to install?
@@ -413,7 +386,7 @@ status_release_page	GitHub page %s
 status_resolving	checking %s
 db_updated	MySQL update verified. Current MySQL: %s.
 registry_rate_limited	Docker Hub rejected some lookups because of its rate limit (HTTP 429). Wait a few minutes or run docker login, then try again.
-menu_certificates	Certificates: status and renewal
+menu_certificates	HTTPS and certificates
 menu_schedule	Automatic backups and maintenance
 menu_self_update	Update this manager
 menu_uninstall	Uninstall GLPI
@@ -423,22 +396,18 @@ desc_status	Services, health, versions and published ports.
 desc_start	Start GLPI if stopped and verify database, schema and web access.
 desc_stop	Stop GLPI and MySQL; data is kept.
 desc_logs	Recent container logs, scrollable.
-desc_update	Install a later GLPI release; a backup and a rehearsal run first.
-desc_check-updates	Show the latest GLPI releases without changing anything.
-desc_refresh-image	Pull a newer image digest of the installed GLPI version.
+desc_update	Newer patches, the next branch or a refreshed image of the same version; backup and rehearsal first.
 desc_db-update	Apply the latest MySQL 8.4 patch with backup and rehearsal.
 desc_diagnose	System, Docker, disk and configuration summary without passwords.
 desc_self-update	Download the latest release of this manager; GLPI is not touched.
 desc_uninstall	Remove GLPI containers, volumes and data (asks for UNINSTALL).
 desc_quit	Close the manager; GLPI keeps running.
-desc_backup	Create a verified manual backup; manual backups are never rotated.
+desc_backup	A verified manual backup, or the final backup to move to another server.
 desc_backups	Browse, verify, export, restore or delete backups.
-desc_restore	Restore GLPI from a backup archive.
+desc_restore	Go back to a backup. The current installation is backed up first and removed afterwards, so nothing piles up.
 desc_schedule	Daily automatic backups (5 kept), log rotation and certificate renewal.
-desc_transfer	Final backup for another server; GLPI stays stopped afterwards.
 desc_address	Server address, web ports and time zone.
-desc_https	HTTP only, self-signed, Let's Encrypt or your own certificate.
-desc_certificates	Expiry date, renewal and reload of the HTTPS certificate.
+desc_certificates	HTTPS mode, certificate expiry, renewal and reload.
 desc_db-exposure	Publish MySQL on port 3306 or keep it internal.
 desc_credentials	Show the database credentials after confirmation.
 desc_language	Interface language of this manager.
@@ -455,11 +424,11 @@ dash_db_public	MySQL: exposed :3306
 dash_db_private	MySQL: internal
 dash_backup	Backup: %s (%s)
 dash_backup_none	No backups yet
-dash_auto_on	Auto backup %s:00
+dash_auto_on	Auto backup: %s
 dash_auto_off	Auto backups off
 dash_maintenance_missing	Maintenance not scheduled
 backup_origin_auto	Automatic
-backups_counts	%s manual · %s automatic.
+backups_counts	%s manual [M] · %s before updates/restores [P] · %s automatic [A].
 ui_db_current	Current state
 ui_db_unchanged	No change: MySQL access stays as it is.
 firewall_docker	Docker publishes port %s directly in iptables, bypassing ufw/firewalld rules. Restrict access in the DOCKER-USER chain or at your network firewall.
@@ -468,18 +437,16 @@ maint_title	Automatic backups and maintenance
 maint_backups	Automatic backups
 maint_on	Enabled
 maint_off	Disabled
-maint_hour	Daily at
 maint_keep	Automatic backups kept
 maint_scheduler	Scheduler
 maint_scheduler_on	Installed (%s)
 maint_scheduler_missing	Not installed
-maint_body	The daily task also rotates logs and renews self-signed certificates. GLPI stops for a few minutes during each backup. Only the %s newest automatic backups are kept; manual backups are never deleted automatically.
+maint_body	The daily task also rotates logs and renews self-signed certificates, even on days without a backup. Only the %s newest automatic backups are kept; manual ones are never deleted automatically. A missed run (server off) is done at the next start.
 maint_prompt	What do you want to change?
 maint_enable	Enable automatic backups
 maint_disable	Disable automatic backups
-maint_change_hour	Change the time
 maint_run_now	Run maintenance now
-maint_hour_prompt	At what time should maintenance run?
+maint_hour_prompt	At what time? GLPI stops for a few minutes during each backup.
 maint_saved	✓ Maintenance schedule saved
 maint_no_scheduler	Automatic maintenance could not be scheduled (no systemd or cron). Run ./start.sh maintenance periodically.
 maint_skipped	Maintenance skipped: the installation is not ready or an operation is pending.
@@ -540,3 +507,150 @@ self_update_git_dirty	%s has local changes. Commit or discard them, then use Upd
 self_update_git_noupstream	The Git branch in %s has no remote branch to update from; run git pull there manually.
 self_update_git_none	The Git checkout is up to date (branch %s).
 self_update_git_behind	%s new commits available on branch %s
+update_label_patch	%s · branch %s · patch
+update_label_major	%s · new branch %s → %s · migration
+opt_recommended	recommended
+opt_installed	Installed
+opt_current	(current)
+opt_update_patch	Patch release within GLPI %s: bug and security fixes, same data structure. A backup and an isolated rehearsal run first.
+opt_update_major	Branch migration %s → %s: the database is converted and plugins may stop working. Rehearsal and a typed confirmation are required.
+opt_major_latest	Newest supported GLPI branch.
+opt_major_older	Previous branch; choose it only if your plugins require it.
+opt_version_latest	Latest patch of this branch, with the newest fixes.
+opt_version_older	Earlier patch; it lacks later bug and security fixes.
+opt_version_other	Type any stable version of this branch.
+opt_db_internal	Only GLPI reaches MySQL through the private Docker network. Recommended.
+opt_db_public	Any host that reaches port 3306 can try to connect. Docker bypasses ufw/firewalld rules.
+opt_install	Guided setup: version, address, ports, HTTPS and passwords, then automatic deployment.
+opt_restore	Rebuild GLPI from a backup (.tar.gz) of this manager; a running installation is backed up first.
+opt_resume	Continue the remaining installation stages with the saved settings.
+opt_recover	Re-check services and close the pending operation. Use it only after reviewing the logs.
+opt_resources_continue	Below the recommended RAM or disk GLPI may be slow or run out of space.
+opt_tls_off	No encryption. Acceptable only inside a trusted network.
+opt_tls_self_signed	Encrypted at once; browsers warn until clients trust the generated certificate.
+opt_tls_acme	Public domain pointing here with ports 80/443 open: trusted certificate, renewed automatically.
+opt_tls_custom	Use PEM files from your own or corporate certificate authority.
+opt_release_notes	Read the official release notes before continuing.
+opt_maint_enable	One backup per day at the chosen time; the %s newest automatic backups are kept.
+opt_maint_disable	No more automatic backups; existing ones are kept. Log rotation continues.
+opt_maint_run	Rotate logs, check certificates and, if enabled, back up right now.
+opt_cert_renew	Issues a new certificate and restarts the services for a few seconds; clients must trust it again.
+opt_cert_reload	Validates the replaced PEM files and restarts the services for a few seconds.
+opt_cert_restart	Caddy retries the Let's Encrypt renewal on start; GLPI is unreachable for a few seconds.
+opt_uninstall_keep	Deletes containers, volumes and GLPI data. Backups and certificates remain for a later restore.
+opt_uninstall_all	Deletes everything, backups included. This cannot be undone.
+restore_plan_safe	Your current installation will be backed up first ([P] backup) and removed once the restored one is verified, so no copies pile up. To go forward again, restore that backup.
+restore_plan_keep	The current installation cannot be backed up (it is not running), so it is kept stopped as the only return point. Remove it later from Free disk space.
+restore_step_backup	Backing up the current installation
+restore_step_cleanup	Removing the replaced installation
+restore_removed_previous	The replaced installation was removed; its data is in the backup %s.
+restore_kept_previous	The replaced installation is kept stopped as a return point (only one is ever kept). Remove it from Free disk space when you no longer need it.
+backup_origin_restore	Before restoring
+backup_origin_pre	Before an update or restore
+dash_previous	%s replaced installation kept
+menu_cleanup	Free disk space
+desc_cleanup	Unused images, replaced installations, old backups and revisions, with their size.
+cleanup_title	Free disk space
+cleanup_body	Only what this manager created is listed. The active installation, its images and manual backups are never removed here.
+cleanup_prompt	What do you want to free?
+cleanup_scanning	Measuring reclaimable space
+cleanup_empty	nothing to free
+cleanup_images	Unused images · %s · %s
+cleanup_images_help	GLPI/MySQL/Caddy images of earlier versions. The previous version is kept for a fast rollback; any other is downloaded again if a restore needs it.
+cleanup_previous	Replaced installations · %s · %s
+cleanup_previous_help	%s: stopped containers, volumes and data left by a restore. Irreversible unless you have a backup of them; asks for DELETE.
+cleanup_backups	Older pre-update/restore backups [P] · %s · %s
+cleanup_backups_help	Keeps the newest [P] backup. Manual [M] and automatic [A] backups are not touched.
+cleanup_backups_confirm	Delete the older [P] backups?
+cleanup_revisions	Old configuration revisions · %s · %s
+cleanup_revisions_help	Settings snapshots from earlier changes and leftover rehearsal folders. The newest 3 and those still in use stay.
+cleanup_releases	Older manager versions · %s · %s
+cleanup_releases_help	Previous copies of this manager kept after self-updates. The installed version stays.
+cleanup_step_images	Removing unused images
+cleanup_step_previous	Removing replaced installations
+cleanup_step_backups	Removing older [P] backups
+cleanup_step_files	Removing old files
+cleanup_done	Space freed. The list below is up to date.
+cleanup_nothing	There is nothing to free in that category.
+cleanup_image_in_use	Image kept because another container uses it: %s
+plugins_title	Plugins registered in GLPI (%s)
+plugins_none	No plugins are registered; the migration does not depend on third-party code.
+plugins_help	Check that each active plugin has a release for GLPI %s before migrating. Incompatible plugins are disabled by GLPI after the update.
+plugin_active	active
+plugin_inactive	inactive
+plugin_other	needs attention (not installed or pending)
+rollback_title	The update did not complete
+rollback_body	Services may be stopped and the operation journal is open. You can restore the backup taken just before the update, or leave everything as it is to review the logs first.
+rollback_backup	Backup before the update
+rollback_prompt	How do you want to continue?
+rollback_restore	Restore the backup taken before the update
+rollback_keep	Leave it as it is and review the logs
+opt_rollback_restore	Back to the previous version with the data at backup time. The failed installation is kept as the return point.
+opt_rollback_keep	Nothing changes now. Later use Restore or Recover from the menu.
+maint_glpi_logs_failed	GLPI technical logs could not be rotated this time.
+restore_replaces_kept	The installation kept from an earlier restore (%s) will be removed and replaced by this one.
+update_label_refresh	%s · same version · refreshed image
+opt_update_refresh	Docker Hub published a new image of the installed version (base-system fixes). The database does not change; backup and rehearsal still run.
+backup_kind_prompt	Which backup do you want to create?
+backup_kind_manual	Manual backup [M]
+backup_kind_transfer	Final backup to move to another server
+opt_backup_manual	GLPI stops for a few minutes and starts again. Kept until you delete it.
+opt_backup_transfer	GLPI stays STOPPED afterwards so no new data is written; restore the archive on the new server.
+cert_change_mode	Change HTTPS mode
+opt_cert_mode	HTTP only, self-signed, Let's Encrypt or your own certificate; services restart.
+dash_disk_low	Disk: %s GB free
+dash_maintenance_failed	Maintenance FAILED %s
+dash_maintenance_warning	Maintenance warnings %s
+day_long_1	Monday
+day_short_1	Mon
+day_long_2	Tuesday
+day_short_2	Tue
+day_long_3	Wednesday
+day_short_3	Wed
+day_long_4	Thursday
+day_short_4	Thu
+day_long_5	Friday
+day_short_5	Fri
+day_long_6	Saturday
+day_short_6	Sat
+day_long_7	Sunday
+day_short_7	Sun
+freq_daily	every day
+freq_every	every %s days
+freq_workdays	Monday to Friday
+freq_weekly	every %s
+freq_label_daily	Every day
+freq_label_every	Every %s days
+freq_label_workdays	Monday to Friday
+freq_label_weekly	Once a week…
+freq_label_pick	Choose weekdays…
+freq_label_custom	Every N days…
+opt_freq_coverage	The %s kept backups let you go back about %s days.
+opt_freq_workdays	No backups on weekends, when GLPI usually has no changes.
+opt_freq_pick	Mark any combination of days with checkboxes.
+opt_freq_custom	Type a number of days between 1 and 30.
+maint_freq_prompt	How often should automatic backups run?
+maint_weekday_prompt	On which day of the week?
+maint_every_prompt	Every how many days? (1-30)
+ui_bad_days	Type a number from 1 to 30.
+weekdays_prompt	Mark the backup days (Enter marks or unmarks)
+weekdays_save	Save these days
+opt_weekdays_save	Backups run on the marked days at the chosen time.
+weekdays_none	Mark at least one day.
+maint_minute_prompt	At which exact minute?
+hour_recommended	recommended
+hour_quiet	outside office hours
+hour_work	office hours
+opt_hour_recommended	Lowest activity in most organisations.
+opt_hour_quiet	Few people use GLPI at this time.
+opt_hour_work	Users lose access to GLPI for a few minutes while the backup runs.
+opt_hour_other	Check that nobody depends on GLPI at this time.
+maint_frequency	Frequency
+maint_time	Time
+maint_next	Next backups
+maint_coverage	%s backups · about %s days of history
+maint_frequency_option	Frequency: %s
+maint_time_option	Time: %s
+opt_maint_frequency	Every day, every few days, weekly, Monday to Friday or chosen weekdays.
+opt_maint_time	Hour and minute of the daily task; office hours are marked.
+maint_backup_not_due	No automatic backup due today; next: %s.

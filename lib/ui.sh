@@ -67,7 +67,8 @@ ui_level_of() {
         host_storage_steps|acme_requirements|cert_instructions|releases_stale|install_exists|admin_command|registry_rate_limited|\
         docker_context_help|maint_no_scheduler|maint_skipped|maint_services_stopped|backups_prune_skipped|\
         cert_expiring|cert_custom_expiring|cert_acme_expiring|cert_auto_renewing|firewall_docker|\
-        self_update_git|self_update_unavailable|self_update_git_dirty|self_update_git_noupstream)
+        self_update_git|self_update_unavailable|self_update_git_dirty|self_update_git_noupstream|cleanup_image_in_use|\
+        weekdays_none)
             UI_LEVEL=warning;;
         ready|updated|detected|*_done|*_ok|*_ready|*_saved|*_cached|self_signed)
             UI_LEVEL=success;;
@@ -362,23 +363,61 @@ ui_restore() {
     if [[ $UI_CURSOR_HIDDEN == true ]]; then printf '\033[?25h' >&2; UI_CURSOR_HIDDEN=false; fi
     UI_ACTIVE=false
 }
+# Option kinds make the consequence of each choice visible before Enter:
+#   primary ▶ recommended · ok ● safe · warn ▲ restarts/risk · danger ✖ destroys
+#   back ← cancel/return. A label is "KIND::text" plus an optional "\thelp"
+#   line shown under the list while that option is highlighted (ui_opt builds it).
+ui_opt() {
+    [[ -z $1 ]] || printf '%s::' "$1"
+    printf '%s%s' "$2" "${3:+$'\t'$3}"
+}
+ui_kind_style() {
+    case $1 in
+        primary) UI_GLYPH='▶' UI_KIND_TONE='1;36' UI_BAR='1;37;44';;
+        ok) UI_GLYPH='●' UI_KIND_TONE='32' UI_BAR='1;37;44';;
+        warn) UI_GLYPH='▲' UI_KIND_TONE='33' UI_BAR='1;30;43';;
+        danger) UI_GLYPH='✖' UI_KIND_TONE='1;31' UI_BAR='1;37;41';;
+        back) UI_GLYPH='←' UI_KIND_TONE='2' UI_BAR='1;37;44';;
+        *) UI_GLYPH='·' UI_KIND_TONE='' UI_BAR='1;37;44';;
+    esac
+}
 ui_draw_choices() {
     # Arrays and drawing state are scoped by choose; Bash dynamic scope avoids
     # evaluating input or transporting selected values through terminal output.
-    local ui_i ui_last ui_label ui_keys UI_DRAW_LINES=0
+    local ui_i ui_last ui_label ui_keys ui_part ui_count UI_DRAW_LINES=0
     ui_question "$ui_title"
     printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
     ui_last=$((ui_offset+ui_visible))
     (( ui_last <= ${#ui_values[@]} )) || ui_last=${#ui_values[@]}
     for (( ui_i=ui_offset; ui_i<ui_last; ui_i++ )); do
-        ui_label=${ui_labels[ui_i]:0:UI_WIDTH-2}
+        ui_label=${ui_labels[ui_i]:0:UI_WIDTH-4}
+        ui_kind_style "${ui_kinds[ui_i]}"
         if (( ui_i == ui_selected )); then
-            printf '  ' >&2; ui_color '1;37;44'
-            printf '> %s%*s' "$ui_label" "$((UI_WIDTH-${#ui_label}))" '' >&2; ui_color 0
-        else printf '    %s' "$ui_label" >&2; fi
+            printf '  ' >&2; ui_color "$UI_BAR"
+            printf '> %s %s%*s' "$UI_GLYPH" "$ui_label" "$((UI_WIDTH-2-${#ui_label}))" '' >&2; ui_color 0
+        else
+            printf '    ' >&2
+            [[ -z $UI_KIND_TONE ]] || ui_color "$UI_KIND_TONE"
+            printf '%s %s' "$UI_GLYPH" "$ui_label" >&2
+            [[ -z $UI_KIND_TONE ]] || ui_color 0
+        fi
         printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
     done
     printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
+    if (( ui_help_lines > 0 )); then
+        # Fixed height: exactly two description lines, so redraws stay aligned.
+        ui_kind_style "${ui_kinds[ui_selected]}"
+        ui_count=0
+        while IFS= read -r ui_part && (( ui_count < 2 )); do
+            if (( ui_count == 0 )); then printf '  ' >&2; ui_color 2; printf '[*] ' >&2; ui_color 0
+            else printf '      ' >&2; fi
+            [[ -z $UI_KIND_TONE || ${ui_kinds[ui_selected]} == back ]] && ui_color 0 || ui_color "${UI_KIND_TONE#1;}"
+            printf '%s' "$ui_part" >&2; ui_color 0; printf '\033[K\n' >&2
+            ((ui_count+=1)); ((UI_DRAW_LINES+=1))
+        done < <(ui_wrap "${ui_helps[ui_selected]:- }" "$((UI_WIDTH-4))")
+        while (( ui_count < 2 )); do printf '\033[K\n' >&2; ((ui_count+=1)); ((UI_DRAW_LINES+=1)); done
+        printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
+    fi
     if (( UI_WIDTH < 50 )); then ui_keys=$(t ui_keys_short); else ui_keys=$(t ui_keys); fi
     printf '  ' >&2; ui_color 2; printf '%s · %s/%s' "$ui_keys" "$((ui_selected+1))" "${#ui_values[@]}" >&2; ui_color 0
     printf '\033[K\n' >&2; ((UI_DRAW_LINES+=1))
@@ -386,11 +425,18 @@ ui_draw_choices() {
 }
 choose() {
     local ui_out=$1 ui_key=$2 ui_default=$3; shift 3
-    local -a ui_values=() ui_labels=()
+    local -a ui_values=() ui_labels=() ui_kinds=() ui_helps=()
     local ui_i ui_selected=0 ui_offset=0 ui_visible ui_drawn=0 ui_keypress ui_next ui_sequence ui_search=''
-    local ui_reply ui_match ui_title ui_previous_cols=0 ui_question_lines
+    local ui_reply ui_match ui_title ui_previous_cols=0 ui_question_lines ui_label ui_kind ui_help ui_help_lines=0
     [[ -t 0 ]] || die interactive_required
-    while (( $# >= 2 )); do ui_values+=("$1"); ui_labels+=("$2"); shift 2; done
+    while (( $# >= 2 )); do
+        ui_label=$2 ui_kind='' ui_help=''
+        if [[ $ui_label =~ ^(primary|ok|warn|danger|back)::(.*)$ ]]; then ui_kind=${BASH_REMATCH[1]} ui_label=${BASH_REMATCH[2]}; fi
+        if [[ $ui_label == *$'\t'* ]]; then ui_help=${ui_label#*$'\t'} ui_label=${ui_label%%$'\t'*}; fi
+        [[ -z $ui_help ]] || ui_help_lines=3
+        ui_values+=("$1"); ui_labels+=("$ui_label"); ui_kinds+=("$ui_kind"); ui_helps+=("$ui_help")
+        shift 2
+    done
     (( ${#ui_values[@]} > 0 )) || return 1
     for ui_i in "${!ui_values[@]}"; do [[ ${ui_values[ui_i]} != "$ui_default" ]] || ui_selected=$ui_i; done
     ui_title=$(t "$ui_key")
@@ -400,7 +446,11 @@ choose() {
     if ! ui_interactive || (( UI_COLS < 36 || UI_ROWS < 16 )); then
         while :; do
             printf '\n%s\n' "$ui_title" >&2
-            for ui_i in "${!ui_values[@]}"; do printf '  %s) %s\n' "$((ui_i+1))" "${ui_labels[ui_i]}" >&2; done
+            for ui_i in "${!ui_values[@]}"; do
+                ui_kind_style "${ui_kinds[ui_i]}"
+                printf '  %s) %s %s\n' "$((ui_i+1))" "$UI_GLYPH" "${ui_labels[ui_i]}" >&2
+                [[ -z ${ui_helps[ui_i]} ]] || printf '       %s\n' "${ui_helps[ui_i]}" >&2
+            done
             printf '%s\n' "$(t ui_plain_keys)" >&2
             printf '[%s] ' "$((ui_selected+1))" >&2
             IFS= read -r ui_reply || return 1
@@ -426,7 +476,7 @@ choose() {
         if (( ui_drawn > 0 && UI_COLS == ui_previous_cols )); then printf '\033[%sA' "$ui_drawn" >&2
         else ui_question_lines=$(ui_wrap "$ui_title" "$((UI_WIDTH-2))" | wc -l); fi
         ui_previous_cols=$UI_COLS
-        ui_visible=$((UI_ROWS-ui_question_lines-4-UI_PAGE_LINES))
+        ui_visible=$((UI_ROWS-ui_question_lines-4-UI_PAGE_LINES-ui_help_lines))
         (( ui_visible <= 10 )) || ui_visible=10
         (( ui_visible >= 1 )) || ui_visible=1
         (( ui_selected >= ui_offset )) || ui_offset=$ui_selected
@@ -488,9 +538,10 @@ ask_value() {
                 fi;;
             timezone) [[ $ui_input_value != *..* && $ui_input_value =~ ^[A-Za-z0-9_+/-]+$ && -f /usr/share/zoneinfo/$ui_input_value ]] && ui_valid=true;;
             hostname) [[ $ui_input_value =~ ^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$ ]] && ui_valid=true;;
+            days) [[ $ui_input_value =~ ^[0-9]{1,2}$ ]] && (( 10#$ui_input_value >= 1 && 10#$ui_input_value <= 30 )) && ui_valid=true;;
         esac
         if [[ $ui_valid == true ]]; then
-            [[ $ui_kind != port ]] || ui_input_value=$((10#$ui_input_value))
+            [[ $ui_kind != port && $ui_kind != days ]] || ui_input_value=$((10#$ui_input_value))
             printf -v "$ui_out" '%s' "$ui_input_value"
             return
         fi
@@ -627,7 +678,7 @@ ui_help() {
         "help_group_options;--lang en|es=help_opt_lang;--state-dir PATH=help_opt_state;-h, --help=help_opt_help;--version=help_opt_version"
         "help_group_service;status=menu_status;start=menu_start;stop=menu_stop;logs=menu_logs"
         "help_group_updates;install [x.y.z]=help_cmd_install;check-updates=menu_versions;update [x.y.z]=menu_update;migrate [x.y.z]=help_cmd_migrate;refresh-image=menu_refresh;db-update=menu_database_update"
-        "help_group_data;backup=menu_backup;backups=menu_backups;restore [file]=menu_restore;schedule=menu_schedule;transfer=menu_transfer"
+        "help_group_data;backup=menu_backup;backups=menu_backups;restore [file]=menu_restore;schedule=menu_schedule;cleanup=menu_cleanup;transfer=menu_transfer"
         "help_group_settings;address=menu_address;https=menu_https;certificates=menu_certificates;db-exposure=menu_exposure;credentials=menu_credentials;language=menu_language"
         "help_group_manager;diagnose=menu_diagnose;recover=menu_recover;maintenance=help_cmd_maintenance;self-update=menu_self_update;uninstall=menu_uninstall;version=help_opt_version;help=help_opt_help"
     )

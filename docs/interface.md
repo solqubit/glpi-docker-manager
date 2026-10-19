@@ -70,6 +70,14 @@ header with version, magenta titles, a blue selection bar and these markers:
 | `[✗]` | error or failed stage (red) |
 | `[?]` | question or selector |
 
+Selector options show their consequence before Enter: `▶` recommended (cyan),
+`●` safe (green), `▲` restarts services or carries risk such as a branch
+migration or exposing MySQL (yellow, yellow selection bar), `✖` destructive
+(red, red selection bar) and `←` back/cancel/no (dim). The highlighted option's
+description appears under the list. "Yes" in confirmations that stop services,
+migrate data or reveal secrets is drawn as a risk, and risky actions are never
+preselected. Plain mode keeps the symbols and prints descriptions under options.
+
 Start-up and `help` show a compact ASCII banner. The eight installation stages,
 the three update stages (backup, rehearsal, apply) and MySQL updates are numbered
 (`[2/8]`, `[1/3]`) and keep the completed list with each stage's duration. The
@@ -105,10 +113,39 @@ tasks) stay in GLPI.
   renews self-signed certificates 30 days before expiry and, when enabled, creates
   an automatic backup. It waits up to 15 minutes for an open interactive session.
   Output goes to `state/logs/maintenance-YYYYMMDD.log`.
-* **Automatic backups** are enabled and timed from *Automatic backups and
-  maintenance*. They are named `glpi-<version>-<time>-auto-<id>.tar.gz`, shown as
+* **Automatic backups** are configured from *Automatic backups and
+  maintenance*: frequency (every day, every 2 or 3 days, every N days up to 30,
+  Monday to Friday, one weekday, or any weekdays marked with checkboxes) and time
+  (hour, with office hours marked as a risk, and minute 00/15/30/45). The screen
+  previews the next three backup dates and how many days of history the kept
+  backups cover. The task runs daily at that time; in "every N days" mode the
+  count starts from the newest automatic backup, and *Run now* backs up
+  immediately. They are named `glpi-<version>-<time>-auto-<id>.tar.gz`, shown as
   `[A]` (manual ones `[M]`), and only the 5 newest are kept. Manual and pre-update
   backups are never deleted automatically. GLPI stops for a few minutes per backup.
+* **Backup kinds** are visible in every list: `[M]` manual (never rotated),
+  `[P]` taken automatically before an update or restore (the 3 newest are
+  kept) and `[A]` scheduled (the 5 newest are kept).
+* **Going back with Restore** never piles up installations. A running
+  installation is backed up first (`[P]`, origin "Before restoring"); after the
+  restored one passes every check, the replaced containers, volumes and data
+  are removed. To go forward again, restore that `[P]` backup or update again.
+  If the current installation cannot be backed up (stopped or broken), it is
+  kept stopped as the only return point; at most one is ever kept, and the
+  dashboard flags it.
+* **Free disk space** lists, with sizes: unused images (the previous version
+  is kept for a fast rollback; others are pulled again if a restore needs
+  them), replaced installations (typed `DELETE`), older `[P]` backups (the
+  newest stays), old configuration revisions and leftover rehearsals, and older
+  manager versions. Only resources created by this manager are listed; the
+  active installation and manual backups are never offered.
+* **Updates** check that the new image is already local before GLPI is
+  stopped, list the plugins registered in GLPI before a branch migration, and
+  offer to restore the pre-update backup at once if the apply stage fails.
+* **GLPI technical logs** (`/var/glpi/_log`, not the audit history, which
+  lives in the database) are compressed with the date when they exceed 20 MiB
+  and the compressed copies are deleted after 30 days. MySQL keeps its own
+  30-day binary-log default.
 * **Container logs** are limited to 3 × 10 MiB per service. Older installations
   get the limit once from *Start / verify GLPI* (brief restart).
 * **Certificates** shows the expiry date. Self-signed: renew now. Imported:

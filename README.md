@@ -114,12 +114,19 @@ sudo ./start.sh https
 sudo ./start.sh address                # edit access IP, ports, timezone and HTTPS
 sudo ./start.sh db-exposure
 sudo ./start.sh credentials
+sudo ./start.sh certificates           # HTTPS mode, expiry, renewal and reload
+sudo ./start.sh schedule               # automatic backups and daily maintenance
+sudo ./start.sh cleanup                # free disk space
+sudo ./start.sh self-update            # update this manager
+sudo ./start.sh uninstall
 sudo ./start.sh diagnose
 sudo ./start.sh recover
 ```
 
 Also available: `start`, `stop`, `logs`, `db-update`, `refresh-image`, `language`,
-`version`. Data-changing commands require an interactive terminal and relevant
+`maintenance` (the daily job), `version`. In the menu, *Update GLPI* also covers
+`check-updates` and `refresh-image`, *Create backup* also offers `transfer`, and
+*HTTPS and certificates* also changes the HTTPS mode. Data-changing commands require an interactive terminal and relevant
 confirmations; there is no blanket `--yes` switch.
 
 ## State and credentials

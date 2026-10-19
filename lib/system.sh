@@ -249,7 +249,8 @@ check_resources() {
     storage_preflight 0 1024
     if (( available < 10240 || memory < 4096 )); then
         say resource_reference
-        choose resource_action resource_warning continue continue "$(t ui_continue_install)" back "$(t ui_back_menu)" || exit 10
+        choose resource_action resource_warning continue continue "$(ui_opt warn "$(t ui_continue_install)" "$(t opt_resources_continue)")" \
+            back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
         [[ $resource_action != back ]] || exit 10
     fi
 }

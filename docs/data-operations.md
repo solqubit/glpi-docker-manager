@@ -74,11 +74,16 @@ images.
    tool. Install this repository there and run `./start.sh`.
 3. Select `restore` and supply the absolute archive path. The manager checks
    archive structure/checksums and configuration **before** stopping any service.
-4. Type `RESTORE` after reading the effects. A new installation ID and empty
-   volumes are used; the backup's original GLPI/MySQL images are pulled by digest.
+4. Type `RESTORE` after reading the effects. A running installation is backed up
+   first (`[P]`, "Before restoring"). A new installation ID and empty volumes are
+   used; the backup's original GLPI/MySQL images are pulled by digest when missing.
 5. The logical dump is imported into the fresh database; file/keys/plugin volumes
    are restored. Schema, authenticated SQL and HTTP/HTTPS must pass.
-6. Check hostname, DNS, certificate trust, mail, inventory, cron and integrations.
+6. Only then is the replaced installation removed (its data is in the `[P]`
+   backup). When it could not be backed up it is kept stopped as the single return
+   point, replacing any older kept one; **Free disk space** removes it later.
+   Daily maintenance is scheduled for the restored installation.
+7. Check hostname, DNS, certificate trust, mail, inventory, cron and integrations.
    Keep the old server until the destination is verified, then switch traffic.
    Keep source GLPI stopped while the destination is active. To cancel, use
    `start` on the source. Coordinate external MySQL writers separately.

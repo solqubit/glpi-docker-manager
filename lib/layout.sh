@@ -8,7 +8,7 @@ layout_install_code() {
     [[ $root_resolved != "$(readlink -f -- "$STATE")" ]] || die layout_checkout_in_root "$STATE"
     if [[ $root_resolved == "$manager_resolved" ]]; then layout_write_entrypoint; return; fi
     [[ ! -e $STATE/manager || -L $STATE/manager ]] || die layout_code_conflict "$STATE/manager"
-    local -a files=(start.sh VERSION LICENSE README.md README.es.md CONTRIBUTING.md .env.example)
+    local -a files=(start.sh VERSION LICENSE README.md README.es.md CONTRIBUTING.md CHANGELOG.md .env.example)
     for path in "$GDM_ROOT"/lib/*.sh "$GDM_ROOT"/locales/*.tsv "$GDM_ROOT"/templates/*.sh "$GDM_ROOT"/tools/*.py "$GDM_ROOT"/docs/*.md; do
         files+=("${path#"$GDM_ROOT"/}")
     done

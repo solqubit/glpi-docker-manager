@@ -1,5 +1,10 @@
 # Validation evidence
 
+> The evidence below was recorded for 0.1.0 on 2026-10-18. Release 1.0.0 adds
+> maintenance, cleanup, restore and update changes; re-run `bash tests/run.sh`,
+> ShellCheck and the opt-in integration tests and record the new results here
+> before publishing 1.0.0.
+
 Local verification on 2026-10-18 used Docker Desktop's Linux engine from a Windows
 development host. The Ubuntu 24.04 test runner accessed the local Docker socket
 and the repository at the same path seen by the daemon. This validates the Linux

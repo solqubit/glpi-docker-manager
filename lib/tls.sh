@@ -62,7 +62,10 @@ tls_prepare() {
 tls_wizard() {
     local input=$1 output=$2 mode host
     choose mode tls_prompt "$(jq -r .tls "$input")" \
-        off "$(t ui_tls_off)" self-signed "$(t ui_tls_self-signed)" acme "$(t ui_tls_acme)" custom "$(t ui_tls_custom)" || die cancelled
+        off "$(ui_opt '' "$(t ui_tls_off)" "$(t opt_tls_off)")" \
+        self-signed "$(ui_opt ok "$(t ui_tls_self-signed)" "$(t opt_tls_self_signed)")" \
+        acme "$(ui_opt primary "$(t ui_tls_acme)" "$(t opt_tls_acme)")" \
+        custom "$(ui_opt '' "$(t ui_tls_custom)" "$(t opt_tls_custom)")" || die cancelled
     case $mode in off|self-signed|acme|custom) ;; *) die invalid tls;; esac
     if [[ $mode == acme ]]; then
         ui_panel "$(t ui_letsencrypt_title)" "$(t ui_letsencrypt_body)" "$(t ui_letsencrypt_ports)"

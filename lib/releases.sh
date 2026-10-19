@@ -131,7 +131,8 @@ release_notice() {
     newest=$(release_versions "$major" | head -n 1)
     [[ $newest == "$version" ]] || say older_release "$newest"
     if [[ -t 0 ]]; then
-        choose note_action ui_release_prompt continue continue "$(t ui_release_continue)" notes "$(t ui_release_details)" || die cancelled
+        choose note_action ui_release_prompt continue continue "$(ui_opt primary "$(t ui_release_continue)")" \
+            notes "$(ui_opt '' "$(t ui_release_details)" "$(t opt_release_notes)")" || die cancelled
         if [[ $note_action == notes ]]; then
             # Upstream text is data, never terminal control sequences or code.
             printf '%s\n' "$body" | LC_ALL=C tr -d '\000-\010\013-\037\177' >&2
@@ -169,9 +170,12 @@ select_version() {
     ui_task task_versions select_version_candidates "$major" "$limit"
     (( ${#versions[@]} > 0 )) || die image_missing "$major"
     local i
-    for i in "${!versions[@]}"; do version_options+=("${versions[i]}" "GLPI ${versions[i]}"); done
-    version_options+=(other "$(t more_versions)")
-    [[ $allow_back != true ]] || version_options+=(back "$(t setup_return_edit)")
+    for i in "${!versions[@]}"; do
+        if (( i == 0 )); then version_options+=("${versions[i]}" "$(ui_opt primary "GLPI ${versions[i]} · $(t opt_recommended)" "$(t opt_version_latest)")")
+        else version_options+=("${versions[i]}" "$(ui_opt '' "GLPI ${versions[i]}" "$(t opt_version_older)")"); fi
+    done
+    version_options+=(other "$(ui_opt '' "$(t more_versions)" "$(t opt_version_other)")")
+    [[ $allow_back != true ]] || version_options+=(back "$(ui_opt back "$(t setup_return_edit)")")
     if ! choose choice choose_version "${versions[0]}" "${version_options[@]}"; then
         [[ $allow_back != true ]] || return 10
         die cancelled

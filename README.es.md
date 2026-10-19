@@ -110,8 +110,17 @@ sudo ./start.sh https
 sudo ./start.sh address
 sudo ./start.sh db-exposure
 sudo ./start.sh transfer
+sudo ./start.sh certificates     # modo HTTPS, caducidad, renovación y recarga
+sudo ./start.sh schedule         # respaldos automáticos y mantenimiento diario
+sudo ./start.sh cleanup          # liberar espacio
+sudo ./start.sh self-update      # actualizar este gestor
+sudo ./start.sh uninstall
 sudo ./start.sh diagnose
 ```
+
+En el menú, *Actualizar GLPI* incluye también `check-updates` y `refresh-image`,
+*Crear respaldo* ofrece el respaldo de traslado (`transfer`) y *HTTPS y
+certificados* permite cambiar el modo HTTPS.
 
 Sin comandos se abre el menú interactivo. Las operaciones sensibles solicitan
 confirmación. Las restauraciones y migraciones principales requieren escribir una

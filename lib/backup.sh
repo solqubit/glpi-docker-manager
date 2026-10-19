@@ -21,7 +21,7 @@ backup_create() {
     local resume=${1:-true} origin=${2:-manual} target=${3:-} work archive role size free volume_size was_proxy=false required database_size
     local usage measured=0 tag
     local -a mounts=() paths=()
-    case $origin in manual|auto|update|migrate|db-update|refresh-image|transfer) ;; *) die invalid backup_origin;; esac
+    case $origin in manual|auto|update|migrate|db-update|refresh-image|transfer|restore) ;; *) die invalid backup_origin;; esac
     ui_status "$(t status_measure)"
     # Use uncompressed volume usage plus database size as a conservative budget.
     database_size=$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT COALESCE(SUM(data_length+index_length),0) FROM information_schema.tables"')
@@ -45,8 +45,9 @@ backup_create() {
     ui_progress_note backup_estimate "$(((size+1048575)/1048576))" "$((required+512))" "$free"
     storage_preflight 0 "$required"
     work=$(mktemp -d "$STATE/backups/.work-XXXXXX"); CLEANUP_DIRECTORIES+=("$work")
-    # Automatic backups carry "-auto-" in the name: retention never touches manual ones.
-    tag=""; [[ $origin != auto ]] || tag=auto-
+    # Rotation works on names: "-auto-" scheduled (5 kept), "-pre-" taken before
+    # an update/restore (3 kept). Manual and transfer backups are never rotated.
+    case $origin in auto) tag=auto-;; update|migrate|db-update|refresh-image|restore) tag=pre-;; *) tag='';; esac
     archive="$STATE/backups/glpi-$(cfg glpi_version)-$(date -u +%Y%m%dT%H%M%S)-$tag$(openssl rand -hex 3).tar.gz"
     CLEANUP_PATHS+=("$archive.partial")
     say backup_started
@@ -83,6 +84,7 @@ backup_create() {
     fi
     LAST_BACKUP=$archive
     say backup_ready "$archive"
+    [[ $tag != pre- ]] || backup_prune pre "$PRE_BACKUP_KEEP"
     # Exact directory from mktemp under our private backup directory.
     if [[ $work == "$STATE/backups/.work-"* && ! -L $work ]]; then rm -rf -- "$work"; fi
 }
@@ -105,8 +107,15 @@ restore_into_current() {
     ui_status "$(t status_import)"
     dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$MYSQL_DATABASE"' < "$folder/mysql.sql"
 }
+# Going back to a backup never leaves a growing pile of installations:
+#  1/3 the current installation is backed up first (origin "restore"), when it runs;
+#  2/3 the backup is restored into new volumes and verified;
+#  3/3 the replaced installation is removed when step 1 saved it. If it could not
+#      be backed up (broken/stopped), it is kept as the only return point and any
+#      older kept installation is removed.
 restore_backup() {
-    local archive=${1:-} selection picker_result
+    local archive=${1:-} selection picker_result pre_backup='' note
+    RESTORE_PREVIOUS_ID='' RESTORE_KEPT=''
     if [[ -z $archive ]]; then
         selection=$(mktemp "$STATE/.backup-choice.XXXXXX"); CLEANUP_PATHS+=("$selection")
         if python3 "$GDM_ROOT/tools/backup_picker.py" "$STATE/backups" "$LANGUAGE" "$selection"; then picker_result=0; else picker_result=$?; fi
@@ -114,15 +123,44 @@ restore_backup() {
         IFS= read -r archive < "$selection"
     fi
     backup_extract "$archive"
-    ui_panel "$(t backup_selected)" "$archive" "$(t restore_effect)"
+    local replaced='' id
+    if restore_can_backup; then note=$(t restore_plan_safe)
+    else
+        note=$(t restore_plan_keep)
+        # Only when there is a current installation to keep in its place.
+        if [[ -L $STATE/current ]]; then
+            while IFS= read -r id; do replaced+="${replaced:+, }GLPI $(installation_version "$id")"; done < <(previous_installations)
+            [[ -z $replaced ]] || note+=" $(t restore_replaces_kept "$replaced")"
+        fi
+    fi
+    ui_panel "$(t backup_selected)" "$archive" "$(t restore_effect)" "$note"
     typed_confirm RESTORE
-    ui_run 0 backup_step_restore restore_selected_backup "$archive"
-    ui_panel "✓ $(t restore_done)" "$(t ready "$(installation_url)")" "$archive"
+    local first=1/2 second=2/2
+    if restore_can_backup; then
+        RESTORE_PREVIOUS_ID=$(cfg id)
+        ui_run 1/3 restore_step_backup backup_create true restore
+        pre_backup=$LAST_BACKUP first=2/3 second=3/3
+    fi
+    ui_run "$first" backup_step_restore restore_selected_backup "$archive"
+    ui_run "$second" restore_step_cleanup restore_cleanup "$pre_backup"
+    maintenance_ensure
+    if [[ -n $pre_backup ]]; then note=$(t restore_removed_previous "$pre_backup")
+    elif [[ -n $RESTORE_KEPT ]]; then note=$(t restore_kept_previous)
+    else note=''; fi
+    ui_panel "✓ $(t restore_done)" "$(t ready "$(installation_url)")" "$archive" ${note:+"$note"}
+}
+# The running installation can be backed up before it is replaced.
+restore_can_backup() {
+    [[ -L $STATE/current && ! -f $STATE/operation.json ]] || return 1
+    ( config_load ) >/dev/null 2>&1 || return 1
+    config_load
+    [[ $(cfg status) == ready && -n $(dc ps --status running --quiet glpi) && -n $(dc ps --status running --quiet db) ]]
 }
 restore_selected_backup() {
     local tmp old_revision='' had_install=false archive=${1:-}
     if [[ -L $STATE/current ]]; then
         config_load; old_revision=$(readlink -f "$STATE/current"); had_install=true
+        [[ -n $RESTORE_PREVIOUS_ID ]] || RESTORE_PREVIOUS_ID=$(cfg id)
     fi
     # Existing journals are evidence, not discarded when recovery uses a restore.
     if [[ -f $STATE/operation.json ]]; then
@@ -153,6 +191,23 @@ restore_selected_backup() {
     config_set_status ready
     journal_done
     [[ -z $old_revision ]] || printf '%s\n' "$old_revision" > "$STATE/previous-revision"
+}
+# Runs only after the restored installation passed every check.
+restore_cleanup() {
+    local pre_backup=${1:-} current id
+    current=$(cfg id)
+    if [[ -n $pre_backup && -n $RESTORE_PREVIOUS_ID ]]; then
+        # Its data is in the new [P] backup; an older kept installation stays.
+        installation_remove "$RESTORE_PREVIOUS_ID"
+        rm -f -- "$STATE/previous-revision"
+        return 0
+    fi
+    RESTORE_KEPT=$RESTORE_PREVIOUS_ID
+    [[ -n $RESTORE_KEPT ]] || return 0
+    # It becomes the only return point; the panel announced the replacement.
+    while IFS= read -r id; do
+        [[ $id == "$current" || $id == "$RESTORE_KEPT" ]] || installation_remove "$id"
+    done < <(previous_installations)
 }
 backup_list() {
     say backup_list

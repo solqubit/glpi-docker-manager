@@ -221,14 +221,15 @@ class Setup:
         elif kind == 'tls':
             values = ['off', 'self-signed', 'acme', 'custom']
             value = self.ui.menu(self.ui.t('setup_tls'),
-                                 [(v, self.ui.t('ui_tls_' + v), '') for v in values],
+                                 [(v, glyph + ' ' + self.ui.t('ui_tls_' + v), style)
+                                  for v, glyph, style in zip(values, '·●▶·', ('', 'ok', 'accent', ''))],
                                  values.index(self.data[key]), help_text=self.ui.t('setup_tls_help'))
             if value == 'acme':
                 self.data['http_port'], self.data['https_port'] = 80, 443
         elif kind == 'exposure':
             value = self.ui.menu(self.ui.t('expose_prompt'),
-                                 [(False, self.ui.t('ui_db_expose_no'), 'ok'),
-                                  (True, self.ui.t('ui_db_expose_yes'), 'warning')],
+                                 [(False, '● ' + self.ui.t('ui_db_expose_no'), 'ok'),
+                                  (True, '▲ ' + self.ui.t('ui_db_expose_yes'), 'warning')],
                                  int(self.data[key]), notice=self.ui.t('ui_db_access_body'),
                                  help_text=self.ui.t('ui_db_access_later'))
         else:

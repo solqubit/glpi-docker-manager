@@ -60,10 +60,16 @@ ask() {
     printf -v "$var" '%s' "${prompt_input:-$default}"
 }
 confirm() {
-    local answer
+    local answer kind=ok
     local default=no
     [[ ${2:-n} != y ]] || default=yes
-    choose answer "$1" "$default" yes "$(t ui_yes)" no "$(t ui_no)" || return 1
+    # "Yes" is drawn as a risk when it stops services, migrates data or shows secrets.
+    case $1 in
+        stop_confirm|transfer_confirm|update_confirm|migration_review|db_update_confirm|config_confirm|\
+        unsupported_confirm|credentials_warning|self_update_confirm|install_docker|install_dependencies|\
+        docker_plugins_confirm) kind=warn;;
+    esac
+    choose answer "$1" "$default" yes "$(ui_opt "$kind" "$(t ui_yes)")" no "$(ui_opt back "$(t ui_no)")" || return 1
     [[ $answer == yes ]]
 }
 typed_confirm() {

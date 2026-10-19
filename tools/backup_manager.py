@@ -85,16 +85,21 @@ class Backups:
                 date = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
                 version = re.search(r'glpi-([0-9.]+)-', path.name)[1]
                 # Automatic (scheduled, rotated) and manual (kept until deleted) backups.
+                # [M] manual (kept until deleted) · [P] before an update/restore
+                # (3 kept) · [A] scheduled (5 kept).
                 automatic = '-auto-' in path.name
-                origin = self.ui.t('backup_origin_' + ('auto' if automatic else data.get('origin', 'unknown')))
-                kind = '[A]' if automatic else '[M]'
+                previous = '-pre-' in path.name
+                origin = data.get('origin') or ('auto' if automatic else 'pre' if previous else 'unknown')
+                origin = self.ui.t('backup_origin_' + ('auto' if automatic else origin))
+                kind = '[A]' if automatic else '[P]' if previous else '[M]'
                 rows.append((str(path), f'{kind} {date} · GLPI {version} · {path.stat().st_size / 1048576:.1f} MiB · {origin}',
                              'info' if automatic else ''))
             rows.append(('back', self.ui.t('ui_status_back'), 'accent'))
             total = sum(path.stat().st_size for path in paths) / 1048576
             title = self.ui.t('backups_overview', len(paths), f'{total:.1f}')
             automatic = sum('-auto-' in path.name for path in paths)
-            counts = self.ui.t('backups_counts', len(paths) - automatic, automatic)
+            previous = sum('-pre-' in path.name for path in paths)
+            counts = self.ui.t('backups_counts', len(paths) - automatic - previous, previous, automatic)
             note = self.notice or counts + ' ' + self.ui.t('backups_help' if paths else 'backup_none')
             selected = self.ui.menu(title, rows, notice=note, help_text=self.ui.t('setup_keys'))
             if selected in (None, 'back'): return dict(action='back')

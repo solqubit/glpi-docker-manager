@@ -27,8 +27,7 @@ installation_finish() {
     ui_run 8/8 ui_step_verify verify_services
     config_set_status ready
     journal_done
-    [[ -f $STATE/maintenance.json ]] || maintenance_save false 3
-    if ! scheduler_install; then say maint_no_scheduler; fi
+    maintenance_ensure
     [[ $(cfg expose_db) != true ]] || say firewall_docker 3306
     ui_panel "$(t ui_install_success)" "$(t ready "$(installation_url)")" \
         "GLPI $(cfg glpi_version) · MySQL $(cfg mysql_version)" \
@@ -68,14 +67,23 @@ service_start() {
     ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")" "$(t ui_next_steps)"
 }
 select_major() {
-    local major_output=$1 major_default=$2 major_minimum=${3:-9} major_value
+    # MINIMUM excludes branches at or below it: 10 for new installations (GLPI 10
+    # is end of life; it stays restorable and reachable with "install 10.x.y").
+    local major_output=$1 major_default=$2 major_minimum=${3:-10} major_mode=${5:-install} major_value major_first=true
     local -a major_options=()
     while IFS= read -r major_value; do
         (( major_value > major_minimum )) || continue
-        major_options+=("$major_value" "GLPI $major_value")
+        if [[ $major_mode == migrate ]]; then
+            major_options+=("$major_value" "$(ui_opt warn "GLPI $major_value" "$(t opt_update_major "$major_minimum" "$major_value")")")
+        elif [[ $major_first == true ]]; then
+            major_options+=("$major_value" "$(ui_opt primary "GLPI $major_value · $(t opt_recommended)" "$(t opt_major_latest)")")
+        else
+            major_options+=("$major_value" "$(ui_opt '' "GLPI $major_value" "$(t opt_major_older)")")
+        fi
+        major_first=false
     done < <(jq -r '[.[].version|split(".")[0]|tonumber]|unique|sort|reverse|.[]|select(.>=10)' "$STATE/cache/releases.json")
     (( ${#major_options[@]} > 0 )) || die image_missing "$major_default"
-    [[ ${4:-false} != true ]] || major_options+=(back "$(t setup_return_edit)")
+    [[ ${4:-false} != true ]] || major_options+=(back "$(ui_opt back "$(t setup_return_edit)")")
     if ! choose "$major_output" major_prompt "$major_default" "${major_options[@]}"; then
         if [[ ${4:-false} == true ]]; then printf -v "$major_output" '%s' back; else die cancelled; fi
     fi
@@ -110,7 +118,7 @@ install_wizard() {
     ui_task ui_releases_loading release_fetch
     if [[ -n $requested ]]; then major=${requested%%.*}
     else
-        select_major major "$(jq -r '[.[].version|split(".")[0]|tonumber]|max' "$STATE/cache/releases.json")"
+        select_major major "$(jq -r '[.[].version|split(".")[0]|tonumber]|max' "$STATE/cache/releases.json")" 10 false install
     fi
     [[ $major =~ ^[1-9][0-9]{1,2}$ ]] || die invalid major
     select_version "$major" "$requested"
@@ -137,7 +145,7 @@ install_wizard() {
                 cp -- "$clean_file" "$file";;
             10|130) exit "$editor_result";;
             20)
-                select_major major "$(jq -r .major "$file")" 9 true
+                select_major major "$(jq -r .major "$file")" 10 true install
                 [[ $major != back ]] || continue
                 if select_version "$major" '' true; then
                     jq --arg version "$SELECTED_VERSION" --arg image "$SELECTED_IMAGE" \
@@ -271,6 +279,7 @@ update_glpi() {
         select_update_target "$current" "$source_major"
         requested=$SELECTED_UPDATE
         [[ -n $requested ]] || return 0
+        if [[ $requested == refresh ]]; then kind=refresh-image requested=''; fi
     fi
     if [[ $kind == update && -n $requested ]] && valid_version "$requested" && (( ${requested%%.*} > source_major )); then kind=migrate; fi
     if [[ $kind == refresh-image ]]; then
@@ -284,12 +293,13 @@ update_glpi() {
             select_version "${target%%.*}" "$target"
         else
             local major
-            select_major major "$((source_major+1))" "$source_major"
+            select_major major "$((source_major+1))" "$source_major" false migrate
             if [[ ! $major =~ ^[1-9][0-9]{1,2}$ ]] || (( major != source_major+1 )); then die update_boundary; fi
             select_version "$major"
         fi
         target=$SELECTED_VERSION; image=$SELECTED_IMAGE
         say migration_warning
+        plugins_panel "${target%%.*}"
         confirm migration_review || die cancelled
     else
         target=${requested:-$(release_versions "$source_major" | head -n 1)}
@@ -306,7 +316,7 @@ update_glpi() {
     # Rehearse every application version change, including patch updates.
     ui_run 2/3 update_step_rehearsal rehearse "$EXTRACTED" "$target" "$image"
     [[ $kind != migrate ]] || typed_confirm "MIGRATE-$source_major-${target%%.*}"
-    ui_run 3/3 update_step_apply apply_glpi_update "$kind" "$target" "$image" "$source_major"
+    update_apply_guarded apply_glpi_update "$kind" "$target" "$image" "$source_major"
     ui_panel "✓ $(t updated "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
 }
 apply_glpi_update() {
@@ -314,6 +324,9 @@ apply_glpi_update() {
     file=$(mktemp "$STATE/.update.XXXXXX"); CLEANUP_PATHS+=("$file")
     write_target_config "$target" "$image" "$file"
     config_stage "$file"
+    # The rehearsal already pulled it; never depend on the network once GLPI is down.
+    ui_status "$(t status_pulling "${image%@*}")"
+    docker image inspect "$image" >/dev/null 2>&1 || docker pull --quiet "$image"
     old=$(readlink -f "$STATE/current")
     journal_begin "$kind"
     printf '%s\n' "$old" > "$STATE/previous-revision"
@@ -321,7 +334,6 @@ apply_glpi_update() {
     dc stop glpi
     [[ $(cfg tls) == off ]] || dc stop proxy
     config_activate "$REVISION"
-    docker pull "$image"
     journal_phase migration
     move_legacy_marketplace "$EXTRACTED" "$source_major"
     oneoff_action requirements
@@ -332,6 +344,49 @@ apply_glpi_update() {
     verify_services
     config_set_status ready
     journal_done
+}
+# Later releases plus the current version's digest (to detect a refreshed image).
+update_choices_scan() {
+    build_update_choices "$1" "$2"
+    REFRESH_REF=$(image_resolve glpi/glpi "$1" 2>/dev/null) || REFRESH_REF=''
+}
+# Plugins registered in GLPI, read from its database before a branch change.
+plugins_panel() {
+    local target_major=$1 rows directory version state label
+    local -a lines=()
+    rows=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Nse "SELECT directory, version, state FROM glpi_plugins ORDER BY state, directory"' 2>/dev/null) || rows=''
+    while IFS=$'\t' read -r directory version state; do
+        [[ -n $directory ]] || continue
+        # GLPI plugin states: 1 activated, 4 not activated; others need attention.
+        case $state in 1) label=$(t plugin_active);; 4) label=$(t plugin_inactive);; *) label=$(t plugin_other);; esac
+        lines+=("${directory//[^A-Za-z0-9_.-]/}"$'\t'"${version//[^A-Za-z0-9_.+-]/} · $label")
+    done <<< "$rows"
+    if (( ${#lines[@]} == 0 )); then ui_panel "$(t plugins_title 0)" "$(t plugins_none)"
+    else ui_panel "$(t plugins_title "${#lines[@]}")" "${lines[@]}" "$(t plugins_help "$target_major")"; fi
+}
+# The apply stage runs in a subshell: when it fails, the pre-update backup is
+# offered at once instead of leaving stopped services and a manual recovery.
+update_apply_guarded() {
+    local rc
+    set +e
+    trap - ERR
+    ( set -Eeuo pipefail; trap on_error ERR; ui_run 3/3 update_step_apply "$@" )
+    rc=$?
+    trap on_error ERR
+    set -e
+    (( rc != 0 )) || return 0
+    if (( rc == 74 )); then GDM_STORAGE_FAILURE=true; exit 74; fi
+    rollback_offer "$rc"
+}
+rollback_offer() {
+    local rc=$1 action
+    [[ -t 0 && -n ${LAST_BACKUP:-} && -f $LAST_BACKUP ]] || exit "$rc"
+    ui_panel "$(t rollback_title)" "$(t rollback_body)" "$(t rollback_backup)"$'\t'"${LAST_BACKUP##*/}"
+    choose action rollback_prompt restore restore "$(ui_opt warn "$(t rollback_restore)" "$(t opt_rollback_restore)")" \
+        keep "$(ui_opt back "$(t rollback_keep)" "$(t opt_rollback_keep)")" || exit "$rc"
+    [[ $action == restore ]] || exit "$rc"
+    restore_backup "$LAST_BACKUP"
+    exit 0
 }
 build_update_choices() {
     local current=$1 major=$2 version image resolved
@@ -353,23 +408,35 @@ build_update_choices() {
     done < "$resolved" > "$UPDATE_CHOICES_FILE"
 }
 select_update_target() {
-    local current=$1 major=$2 version branch image choice default='' UPDATE_CHOICES_FILE UPDATE_CANDIDATES=0
+    local current=$1 major=$2 version branch image choice default='' UPDATE_CHOICES_FILE UPDATE_CANDIDATES=0 REFRESH_REF=''
     local -a choices=()
     SELECTED_UPDATE=''
     UPDATE_CHOICES_FILE=$(mktemp "$STATE/.updates.XXXXXX"); CLEANUP_PATHS+=("$UPDATE_CHOICES_FILE")
-    ui_run 0 update_loading build_update_choices "$current" "$major"
+    ui_run 0 update_loading update_choices_scan "$current" "$major"
+    # Newest patch of the installed branch is the recommended choice.
     while IFS=$'\t' read -r version branch image; do
-        if [[ $branch == "$major" ]]; then
-            choices+=("$version" "GLPI $version · $(t update_same_branch)"); default=$version
-        else choices+=("$version" "GLPI $version · $(t update_new_branch)"); fi
+        [[ $branch != "$major" ]] || default=$version
     done < "$UPDATE_CHOICES_FILE"
+    while IFS=$'\t' read -r version branch image; do
+        if [[ $version == "$default" ]]; then
+            choices+=("$version" "$(ui_opt primary "$(t update_label_patch "GLPI $version" "$branch") · $(t opt_recommended)" "$(t opt_update_patch "$branch")")")
+        elif [[ $branch == "$major" ]]; then
+            choices+=("$version" "$(ui_opt ok "$(t update_label_patch "GLPI $version" "$branch")" "$(t opt_update_patch "$branch")")")
+        else
+            choices+=("$version" "$(ui_opt warn "$(t update_label_major "GLPI $version" "$major" "$branch")" "$(t opt_update_major "$major" "$branch")")")
+        fi
+    done < "$UPDATE_CHOICES_FILE"
+    # Same version, newer image digest (base-system fixes): formerly "Refresh image".
+    if [[ -n $REFRESH_REF && -n ${CONFIG:-} && -r $CONFIG && $REFRESH_REF != "$(cfg glpi_image)" ]]; then
+        choices+=(refresh "$(ui_opt ok "$(t update_label_refresh "GLPI $current")" "$(t opt_update_refresh)")")
+    fi
     if (( ${#choices[@]} == 0 )); then
         if (( UPDATE_CANDIDATES > 0 )); then say update_images_unavailable; else say update_none; fi
         return 0
     fi
     if [[ -z $default ]]; then say update_no_patches; default=${choices[0]}; fi
-    choices+=(back "$(t ui_back_menu)")
-    ui_panel "$(t update_select_title)" "GLPI $current" "$(t update_select_help)"
+    choices+=(back "$(ui_opt back "$(t ui_back_menu)")")
+    ui_panel "$(t update_select_title)" "$(t opt_installed)"$'\t'"GLPI $current" "$(t update_select_help)"
     choose choice update_select_prompt "$default" "${choices[@]}" || exit 10
     [[ $choice != back ]] || exit 10
     SELECTED_UPDATE=$choice
@@ -389,7 +456,7 @@ update_database() {
     ui_panel "$(t backup_recovery_ready)" "$LAST_BACKUP" "$(t backup_recovery_help)"
     ui_run 2/3 update_step_rehearsal rehearse "$EXTRACTED" "$(cfg glpi_version)" "$(cfg glpi_image)" "$target" "$image"
     typed_confirm UPDATE-MYSQL
-    ui_run 3/3 update_step_apply apply_database_update "$target" "$image"
+    update_apply_guarded apply_database_update "$target" "$image"
     ui_panel "✓ $(t db_updated "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
 }
 mysql_target_lookup() { official_image_lookup mysql 8.4 > "$1" || die image_missing mysql; }
@@ -398,11 +465,11 @@ apply_database_update() {
     file=$(mktemp "$STATE/.mysql.XXXXXX"); CLEANUP_PATHS+=("$file")
     jq --arg version "$target" --arg image "$image" '.mysql_version=$version | .mysql_image=$image | .status="configured"' "$CONFIG" > "$file"
     config_stage "$file"
+    docker image inspect "$image" >/dev/null 2>&1 || docker pull --quiet "$image"
     journal_begin db-update
     printf '%s\n' "$LAST_BACKUP" > "$STATE/recovery-backup"
     dc stop
     config_activate "$REVISION"
-    docker pull "$image"
     dc up -d
     verify_services
     config_set_status ready
@@ -433,7 +500,11 @@ db_exposure_prompt() {
     [[ $(cfg expose_db) != true ]] || current=yes
     if [[ $current == yes ]]; then state=$(t ui_db_public); else state=$(t ui_db_private); fi
     ui_panel "$(t ui_db_access_title)" "$(t ui_db_current)"$'\t'"$state" "$(t ui_db_access_body)" "$(t ui_db_access_later)"
-    choose exposure_choice expose_prompt "$current" yes "$(t ui_db_expose_yes)" no "$(t ui_db_expose_no)" || exit 10
+    local yes_label no_label
+    yes_label=$(t ui_db_expose_yes); no_label=$(t ui_db_expose_no)
+    if [[ $current == yes ]]; then yes_label+=" $(t opt_current)"; else no_label+=" $(t opt_current)"; fi
+    choose exposure_choice expose_prompt "$current" \
+        no "$(ui_opt ok "$no_label" "$(t opt_db_internal)")" yes "$(ui_opt warn "$yes_label" "$(t opt_db_public)")" || exit 10
     if [[ $exposure_choice == "$current" ]]; then say ui_db_unchanged; exit 10; fi
     [[ $exposure_choice != yes ]] || say firewall_docker 3306
     [[ $exposure_choice == yes ]]
@@ -481,6 +552,10 @@ diagnose() {
             openssl x509 -in "$STATE/current/tls/fullchain.pem" -noout -subject -issuer -dates
         fi
     fi
+    if [[ -f $STATE/maintenance-last.json ]]; then
+        diagnose_section "$STATE/maintenance-last.json · $(maintenance_summary)"
+        jq . "$STATE/maintenance-last.json"
+    fi
     if [[ -f $STATE/operation.json ]]; then
         diagnose_section "$STATE/operation.json"
         jq '{action,phase,started_at}' "$STATE/operation.json"
@@ -519,6 +594,13 @@ dispatch() {
                 update|migrate|refresh-image) update_glpi "$command" "$argument";;
                 db-update) update_database;;
                 backup|transfer)
+                    if [[ $command == backup && ${GDM_IN_MENU:-false} == true ]]; then
+                        choose command backup_kind_prompt backup \
+                            backup "$(ui_opt primary "$(t backup_kind_manual)" "$(t opt_backup_manual)")" \
+                            transfer "$(ui_opt warn "$(t backup_kind_transfer)" "$(t opt_backup_transfer)")" \
+                            back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
+                        [[ $command != back ]] || exit 10
+                    fi
                     if [[ $command == transfer ]]; then confirm transfer_confirm || return 0; fi
                     journal_begin "$command"
                     if [[ $command == transfer ]]; then ui_run 0 update_step_backup backup_create false transfer
@@ -530,6 +612,7 @@ dispatch() {
                     [[ $command != transfer ]] || say transfer "$LAST_BACKUP";;
                 https|db-exposure|address) settings_command "$command";;
                 certificates) certificates_menu;;
+                cleanup) cleanup_menu;;
                 schedule) schedule_menu;;
                 credentials)
                     say credentials_note
@@ -555,7 +638,14 @@ dispatch() {
 # Read by tools/main_menu.py: certificate days and maintenance state.
 dashboard_environment() {
     local CERT_DAYS='' CERT_END_DATE=''
+    local folder count=0
     GDM_DASH_CERT_DAYS='' GDM_DASH_MAINTENANCE=$(maintenance_summary)
+    # Replaced installations still on disk (normally none, at most one).
+    for folder in "$STATE"/data/*/; do
+        [[ -d $folder && ${folder%/} != "$STATE/data/$(cfg id)" ]] && count=$((count+1))
+    done
+    GDM_DASH_PREVIOUS=$count
+    export GDM_DASH_PREVIOUS
     if [[ $(cfg tls) == self-signed || $(cfg tls) == custom ]] && cert_days "$STATE/current/tls/fullchain.pem"; then
         GDM_DASH_CERT_DAYS=$CERT_DAYS
         (( CERT_DAYS >= 30 )) || say cert_expiring "$CERT_DAYS"
@@ -567,14 +657,17 @@ menu() {
     while :; do
         if [[ ! -L $STATE/current ]]; then
             ui_panel "$(t ui_first_title)" "$(t ui_first_body)"
-            choose command first_action install install "$(t ui_install)" restore "$(t ui_restore_backup)" quit "$(t ui_exit)" || return 0
+            choose command first_action install install "$(ui_opt primary "$(t ui_install)" "$(t opt_install)")" \
+                restore "$(ui_opt ok "$(t ui_restore_backup)" "$(t opt_restore)")" quit "$(ui_opt back "$(t ui_exit)")" || return 0
         else
             config_load
             if [[ $(cfg status) != ready || -f $STATE/operation.json ]]; then
                 ui_panel "$(t ui_pending_title)" "$(t ui_pending_body)"
-                choose command ui_menu_prompt install install "$(t ui_resume_install)" recover "$(t ui_recover)" \
-                    restore "$(t ui_restore_backup)" logs "$(t ui_logs)" diagnose "$(t ui_diagnose)" \
-                    uninstall "$(t menu_uninstall)" quit "$(t ui_exit)" || return 0
+                choose command ui_menu_prompt install install "$(ui_opt primary "$(t ui_resume_install)" "$(t opt_resume)")" \
+                    recover "$(ui_opt warn "$(t ui_recover)" "$(t opt_recover)")" \
+                    restore "$(ui_opt ok "$(t ui_restore_backup)" "$(t opt_restore)")" \
+                    logs "$(ui_opt '' "$(t ui_logs)" "$(t desc_logs)")" diagnose "$(ui_opt '' "$(t ui_diagnose)" "$(t desc_diagnose)")" \
+                    uninstall "$(ui_opt danger "$(t menu_uninstall)" "$(t desc_uninstall)")" quit "$(ui_opt back "$(t ui_exit)")" || return 0
             else
                 service_snapshot
                 dashboard_environment

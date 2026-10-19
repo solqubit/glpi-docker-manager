@@ -29,6 +29,8 @@ expect_fail version_gt 11.0.7 12.0.0
 ok 'Numeric semantic version comparisons and stable-only selection'
 bash "$GDM_ROOT/tests/release-cases.sh"
 ok 'Paginated release discovery filters drafts/RCs, skips missing images and discovers canonical CLI commands'
+bash "$GDM_ROOT/tests/maintenance-cases.sh"
+ok 'Backup rotation, restore cleanup, free-space selection and flexible backup schedules (days, weekdays, time)'
 
 for distro in ubuntu debian fedora rocky almalinux rhel custom-linux; do
     printf 'ID=%s\nVERSION_ID="99"\nPRETTY_NAME="Test %s"\n' "$distro" "$distro" > "$STATE/os-release"
@@ -158,6 +160,7 @@ if grep -q UNSAFE_CONTINUATION "$STATE/fault/calls"; then exit 1; fi
 ok 'Failed database initialization stops immediately, preserves journal and never reports readiness'
 
 GDM_LANG=es bash "$GDM_ROOT/start.sh" help | grep -q 'Uso:'
-[[ $(bash "$GDM_ROOT/start.sh" version) == 0.1.0 ]]
+bash "$GDM_ROOT/start.sh" help | grep -q 'cleanup'
+[[ $(bash "$GDM_ROOT/start.sh" version) == "$(cat "$GDM_ROOT/VERSION")" ]]
 ok 'Help and version work without Docker or elevated permissions'
 printf '%s tests passed\n' "$passed"

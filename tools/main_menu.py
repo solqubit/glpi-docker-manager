@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import json
+import shutil
 import sys
 from service_view import access_url, records, state
 from terminal_ui import Terminal, curses, translations
@@ -12,16 +13,17 @@ from terminal_ui import Terminal, curses, translations
 GROUPS = [
     ('help_group_service', [('status', 'menu_status'), ('start', 'menu_start'),
                             ('stop', 'menu_stop'), ('logs', 'menu_logs')]),
-    ('help_group_updates', [('update', 'menu_update'), ('check-updates', 'menu_versions'),
-                            ('refresh-image', 'menu_refresh'), ('db-update', 'menu_database_update')]),
+    # Update GLPI also lists newer releases and a refreshed image of the same
+    # version; Create backup also offers the final backup for a server move.
+    ('help_group_updates', [('update', 'menu_update'), ('db-update', 'menu_database_update')]),
     ('help_group_manager', [('diagnose', 'menu_diagnose'), ('self-update', 'menu_self_update'),
                             ('uninstall', 'menu_uninstall'), ('quit', 'ui_exit')]),
     ('help_group_data', [('backup', 'menu_backup'), ('backups', 'menu_backups'),
                          ('restore', 'menu_restore'), ('schedule', 'menu_schedule'),
-                         ('transfer', 'menu_transfer')]),
-    ('help_group_settings', [('address', 'menu_address'), ('https', 'menu_https'),
-                             ('certificates', 'menu_certificates'), ('db-exposure', 'menu_exposure'),
-                             ('credentials', 'menu_credentials'), ('language', 'menu_language')]),
+                         ('cleanup', 'menu_cleanup')]),
+    ('help_group_settings', [('address', 'menu_address'), ('certificates', 'menu_certificates'),
+                             ('db-exposure', 'menu_exposure'), ('credentials', 'menu_credentials'),
+                             ('language', 'menu_language')]),
 ]
 STYLES = {'uninstall': 'warning', 'quit': 'accent'}
 
@@ -55,6 +57,30 @@ def status_line(ui, config, state_folder):
         parts.append(ui.t('dash_backup', age(ui, backups[-1].stat().st_mtime), kind))
     else:
         parts.append(ui.t('dash_backup_none'))
+        style = 'warning'
+    # Problems go first so they survive truncation: low disk, failed maintenance.
+    try:
+        usage = shutil.disk_usage(state_folder)
+        if usage.free < 5 * 1024 ** 3 or usage.free < usage.total // 10:
+            parts.insert(1, ui.t('dash_disk_low', f'{usage.free / 1024 ** 3:.1f}'))
+            style = 'warning'
+    except OSError:
+        pass
+    try:
+        last = json.loads((state_folder / 'maintenance-last.json').read_text(encoding='utf-8'))
+        moment = datetime.fromisoformat(last.get('time', '').replace('Z', '+00:00')).timestamp()
+        stale = datetime.now(timezone.utc).timestamp() - moment > 6 * 3600
+        if last.get('status') == 'running' and stale:
+            parts.insert(1, ui.t('dash_maintenance_failed', age(ui, moment)))
+            style = 'warning'
+        elif last.get('status') == 'warning':
+            parts.insert(1, ui.t('dash_maintenance_warning', age(ui, moment)))
+            style = 'warning'
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    previous = os.environ.get('GDM_DASH_PREVIOUS', '0')
+    if previous.isdigit() and int(previous) > 0:
+        parts.insert(1, ui.t('dash_previous', previous))
         style = 'warning'
     maintenance = os.environ.get('GDM_DASH_MAINTENANCE', '')
     if maintenance.startswith('on:'):

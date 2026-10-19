@@ -25,8 +25,6 @@ docker_plugins_missing	Docker funciona, pero falta Compose V2 o Buildx. El gesto
 docker_plugins_confirm	¿Instalar los plugins Docker que faltan mediante el gestor de paquetes detectado?
 docker_plugins_manual	No se encontraron paquetes de plugins compatibles en los repositorios configurados. Sigue https://docs.docker.com/compose/install/linux/ y https://docs.docker.com/build/install/buildx/ ; comprueba docker compose version y docker buildx version y vuelve a ejecutar.
 plugin_packages	Paquetes de plugins: %s
-compose_missing	Instala el plugin Docker Compose V2. Consulta https://docs.docker.com/compose/install/linux/
-buildx_missing	Instala el plugin Docker Buildx para verificar digests y arquitecturas: https://docs.docker.com/build/install/buildx/
 manual_docker	La instalación automática de Docker no está documentada para esta distribución. Instala Docker Engine, Buildx y Compose siguiendo las instrucciones de tu distribución: https://docs.docker.com/engine/install/ . Después vuelve a ejecutar; se permiten distribuciones fuera de la lista.
 docker_plan	Se instalarán Docker Engine, Buildx y Compose para %s. Procedimiento: %s . No se eliminarán paquetes existentes que entren en conflicto.
 install_docker	¿Instalar Docker mediante el procedimiento mostrado?
@@ -43,7 +41,6 @@ release_limit	La paginación de versiones superó el límite de seguridad. No se
 support_unknown	No se pudo verificar automáticamente el soporte. Revisa https://github.com/glpi-project/glpi/security/policy
 release_notes	Notas oficiales de GLPI %s: %s
 security_release	VERSIÓN DE SEGURIDAD: el proyecto recomienda actualizar. Revisa las correcciones de seguridad y los avisos importantes en las notas oficiales que aparecen a continuación.
-production_http_warning	Elegiste HTTP para producción. Configura HTTPS o un proxy TLS externo de confianza antes de exponer las sesiones de los usuarios. ¿Continuar con HTTP?
 glpi10_warning	ADVERTENCIA: GLPI 10 está fuera del soporte ordinario tras GLPI 12. Se anunció 10.0.28 como última versión de la rama 10.0. No se esperan más correcciones ordinarias de errores o seguridad. Consulta https://www.glpi-project.org/en/glpi-12/ . Las notas anteriores pueden describir la política en su fecha de publicación.
 unsupported_confirm	¿Seguir utilizando esta rama sin soporte después de revisar la advertencia?
 older_release	Existe una versión estable posterior en esta rama: %s. Los parches antiguos pueden carecer de correcciones de seguridad.
@@ -62,18 +59,13 @@ acme_requirements	Para %s: apunta los registros DNS públicos A/AAAA a este serv
 self_signed	Se generó automáticamente un certificado autofirmado: %s. Importa solo este certificado en la confianza de tus equipos; conserva la clave privada en secreto.
 tls_prompt	¿Cómo quieres proteger el acceso a GLPI?
 hostname_prompt	Dominio público o dirección IPv4 (sin protocolo, ruta ni puerto):
-welcome	GLPI Docker Manager
 language_prompt	Idioma / Language: en / es:
 first_action	¿Qué quieres hacer?
 major_prompt	Selecciona la rama de GLPI:
 mode_prompt	¿Para qué utilizarás esta instalación?
 port_prompt	Puerto HTTP del servidor:
-https_port_prompt	Puerto HTTPS del servidor:
-timezone_prompt	Zona horaria IANA, por ejemplo America/Guayaquil:
 db_name_prompt	Nombre de la base de datos:
-db_user_prompt	Usuario de aplicación de la base de datos:
 expose_prompt	¿Exponer el puerto de la base de datos para conexiones externas?
-storage_notice	Los datos de GLPI y MySQL quedan dentro de la carpeta de instalación, montados mediante volúmenes Docker persistentes etiquetados.
 root_password	Elige la contraseña independiente del administrador de MySQL.
 install_confirm	¿Crear la configuración y desplegar esta instalación?
 ready	Abre GLPI en tu navegador: %s
@@ -85,8 +77,8 @@ backup_ready	Respaldo terminado y sumas verificadas: %s . Contiene secretos; gua
 backup_invalid	El respaldo no pasó la validación. No se intentó restaurarlo.
 backup_list	Respaldos disponibles:
 backup_path	Ruta absoluta al archivo de respaldo:
-restore_effect	La restauración crea volúmenes vacíos con las versiones originales del respaldo. Conserva los volúmenes anteriores. Se detendrán los servicios actuales; las escrituras posteriores no se combinarán.
-restore_done	Restauración verificada. Se conservaron los volúmenes anteriores. Revisa dirección, HTTPS/DNS e integraciones antes de cambiar el tráfico.
+restore_effect	El respaldo se restaura en volúmenes nuevos con sus versiones originales. Lo escrito después de ese respaldo no se combina.
+restore_done	Restauración verificada. Revisa dirección, HTTPS/DNS e integraciones antes de enviar a los usuarios.
 transfer	GLPI y sus tareas automáticas del origen quedan DETENIDOS en el momento de este respaldo. Copia %s de forma privada al destino, clona allí el repositorio y ejecuta ./start.sh restore. Verifica dirección, certificados, usuarios, datos e integraciones antes de cambiar DNS. Conserva el origen detenido mientras el destino esté activo. Para cancelar el traslado, ejecuta ./start.sh start en el origen.
 transfer_confirm	¿Preparar el respaldo final de traslado y dejar GLPI detenido para evitar escrituras divergentes o tareas duplicadas?
 backup_space	No hay espacio suficiente para respaldar y verificar. Libera espacio o traslada el directorio de estado a un disco mayor.
@@ -128,26 +120,15 @@ ui_menu_prompt	Selecciona una acción:
 ui_pending_title	Una operación necesita atención
 ui_pending_body	La instalación aún no está lista. Retoma la configuración o revisa sus registros antes de continuar.
 ui_resume_install	Continuar la instalación
-ui_dashboard	Tu instalación de GLPI
 ui_status_running	En ejecución
 ui_status_stopped	Detenido
 ui_status_unknown	Estado no disponible
 ui_status	Servicio · Ver estado
 ui_start	Servicio · Iniciar
-ui_stop	Servicio · Detener
 ui_logs	Servicio · Ver registros
-ui_check_updates	Actualizaciones · Consultar versiones
-ui_update	Actualizaciones · Actualizar GLPI
-ui_backup	Datos · Crear un respaldo
-ui_https	Configuración · HTTPS y certificados
-ui_db_exposure	Configuración · Abrir o cerrar el puerto MySQL
-ui_credentials	Configuración · Ver credenciales de la base
-ui_transfer	Datos · Trasladar a otro servidor
-ui_migrate	Actualizaciones · Migrar a otra rama de GLPI
 ui_db_update	Actualizaciones · Actualizar parches MySQL
 ui_language	Configuración · Idioma
 ui_diagnose	Ayuda · Diagnosticar la instalación
-ui_refresh	Actualizaciones · Renovar la misma imagen GLPI
 ui_recover	Ayuda · Recuperar una operación interrumpida
 ui_mode_test	Pruebas
 ui_mode_production	Producción
@@ -157,7 +138,6 @@ ui_tls_acme	HTTPS público · Let's Encrypt · renovación automática
 ui_tls_custom	HTTPS · importar mis certificados PEM
 ui_releases_loading	Consultando las versiones oficiales de GLPI…
 ui_summary	Revisa tu instalación
-ui_environment	Entorno
 ui_host	Dirección del servidor
 ui_database	Base de datos / usuario
 ui_db_public	Publicado en 3306:3306
@@ -174,8 +154,6 @@ ui_step_install	Instalando la base de datos de GLPI
 ui_step_requirements	Comprobando los requisitos de GLPI
 ui_step_services	Iniciando GLPI y el acceso web
 ui_step_verify	Verificando servicios, base de datos y acceso
-ui_working	Trabajando…
-ui_step_done	Completado
 ui_error_log	Detalles de esta etapa: %s
 ui_continue	Pulsa Enter para volver al menú…
 ui_bad_port	Escribe un número de puerto entre 1 y 65535.
@@ -267,9 +245,6 @@ setup_loading_images	Resolviendo las imágenes oficiales de MySQL y del proxy an
 ui_service_ready	✓ GLPI está iniciado y verificado
 ui_service_starting	Iniciando y comprobando tu instalación de GLPI
 ui_service_checking	Comprobando servicios, base de datos y acceso web
-ui_service_stopped	GLPI está detenido. ¿Cómo quieres continuar?
-ui_service_start_now	Iniciar y verificar GLPI
-ui_service_keep_stopped	Conservar detenido y abrir el menú
 ui_service_health	Salud
 ui_service_ports	Puertos publicados
 ui_service_internal	Solo red interna
@@ -324,8 +299,6 @@ backup_recovery_help	Para regresar a este respaldo, abre Restaurar un respaldo e
 update_step_backup	Creando un respaldo de recuperación
 update_step_rehearsal	Ensayando la actualización en una copia restaurada y aislada
 update_loading	Comprobando las imágenes oficiales disponibles para actualizar
-update_same_branch	Misma rama
-update_new_branch	Nueva rama · aviso y ensayo de migración
 update_select_title	Actualizaciones de GLPI disponibles
 update_select_help	Elige cualquier versión posterior con imagen disponible. Puedes actualizar una por una. Una rama nueva requiere ensayo aislado y confirmación explícita.
 update_select_prompt	¿Qué versión quieres instalar?
@@ -413,7 +386,7 @@ status_release_page	página %s de GitHub
 status_resolving	comprobando %s
 db_updated	Actualización de MySQL verificada. MySQL actual: %s.
 registry_rate_limited	Docker Hub rechazó algunas consultas por su límite de peticiones (HTTP 429). Espera unos minutos o ejecuta docker login y vuelve a intentarlo.
-menu_certificates	Certificados: estado y renovación
+menu_certificates	HTTPS y certificados
 menu_schedule	Respaldos automáticos y mantenimiento
 menu_self_update	Actualizar este gestor
 menu_uninstall	Desinstalar GLPI
@@ -423,22 +396,18 @@ desc_status	Servicios, salud, versiones y puertos publicados.
 desc_start	Inicia GLPI si está detenido y verifica base, esquema y acceso web.
 desc_stop	Detiene GLPI y MySQL; los datos se conservan.
 desc_logs	Registros recientes de los contenedores, con desplazamiento.
-desc_update	Instala una versión posterior de GLPI; antes se respalda y se ensaya.
-desc_check-updates	Muestra las últimas versiones de GLPI sin cambiar nada.
-desc_refresh-image	Descarga una imagen más reciente de la misma versión instalada.
+desc_update	Parches nuevos, la siguiente rama o una imagen renovada de la misma versión; antes se respalda y se ensaya.
 desc_db-update	Aplica el último parche de MySQL 8.4 con respaldo y ensayo.
 desc_diagnose	Resumen de sistema, Docker, disco y configuración, sin contraseñas.
 desc_self-update	Descarga la última versión de este gestor; GLPI no se modifica.
 desc_uninstall	Elimina contenedores, volúmenes y datos de GLPI (pide UNINSTALL).
 desc_quit	Cierra el gestor; GLPI sigue funcionando.
-desc_backup	Crea un respaldo manual verificado; los manuales nunca se rotan.
+desc_backup	Un respaldo manual verificado, o el respaldo final para trasladar a otro servidor.
 desc_backups	Explora, verifica, exporta, restaura o elimina respaldos.
-desc_restore	Restaura GLPI desde un archivo de respaldo.
+desc_restore	Vuelve a un respaldo. La instalación actual se respalda antes y se elimina después, así nada se acumula.
 desc_schedule	Respaldos automáticos diarios (se guardan 5), rotación de registros y renovación de certificados.
-desc_transfer	Respaldo final para otro servidor; GLPI queda detenido después.
 desc_address	Dirección del servidor, puertos web y zona horaria.
-desc_https	Solo HTTP, autofirmado, Let's Encrypt o certificado propio.
-desc_certificates	Caducidad, renovación y recarga del certificado HTTPS.
+desc_certificates	Modo HTTPS, caducidad del certificado, renovación y recarga.
 desc_db-exposure	Publica MySQL en el puerto 3306 o lo mantiene interno.
 desc_credentials	Muestra las credenciales de la base tras confirmar.
 desc_language	Idioma de la interfaz de este gestor.
@@ -455,11 +424,11 @@ dash_db_public	MySQL: expuesto :3306
 dash_db_private	MySQL: interno
 dash_backup	Respaldo: %s (%s)
 dash_backup_none	Aún sin respaldos
-dash_auto_on	Respaldo auto %s:00
+dash_auto_on	Respaldo auto: %s
 dash_auto_off	Respaldos auto: no
 dash_maintenance_missing	Mantenimiento sin programar
 backup_origin_auto	Automático
-backups_counts	%s manuales · %s automáticos.
+backups_counts	%s manuales [M] · %s previos a actualizar/restaurar [P] · %s automáticos [A].
 ui_db_current	Estado actual
 ui_db_unchanged	Sin cambios: el acceso a MySQL se mantiene igual.
 firewall_docker	Docker publica el puerto %s directamente en iptables y se salta las reglas de ufw/firewalld. Restringe el acceso en la cadena DOCKER-USER o en el firewall de tu red.
@@ -468,18 +437,16 @@ maint_title	Respaldos automáticos y mantenimiento
 maint_backups	Respaldos automáticos
 maint_on	Activados
 maint_off	Desactivados
-maint_hour	Cada día a las
 maint_keep	Respaldos automáticos guardados
 maint_scheduler	Programador
 maint_scheduler_on	Instalado (%s)
 maint_scheduler_missing	Sin instalar
-maint_body	La tarea diaria también rota registros y renueva certificados autofirmados. GLPI se detiene unos minutos durante cada respaldo. Solo se guardan los %s respaldos automáticos más recientes; los manuales nunca se eliminan automáticamente.
+maint_body	La tarea diaria también rota registros y renueva certificados autofirmados, incluso los días sin respaldo. Solo se guardan los %s respaldos automáticos más recientes; los manuales nunca se eliminan solos. Si el servidor estaba apagado, la tarea pendiente se hace al arrancar.
 maint_prompt	¿Qué quieres cambiar?
 maint_enable	Activar respaldos automáticos
 maint_disable	Desactivar respaldos automáticos
-maint_change_hour	Cambiar la hora
 maint_run_now	Ejecutar el mantenimiento ahora
-maint_hour_prompt	¿A qué hora debe ejecutarse el mantenimiento?
+maint_hour_prompt	¿A qué hora? GLPI se detiene unos minutos durante cada respaldo.
 maint_saved	✓ Programación del mantenimiento guardada
 maint_no_scheduler	No se pudo programar el mantenimiento automático (sin systemd ni cron). Ejecuta ./start.sh maintenance periódicamente.
 maint_skipped	Mantenimiento omitido: la instalación no está lista o hay una operación pendiente.
@@ -540,3 +507,150 @@ self_update_git_dirty	%s tiene cambios locales. Confírmalos o descártalos y vu
 self_update_git_noupstream	La rama de Git en %s no tiene una rama remota de la que actualizar; ejecuta git pull ahí manualmente.
 self_update_git_none	El repositorio Git está actualizado (rama %s).
 self_update_git_behind	%s commits nuevos disponibles en la rama %s
+update_label_patch	%s · rama %s · parche
+update_label_major	%s · nueva rama %s → %s · migración
+opt_recommended	recomendada
+opt_installed	Instalada
+opt_current	(actual)
+opt_update_patch	Versión de parche dentro de GLPI %s: corrige errores y seguridad con la misma estructura de datos. Antes se respalda y se ensaya en aislado.
+opt_update_major	Migración de rama %s → %s: se convierte la base de datos y algunos plugins pueden dejar de funcionar. Exige ensayo y confirmación escrita.
+opt_major_latest	La rama de GLPI más reciente con soporte.
+opt_major_older	Rama anterior; elígela solo si tus plugins la necesitan.
+opt_version_latest	Último parche de esta rama, con las correcciones más recientes.
+opt_version_older	Parche anterior; no incluye correcciones posteriores de errores y seguridad.
+opt_version_other	Escribe cualquier versión estable de esta rama.
+opt_db_internal	Solo GLPI accede a MySQL por la red privada de Docker. Recomendado.
+opt_db_public	Cualquier equipo que llegue al puerto 3306 podrá intentar conectarse. Docker se salta las reglas de ufw/firewalld.
+opt_install	Asistente guiado: versión, dirección, puertos, HTTPS y contraseñas; después se despliega solo.
+opt_restore	Reconstruye GLPI desde un respaldo (.tar.gz) de este gestor; si hay una instalación en marcha, se respalda antes.
+opt_resume	Continúa las etapas pendientes con la configuración guardada.
+opt_recover	Vuelve a comprobar los servicios y cierra la operación pendiente. Úsalo solo tras revisar los registros.
+opt_resources_continue	Por debajo de la RAM o el disco recomendados GLPI puede ir lento o quedarse sin espacio.
+opt_tls_off	Sin cifrado. Aceptable solo dentro de una red de confianza.
+opt_tls_self_signed	Cifrado al instante; los navegadores avisan hasta que los equipos confíen en el certificado generado.
+opt_tls_acme	Dominio público que apunte aquí con puertos 80/443 abiertos: certificado de confianza renovado solo.
+opt_tls_custom	Usa archivos PEM de tu propia autoridad certificadora o la de tu empresa.
+opt_release_notes	Lee las notas oficiales de la versión antes de continuar.
+opt_maint_enable	Un respaldo al día a la hora elegida; se guardan los %s automáticos más recientes.
+opt_maint_disable	Dejan de crearse respaldos automáticos; los existentes se conservan. La rotación de registros continúa.
+opt_maint_run	Rota registros, revisa certificados y, si están activados, respalda ahora mismo.
+opt_cert_renew	Emite un certificado nuevo y reinicia los servicios unos segundos; los equipos deberán volver a confiar en él.
+opt_cert_reload	Valida los archivos PEM sustituidos y reinicia los servicios unos segundos.
+opt_cert_restart	Caddy reintenta la renovación de Let's Encrypt al arrancar; GLPI no responde durante unos segundos.
+opt_uninstall_keep	Borra contenedores, volúmenes y datos de GLPI. Los respaldos y certificados quedan para restaurar después.
+opt_uninstall_all	Borra todo, incluidos los respaldos. No se puede deshacer.
+restore_plan_safe	Primero se respalda tu instalación actual (respaldo [P]) y se elimina cuando la restaurada esté verificada, así no se acumulan copias. Para volver adelante, restaura ese respaldo.
+restore_plan_keep	La instalación actual no se puede respaldar (no está en marcha), así que se conserva detenida como único punto de retorno. Podrás eliminarla después desde Liberar espacio.
+restore_step_backup	Respaldando la instalación actual
+restore_step_cleanup	Eliminando la instalación reemplazada
+restore_removed_previous	La instalación reemplazada se eliminó; sus datos están en el respaldo %s.
+restore_kept_previous	La instalación reemplazada se conserva detenida como punto de retorno (nunca se guarda más de una). Elimínala desde Liberar espacio cuando ya no la necesites.
+backup_origin_restore	Antes de restaurar
+backup_origin_pre	Previo a una actualización o restauración
+dash_previous	%s instalación reemplazada conservada
+menu_cleanup	Liberar espacio
+desc_cleanup	Imágenes sin usar, instalaciones reemplazadas, respaldos y revisiones antiguas, con su tamaño.
+cleanup_title	Liberar espacio
+cleanup_body	Solo se muestra lo que creó este gestor. La instalación activa, sus imágenes y los respaldos manuales nunca se eliminan aquí.
+cleanup_prompt	¿Qué quieres liberar?
+cleanup_scanning	Midiendo el espacio recuperable
+cleanup_empty	nada que liberar
+cleanup_images	Imágenes sin usar · %s · %s
+cleanup_images_help	Imágenes de GLPI/MySQL/Caddy de versiones anteriores. Se conserva la versión previa para volver rápido; cualquier otra se descarga de nuevo si una restauración la necesita.
+cleanup_previous	Instalaciones reemplazadas · %s · %s
+cleanup_previous_help	%s: contenedores detenidos, volúmenes y datos que dejó una restauración. Irreversible salvo que tengas un respaldo; pide escribir DELETE.
+cleanup_backups	Respaldos previos [P] antiguos · %s · %s
+cleanup_backups_help	Conserva el respaldo [P] más reciente. Los manuales [M] y automáticos [A] no se tocan.
+cleanup_backups_confirm	¿Eliminar los respaldos [P] antiguos?
+cleanup_revisions	Revisiones de configuración antiguas · %s · %s
+cleanup_revisions_help	Copias de configuración de cambios anteriores y restos de ensayos. Se conservan las 3 más recientes y las que siguen en uso.
+cleanup_releases	Versiones antiguas del gestor · %s · %s
+cleanup_releases_help	Copias anteriores de este gestor que quedaron tras actualizarlo. Se conserva la versión instalada.
+cleanup_step_images	Eliminando imágenes sin usar
+cleanup_step_previous	Eliminando instalaciones reemplazadas
+cleanup_step_backups	Eliminando respaldos [P] antiguos
+cleanup_step_files	Eliminando archivos antiguos
+cleanup_done	Espacio liberado. La lista ya está actualizada.
+cleanup_nothing	No hay nada que liberar en esa categoría.
+cleanup_image_in_use	Imagen conservada porque otro contenedor la usa: %s
+plugins_title	Plugins registrados en GLPI (%s)
+plugins_none	No hay plugins registrados; la migración no depende de código de terceros.
+plugins_help	Comprueba que cada plugin activo tenga versión para GLPI %s antes de migrar. GLPI desactiva los incompatibles tras la actualización.
+plugin_active	activo
+plugin_inactive	inactivo
+plugin_other	requiere atención (sin instalar o pendiente)
+rollback_title	La actualización no terminó
+rollback_body	Los servicios pueden estar detenidos y el diario de operación sigue abierto. Puedes restaurar el respaldo hecho justo antes de actualizar, o dejarlo todo como está para revisar primero los registros.
+rollback_backup	Respaldo previo
+rollback_prompt	¿Cómo quieres continuar?
+rollback_restore	Restaurar el respaldo previo a la actualización
+rollback_keep	Dejarlo así y revisar los registros
+opt_rollback_restore	Vuelve a la versión anterior con los datos del momento del respaldo. La instalación fallida se conserva como punto de retorno.
+opt_rollback_keep	No cambia nada ahora. Después usa Restaurar o Recuperar desde el menú.
+maint_glpi_logs_failed	Esta vez no se pudieron rotar los registros técnicos de GLPI.
+restore_replaces_kept	La instalación conservada de una restauración anterior (%s) se eliminará y será sustituida por esta.
+update_label_refresh	%s · misma versión · imagen renovada
+opt_update_refresh	Docker Hub publicó una imagen nueva de la versión instalada (correcciones del sistema base). La base de datos no cambia; igualmente se respalda y se ensaya.
+backup_kind_prompt	¿Qué respaldo quieres crear?
+backup_kind_manual	Respaldo manual [M]
+backup_kind_transfer	Respaldo final para trasladar a otro servidor
+opt_backup_manual	GLPI se detiene unos minutos y vuelve a arrancar. Se conserva hasta que lo elimines.
+opt_backup_transfer	GLPI queda DETENIDO después para que no se escriban datos nuevos; restaura el archivo en el servidor nuevo.
+cert_change_mode	Cambiar el modo HTTPS
+opt_cert_mode	Solo HTTP, autofirmado, Let's Encrypt o certificado propio; los servicios se reinician.
+dash_disk_low	Disco: %s GB libres
+dash_maintenance_failed	Mantenimiento FALLÓ %s
+dash_maintenance_warning	Mantenimiento con avisos %s
+day_long_1	lunes
+day_short_1	lun
+day_long_2	martes
+day_short_2	mar
+day_long_3	miércoles
+day_short_3	mié
+day_long_4	jueves
+day_short_4	jue
+day_long_5	viernes
+day_short_5	vie
+day_long_6	sábado
+day_short_6	sáb
+day_long_7	domingo
+day_short_7	dom
+freq_daily	cada día
+freq_every	cada %s días
+freq_workdays	de lunes a viernes
+freq_weekly	cada %s
+freq_label_daily	Cada día
+freq_label_every	Cada %s días
+freq_label_workdays	De lunes a viernes
+freq_label_weekly	Una vez por semana…
+freq_label_pick	Elegir días de la semana…
+freq_label_custom	Cada N días…
+opt_freq_coverage	Los %s respaldos guardados permiten volver unos %s días atrás.
+opt_freq_workdays	Sin respaldos el fin de semana, cuando GLPI suele no tener cambios.
+opt_freq_pick	Marca cualquier combinación de días con casillas.
+opt_freq_custom	Escribe un número de días entre 1 y 30.
+maint_freq_prompt	¿Cada cuánto quieres respaldar automáticamente?
+maint_weekday_prompt	¿Qué día de la semana?
+maint_every_prompt	¿Cada cuántos días? (1-30)
+ui_bad_days	Escribe un número del 1 al 30.
+weekdays_prompt	Marca los días de respaldo (Enter marca o desmarca)
+weekdays_save	Guardar estos días
+opt_weekdays_save	Los respaldos se harán los días marcados a la hora elegida.
+weekdays_none	Marca al menos un día.
+maint_minute_prompt	¿En qué minuto exacto?
+hour_recommended	recomendada
+hour_quiet	fuera de horario
+hour_work	horario laboral
+opt_hour_recommended	La menor actividad en la mayoría de organizaciones.
+opt_hour_quiet	A esta hora pocas personas usan GLPI.
+opt_hour_work	Los usuarios pierden el acceso a GLPI unos minutos mientras se respalda.
+opt_hour_other	Comprueba que nadie dependa de GLPI a esta hora.
+maint_frequency	Frecuencia
+maint_time	Hora
+maint_next	Próximos respaldos
+maint_coverage	%s respaldos · unos %s días de historia
+maint_frequency_option	Frecuencia: %s
+maint_time_option	Hora: %s
+opt_maint_frequency	Cada día, cada pocos días, semanal, de lunes a viernes o días elegidos.
+opt_maint_time	Hora y minuto de la tarea diaria; las horas de oficina aparecen marcadas.
+maint_backup_not_due	Hoy no toca respaldo automático; próximo: %s.

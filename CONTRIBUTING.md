@@ -17,6 +17,14 @@ bash tests/run.sh
 shellcheck -x start.sh lib/*.sh templates/*.sh tests/*.sh
 ```
 
+## Releases
+
+`Update this manager` installs the newest GitHub release of
+`solqubit/glpi-docker-manager` (override with `GDM_REPOSITORY`). To publish:
+update `VERSION` and `CHANGELOG.md`, run the checks above, then tag `vX.Y.Z`
+matching `VERSION` and create a GitHub release from that tag. Checkouts update
+with `git pull` instead.
+
 For isolated Docker integration, use a development Linux machine with Docker:
 
 ```bash

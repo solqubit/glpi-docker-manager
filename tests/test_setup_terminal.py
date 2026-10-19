@@ -87,7 +87,8 @@ with tempfile.TemporaryDirectory() as directory:
     action = folder / 'action'
     dashboard = drive('main_menu.py', [str(draft), str(services), 'es', str(action)], [end + b'\n'])
     assert action.read_text().strip() == 'quit'
-    for label in ('Actualizar GLPI', 'Restaurar un respaldo', 'Cambiar idioma', 'Administrar respaldos'):
+    for label in ('Actualizar GLPI', 'Restaurar un respaldo', 'Cambiar idioma', 'Administrar respaldos',
+                  'Liberar espacio', 'HTTPS y certificados'):
         assert label.encode() in dashboard, label
     drive('service_view.py', [str(draft), str(services), 'es', 'status', 'true'], [b'\n'])
     archive = folder / 'glpi-11.0.10-20261019T000000-abc.tar.gz'
