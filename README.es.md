@@ -6,7 +6,7 @@ Gestor interactivo para instalar y administrar GLPI en Linux mediante imágenes
 oficiales de Docker. La interfaz está disponible en español e inglés; el código y
 la documentación técnica principal están en inglés.
 
-Versión **1.0.0**. Los [resultados y límites de validación](docs/validation.md)
+Versión **1.0.1**. Los [resultados y límites de validación](docs/validation.md)
 registran 26 grupos aprobados, ShellCheck sin avisos y pruebas desechables de
 instalación, actualización y restauración en Docker el 2026-10-19. No certifican
 todas las distribuciones, plugins ni versiones futuras.
@@ -103,6 +103,9 @@ HTTPS público solicita y renueva certificados de **Let's Encrypt** mediante Cad
 * Restauración guiada a volúmenes nuevos y traslado a otro servidor.
 * Consulta de credenciales bajo confirmación y mantenimiento independiente de
   parches MySQL dentro de la serie 8.4.
+* `proxy-update` aplica la última imagen de Caddy 2 (proxy HTTPS); si HTTPS no
+  responde, vuelve la configuración anterior. El mantenimiento diario solo avisa
+  en el menú principal de imágenes nuevas de GLPI, MySQL y Caddy; nunca las aplica.
 * Imágenes de GLPI, MySQL y Caddy fijadas por versión exacta y digest del registro.
 * Respaldos programados diariamente, cada 2/3/N días (hasta 30), de lunes a
   viernes o en días elegidos, con horario y vista de las próximas ejecuciones.
@@ -148,7 +151,7 @@ certificados* permite cambiar el modo HTTPS.
 Sin comandos se abre el menú interactivo. Las operaciones sensibles solicitan
 confirmación. Las restauraciones y migraciones principales requieren escribir una
 confirmación específica. También están disponibles `start`, `stop`, `logs`,
-`db-update`, `refresh-image`, `language`, `maintenance` (tarea diaria) y `version`.
+`db-update`, `proxy-update`, `refresh-image`, `language`, `maintenance` (tarea diaria) y `version`.
 No existe una opción general `--yes` para omitir las confirmaciones.
 
 ## Datos y credenciales

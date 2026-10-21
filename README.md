@@ -6,7 +6,7 @@ An interactive, bilingual Linux CLI for installing and administering GLPI with
 official Docker images. Bash orchestrates GLPI, MySQL and optional Caddy HTTPS;
 you do not need to configure host PHP, Apache or MySQL.
 
-Version **1.0.0**. [Validation results and limits](docs/validation.md): 26 test
+Version **1.0.1**. [Validation results and limits](docs/validation.md): 26 test
 groups, ShellCheck and disposable Docker installation/update/restore tests passed
 on 2026-10-19. This does not certify every distribution, plugin or future release.
 
@@ -100,6 +100,9 @@ keyboard controls, monochrome and plain-terminal modes.
   version change first runs a database/schema rehearsal on an isolated restored copy.
 * Independent MySQL patch maintenance within 8.4, with backup and rehearsal.
   `refresh-image` handles a rebuild of the same GLPI application version.
+* `proxy-update` applies the latest Caddy 2 image (HTTPS proxy); the previous
+  configuration returns if HTTPS does not answer. The daily maintenance only
+  reports newer GLPI, MySQL and Caddy images on the dashboard; it never applies them.
 * Schedule backups daily, every 2/3/N days (up to 30), on weekdays or on selected
   days, with a time and preview of upcoming runs. Lists distinguish `[M]` manual
   (never rotated), `[P]` before updates/restores (3 newest kept) and `[A]`
@@ -136,7 +139,7 @@ sudo ./start.sh diagnose
 sudo ./start.sh recover
 ```
 
-Also available: `start`, `stop`, `logs`, `db-update`, `refresh-image`, `language`,
+Also available: `start`, `stop`, `logs`, `db-update`, `proxy-update`, `refresh-image`, `language`,
 `maintenance` (the daily job), `version`. In the menu, *Update GLPI* also covers
 `check-updates` and `refresh-image`, *Create backup* also offers `transfer`, and
 *HTTPS and certificates* also changes the HTTPS mode. Data-changing commands require an interactive terminal and relevant

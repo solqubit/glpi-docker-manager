@@ -226,6 +226,7 @@ maintenance_run() {
     # Not in an if/|| context: errexit must stay active while services restart.
     tls_auto_renew
     glpi_logs_rotate
+    image_updates_check
     maintenance_settings
     if [[ $MAINT_BACKUPS == true ]] && { [[ $force == true ]] || backup_due; }; then
         if [[ -n $(dc ps --status running --quiet glpi) && -n $(dc ps --status running --quiet db) ]]; then
@@ -241,6 +242,58 @@ maintenance_run() {
     fi
     maintenance_record "$MAINT_STATUS" "$backup"
     say maint_done
+}
+# ---------------------------------------------------------------- image updates
+# Newer official images (fixes in PHP/Apache, MySQL or Caddy) are only reported:
+# applying one restarts services, so it stays the administrator's decision.
+# Lines are "kind<TAB>version<TAB>image in use when checked"; the dashboard drops
+# a line as soon as that image changes (update applied or setup changed).
+image_updates_check() {
+    local tmp first=${#CLEANUP_PATHS[@]}
+    tmp=$(mktemp "$STATE/cache/.image-updates.XXXXXX") || return 0
+    # Registry or network failures must never fail the maintenance run; the
+    # subshell removes only the temporary files the scan itself registered.
+    if ( trap - ERR; trap 'rm -rf -- "${CLEANUP_PATHS[@]:first}"' EXIT; set +e; image_updates_scan > "$tmp" ); then
+        mv -- "$tmp" "$STATE/cache/image-updates.tsv"
+    else rm -f -- "$tmp"; fi
+    return 0
+}
+image_updates_scan() {
+    local current newest ref version
+    current=$(cfg glpi_version)
+    if release_fetch >&2 && newest=$(release_versions "$(cfg major)" | head -n 1) &&
+       version_gt "$newest" "$current" && image_resolve glpi/glpi "$newest" >/dev/null; then
+        printf 'glpi\t%s\t%s\n' "$newest" "$(cfg glpi_image)"
+    elif ref=$(image_resolve glpi/glpi "$current") && [[ $ref != "$(cfg glpi_image)" ]]; then
+        printf 'glpi-image\t%s\t%s\n' "$current" "$(cfg glpi_image)"
+    fi
+    if ref=$(official_image_lookup mysql 8.4) && version=${ref%%$'\t'*} && version_gt "$version" "$(cfg mysql_version)"; then
+        printf 'mysql\t%s\t%s\n' "$version" "$(cfg mysql_image)"
+    fi
+    if [[ $(cfg tls) != off ]] && ref=$(official_image_lookup caddy 2) && [[ ${ref#*$'\t'} != "$(cfg caddy_image)" ]]; then
+        printf 'caddy\t%s\t%s\n' "${ref%%$'\t'*}" "$(cfg caddy_image)"
+    fi
+    return 0
+}
+# Dashboard text for the pending image updates that still apply, or nothing.
+image_updates_summary() {
+    local kind version image key
+    local -a items=()
+    [[ -r $STATE/cache/image-updates.tsv ]] || return 0
+    while IFS=$'\t' read -r kind version image; do
+        case $kind in
+            glpi) key=glpi_image; items+=("GLPI $version");;
+            glpi-image) key=glpi_image; items+=("$(t dash_image_refresh "GLPI $version")");;
+            mysql) key=mysql_image; items+=("MySQL $version");;
+            caddy) [[ $(cfg tls) != off ]] || continue; key=caddy_image; items+=("Caddy $version");;
+            *) continue;;
+        esac
+        # Already applied, or the installation changed since the check.
+        [[ $image == "$(cfg "$key")" ]] || unset 'items[-1]'
+    done < "$STATE/cache/image-updates.tsv"
+    local text='' item
+    for item in "${items[@]}"; do text+=${text:+, }$item; done
+    printf '%s' "$text"
 }
 maintenance_command() {
     local log

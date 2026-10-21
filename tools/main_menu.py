@@ -15,7 +15,8 @@ GROUPS = [
                             ('stop', 'menu_stop'), ('logs', 'menu_logs')]),
     # Update GLPI also lists newer releases and a refreshed image of the same
     # version; Create backup also offers the final backup for a server move.
-    ('help_group_updates', [('update', 'menu_update'), ('db-update', 'menu_database_update')]),
+    ('help_group_updates', [('update', 'menu_update'), ('db-update', 'menu_database_update'),
+                            ('proxy-update', 'menu_proxy_update')]),
     ('help_group_manager', [('diagnose', 'menu_diagnose'), ('self-update', 'menu_self_update'),
                             ('uninstall', 'menu_uninstall'), ('quit', 'ui_exit')]),
     ('help_group_data', [('backup', 'menu_backup'), ('backups', 'menu_backups'),
@@ -84,6 +85,10 @@ def status_line(ui, config, state_folder):
             style = 'warning'
     except (OSError, ValueError, TypeError, AttributeError):
         pass
+    updates = os.environ.get('GDM_DASH_UPDATES', '')
+    if updates:
+        parts.insert(1, ui.t('dash_updates', updates))
+        style = 'warning'
     previous = os.environ.get('GDM_DASH_PREVIOUS', '0')
     if previous.isdigit() and int(previous) > 0:
         parts.insert(1, ui.t('dash_previous', previous))

@@ -485,6 +485,30 @@ apply_database_update() {
     config_set_status ready
     journal_done
 }
+# Caddy holds no GLPI data: a new image is applied as a configuration revision,
+# and apply_settings reactivates the previous one when HTTPS does not answer.
+update_proxy() {
+    local lookup target image file
+    assert_running
+    [[ $(cfg tls) != off ]] || { say proxy_update_tls_off; return 0; }
+    lookup=$(mktemp "$STATE/.caddy-lookup.XXXXXX"); CLEANUP_PATHS+=("$lookup")
+    ui_task setup_loading_images caddy_target_lookup "$lookup"
+    IFS=$'\t' read -r target image < "$lookup" || die image_missing caddy
+    [[ $image != "$(cfg caddy_image)" ]] || { say proxy_update_none "$(proxy_version "$(cfg caddy_image)")"; return 0; }
+    ui_panel "$(t ui_proxy_update)" "$(t proxy_update_versions "$(proxy_version "$(cfg caddy_image)")" "$target")" \
+        "$(t proxy_update_help)"
+    confirm proxy_update_confirm || exit 10
+    file=$(mktemp "$STATE/.caddy.XXXXXX"); CLEANUP_PATHS+=("$file")
+    jq --arg image "$image" '.caddy_image=$image' "$CONFIG" > "$file"
+    # Downloaded while GLPI is still running.
+    ui_task proxy_update_pulling proxy_image_pull "$image"
+    ui_run 0 settings_step_apply apply_settings "$file" true
+    ui_panel "✓ $(t proxy_updated "$target")" "$(t ready "$(installation_url)")"
+}
+caddy_target_lookup() { official_image_lookup caddy 2 > "$1" || die image_missing caddy; }
+proxy_image_pull() { docker image inspect "$1" >/dev/null 2>&1 || docker pull --quiet "$1" >/dev/null; }
+# "caddy:2.10.2@sha256:…" → "2.10.2"
+proxy_version() { local ref=${1%@*}; printf '%s\n' "${ref##*:}"; }
 apply_settings() {
     local file=$1 old confirmed=${2:-false}
     config_stage "$file"
@@ -603,6 +627,7 @@ dispatch() {
                 check-updates) check_updates;;
                 update|migrate|refresh-image) update_glpi "$command" "$argument";;
                 db-update) update_database;;
+                proxy-update) update_proxy;;
                 backup|transfer)
                     if [[ $command == backup && ${GDM_IN_MENU:-false} == true ]]; then
                         choose command backup_kind_prompt backup \
@@ -655,7 +680,8 @@ dashboard_environment() {
         [[ -d $folder && ${folder%/} != "$STATE/data/$(cfg id)" ]] && count=$((count+1))
     done
     GDM_DASH_PREVIOUS=$count
-    export GDM_DASH_PREVIOUS
+    GDM_DASH_UPDATES=$(image_updates_summary 2>/dev/null) || GDM_DASH_UPDATES=''
+    export GDM_DASH_PREVIOUS GDM_DASH_UPDATES
     if [[ $(cfg tls) == self-signed || $(cfg tls) == custom ]] && cert_days "$STATE/current/tls/fullchain.pem"; then
         GDM_DASH_CERT_DAYS=$CERT_DAYS
         (( CERT_DAYS >= 30 )) || say cert_expiring "$CERT_DAYS"

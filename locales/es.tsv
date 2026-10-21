@@ -713,3 +713,15 @@ ca_fingerprint	SHA-256 de la CA
 ca_agent_help	Agente GLPI: copia gdm-ca.pem en cada equipo (por ejemplo C:\CA-GLPI\gdm-ca.pem) y pon esa ruta en "CA Certificate File"; deja "Fingerprint" vacío. Navegadores: importa gdm-ca.pem como entidad raíz de confianza.
 legacy_branch_label	GLPI 10 · rama sin soporte
 opt_legacy_branch	Solo para plugins que aún no son compatibles o para ensayar una migración. GLPI 10 ya no recibe parches de seguridad.
+menu_proxy_update	Actualizar proxy HTTPS (Caddy)
+desc_proxy-update	Aplica la última imagen de Caddy 2; si HTTPS falla, vuelve la anterior.
+ui_proxy_update	Actualizaciones · Actualizar proxy HTTPS (Caddy)
+proxy_update_versions	Caddy %s → %s
+proxy_update_help	Caddy solo sirve HTTPS: los datos de GLPI y los certificados no cambian. Los servicios se reinician un momento; si HTTPS no responde, vuelve la imagen anterior.
+proxy_update_confirm	¿Aplicar ahora la nueva imagen de Caddy?
+proxy_update_pulling	Descargando la nueva imagen de Caddy
+proxy_update_none	Caddy %s ya es la imagen más reciente.
+proxy_update_tls_off	HTTPS está desactivado: no se usa proxy.
+proxy_updated	Caddy %s aplicado
+dash_updates	Actualizaciones: %s
+dash_image_refresh	%s (imagen renovada)

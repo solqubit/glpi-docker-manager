@@ -139,6 +139,23 @@ Cross-series upgrades (for example 8.4 to 9.x) are not automated. No background
 updater changes database images. Do not manually start an arbitrary newer MySQL
 image on the production volume as a compatibility test.
 
+## Image security updates
+
+PHP and Apache live inside the official GLPI image, so recreating containers
+does not patch them: every image is pinned by digest. Fixes arrive only as a new
+GLPI release (*Update GLPI*) or as a republished image of the same version
+(*Update GLPI* → refreshed image, `refresh-image`).
+
+`proxy-update` replaces the Caddy 2 image used for HTTPS. Caddy holds no GLPI
+data and its certificate volumes are kept, so no backup is taken: the image is
+downloaded while GLPI runs, applied as a new configuration revision and the
+previous revision is reactivated when HTTPS does not answer.
+
+The daily maintenance checks the registries and records newer images in
+`cache/image-updates.tsv`. The dashboard status line lists them
+(`Updates: GLPI 11.0.12, Caddy 2.10.3`) until they are applied; nothing is
+applied automatically, because every image change restarts services.
+
 ## Failure recovery
 
 `operation.json` records an incomplete operation. Mutating commands are blocked

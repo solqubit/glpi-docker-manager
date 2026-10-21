@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.1
+
+### Security
+* *Update HTTPS proxy (Caddy)* (`proxy-update`): applies the latest Caddy 2 image
+  downloaded while GLPI runs; the previous configuration returns if HTTPS fails.
+  Earlier, Caddy kept the image of the installation day.
+* The daily maintenance checks for newer GLPI (PHP/Apache), MySQL and Caddy images
+  and the dashboard lists them (`Updates: …`) until applied. Nothing is applied
+  automatically, since every image change restarts services.
+
 ## 1.0.0
 
 First complete release. GLPI's own settings (mail, plugins, automatic actions,
