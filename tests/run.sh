@@ -72,17 +72,58 @@ config_validate "$STATE/future.json"
 ok 'Future stable majors such as GLPI 13 are not rejected by a hard-coded branch list'
 
 mkdir -p "$STATE/revisions/unit"
-config_render "$STATE/input.json" "$STATE/revisions/unit"
+# MySQL buffer pool: 25 % of RAM, whole GiB from 1 GiB, 256 MiB to 8 GiB.
+buffer_case() {
+    printf 'MemTotal:       %s kB\n' "$1" > "$STATE/meminfo"
+    [[ $(GDM_MEMINFO="$STATE/meminfo" mysql_buffer_pool_mb) == "$2" ]] || { echo "buffer for $1 kB: expected $2" >&2; exit 1; }
+}
+buffer_case 524288 256       # 512 MiB → minimum
+buffer_case 1048576 256      # 1 GiB
+buffer_case 1992294 384      # 1.9 GiB (typical small VM)
+buffer_case 2097152 512      # 2 GiB
+buffer_case 4194304 1024     # 4 GiB
+buffer_case 6291456 1024     # 6 GiB → 1.5 GiB rounded down to whole GiB
+buffer_case 8388608 2048     # 8 GiB
+buffer_case 16777216 4096    # 16 GiB
+buffer_case 67108864 8192    # 64 GiB → maximum
+[[ $(GDM_MEMINFO="$STATE/missing-meminfo" mysql_buffer_pool_mb) == 128 ]]
+ok 'MySQL buffer pool follows host RAM within 256 MiB-8 GiB, MySQL default when RAM is unknown'
+printf 'MemTotal:       4194304 kB\n' > "$STATE/meminfo"
+GDM_MEMINFO="$STATE/meminfo" config_render "$STATE/input.json" "$STATE/revisions/unit"
 grep -q '^GLPI_DB_HOST="db"$' "$STATE/revisions/unit/.env"
 grep -q '^GLPI_DB_PORT="3306"$' "$STATE/revisions/unit/.env"
 grep -q '^GLPI_DB_NAME=' "$STATE/revisions/unit/.env"
 grep -q '^GLPI_DB_USER=' "$STATE/revisions/unit/.env"
 jq -e '.services.db.ports==null and .services.glpi.environment.GLPI_SKIP_AUTOUPDATE=="true" and .services.glpi.environment.GLPI_SKIP_AUTOINSTALL=="true" and .services.glpi.environment.MYSQL_ROOT_PASSWORD==null and .services.glpi.volumes[0]=="glpi_data:/var/glpi"' "$STATE/revisions/unit/compose.json" >/dev/null
-jq -e '.services.db.command==["--binlog-expire-logs-seconds=2592000"] and .services.glpi.logging.options["max-size"]=="10m" and .services.db.logging.options["max-file"]=="3"' "$STATE/revisions/unit/compose.json" >/dev/null
+jq -e '.services.db.command==["--binlog-expire-logs-seconds=2592000","--innodb-buffer-pool-size=1024M"] and .services.glpi.logging.options["max-size"]=="10m" and .services.db.logging.options["max-file"]=="3"' "$STATE/revisions/unit/compose.json" >/dev/null
 jq '.expose_db=true | .major=10 | .glpi_version="10.0.28" | .glpi_image=(.glpi_image|sub("11.0.11";"10.0.28"))' "$STATE/input.json" > "$STATE/legacy.json"
 config_render "$STATE/legacy.json" "$STATE/revisions/legacy"
 jq -e '.services.db.ports==["3306:3306"] and (.services.glpi.volumes|index("marketplace:/var/www/glpi/marketplace"))!=null' "$STATE/revisions/legacy/compose.json" >/dev/null
 ok 'Database exposure is binary, legacy marketplace persists, automatic schema updates disabled'
+
+mkdir -p "$STATE/diagnose/revision"
+cp "$STATE/input.json" "$STATE/diagnose/revision/config.json"
+# An existing installation has no explicit buffer argument: SQL is the truth.
+jq 'del(.services.db.command[1])' "$STATE/revisions/unit/compose.json" > "$STATE/diagnose/revision/compose.json"
+GDM_STATE_DIR="$STATE/diagnose" GDM_MEMINFO="$STATE/meminfo" ARCH=amd64 bash <<'BASH'
+set -Eeuo pipefail
+for module in core system releases config operations; do source "$GDM_ROOT/lib/$module.sh"; done
+tr_load
+ln -s revision "$STATE/current"
+docker() { :; }
+dc() {
+    [[ $1 == exec ]] || return 0
+    [[ $mysql_state == running ]] || return 1
+    printf '134217728\n'
+}
+for mysql_state in running stopped; do
+    diagnose > "$STATE/$mysql_state.log" 2>&1
+    grep -Fq 'next revision: --innodb-buffer-pool-size=1024M' "$STATE/$mysql_state.log"
+done
+grep -Fq 'applied: innodb_buffer_pool_size=134217728 bytes (128 MiB)' "$STATE/running.log"
+grep -Fq 'applied: unavailable (MySQL stopped or unreachable)' "$STATE/stopped.log"
+BASH
+ok 'MySQL diagnosis reports the live buffer without an explicit argument and handles a stopped database'
 
 if docker compose version >/dev/null 2>&1; then
     while IFS= read -r password_case; do

@@ -568,6 +568,7 @@ settings_command() {
 }
 diagnose_section() { printf '\n' >&2; ui_log info "$1"; }
 diagnose() {
+    local buffer_bytes
     say diagnose_note
     os_detect /etc/os-release
     diagnose_section "$OS_NAME / $ARCH"
@@ -581,6 +582,18 @@ diagnose() {
         jq '{format,project,status,major,glpi_version,mysql_version,http_port,https_port,expose_db,tls,hostname}' "$CONFIG"
         diagnose_section "docker compose ps"
         dc ps --all
+        # Applied now vs. what the next revision would use for this host's RAM.
+        diagnose_section "MySQL"
+        # Database credentials expand only inside the container.
+        # shellcheck disable=SC2016
+        if buffer_bytes=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql --protocol=TCP -h 127.0.0.1 --connect-timeout=5 -u"$GDM_DB_USER" -Nse "SELECT @@innodb_buffer_pool_size"' </dev/null 2>/dev/null) &&
+           [[ $buffer_bytes =~ ^[0-9]+$ ]]; then
+            printf 'applied: innodb_buffer_pool_size=%s bytes (%s MiB)\n' "$buffer_bytes" "$((buffer_bytes/1024/1024))"
+        else
+            printf 'applied: unavailable (MySQL stopped or unreachable)\n'
+        fi
+        jq -r '.services.db.command[]?' "$STATE/current/compose.json"
+        printf 'next revision: --innodb-buffer-pool-size=%sM\n' "$(mysql_buffer_pool_mb)"
         if [[ -f $STATE/current/tls/fullchain.pem ]]; then
             diagnose_section TLS
             openssl x509 -in "$STATE/current/tls/fullchain.pem" -noout -subject -issuer -dates

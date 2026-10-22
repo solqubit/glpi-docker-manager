@@ -6,7 +6,7 @@ An interactive, bilingual Linux CLI for installing and administering GLPI with
 official Docker images. Bash orchestrates GLPI, MySQL and optional Caddy HTTPS;
 you do not need to configure host PHP, Apache or MySQL.
 
-Version **1.0.1**. [Validation results and limits](docs/validation.md): 26 test
+Version **1.0.2**. [Validation results and limits](docs/validation.md): 26 test
 groups, ShellCheck and disposable Docker installation/update/restore tests passed
 on 2026-10-19. This does not certify every distribution, plugin or future release.
 
@@ -99,6 +99,8 @@ keyboard controls, monochrome and plain-terminal modes.
   or the next major with a migration warning and explicit confirmation. Each
   version change first runs a database/schema rehearsal on an isolated restored copy.
 * Independent MySQL patch maintenance within 8.4, with backup and rehearsal.
+* MySQL's buffer pool is sized from the server's RAM (25 %, 256 MiB to 8 GiB) and
+  recalculated whenever the configuration is regenerated.
   `refresh-image` handles a rebuild of the same GLPI application version.
 * `proxy-update` applies the latest Caddy 2 image (HTTPS proxy); the previous
   configuration returns if HTTPS does not answer. The daily maintenance only

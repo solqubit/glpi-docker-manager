@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2
+
+### Performance
+* The MySQL buffer pool follows the server's RAM: 25 % of it, between 256 MiB and
+  8 GiB (whole GiB from 1 GiB), instead of MySQL's fixed 128 MiB. It is recalculated
+  whenever the configuration is regenerated (install, updates, settings, restore),
+  never by the daily job; *Diagnose* shows the applied and the next value.
+
 ## 1.0.1
 
 ### Security

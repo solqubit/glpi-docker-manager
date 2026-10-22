@@ -6,7 +6,7 @@ Gestor interactivo para instalar y administrar GLPI en Linux mediante imágenes
 oficiales de Docker. La interfaz está disponible en español e inglés; el código y
 la documentación técnica principal están en inglés.
 
-Versión **1.0.1**. Los [resultados y límites de validación](docs/validation.md)
+Versión **1.0.2**. Los [resultados y límites de validación](docs/validation.md)
 registran 26 grupos aprobados, ShellCheck sin avisos y pruebas desechables de
 instalación, actualización y restauración en Docker el 2026-10-19. No certifican
 todas las distribuciones, plugins ni versiones futuras.
@@ -103,6 +103,8 @@ HTTPS público solicita y renueva certificados de **Let's Encrypt** mediante Cad
 * Restauración guiada a volúmenes nuevos y traslado a otro servidor.
 * Consulta de credenciales bajo confirmación y mantenimiento independiente de
   parches MySQL dentro de la serie 8.4.
+* Memoria de MySQL (buffer pool) calculada según la RAM del servidor (25 %, de
+  256 MiB a 8 GiB) y recalculada cada vez que se regenera la configuración.
 * `proxy-update` aplica la última imagen de Caddy 2 (proxy HTTPS); si HTTPS no
   responde, vuelve la configuración anterior. El mantenimiento diario solo avisa
   en el menú principal de imágenes nuevas de GLPI, MySQL y Caddy; nunca las aplica.

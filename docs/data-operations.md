@@ -139,6 +139,18 @@ Cross-series upgrades (for example 8.4 to 9.x) are not automated. No background
 updater changes database images. Do not manually start an arbitrary newer MySQL
 image on the production volume as a compatibility test.
 
+## MySQL memory
+
+The InnoDB buffer pool is 25 % of the host's RAM (`/proc/meminfo`), in multiples
+of 128 MiB below 1 GiB and whole GiB above, kept between 256 MiB and 8 GiB. The
+rest stays for GLPI, Apache, Caddy and the system, which share the host. It is
+passed as `--innodb-buffer-pool-size` and recalculated whenever a configuration
+revision is generated: installation, GLPI/MySQL/Caddy updates, address, HTTPS or
+database exposure changes, and restore (a restored backup takes the new
+server's value). The daily job never changes it, since that restarts MySQL. An
+existing installation keeps its value until its next revision. *Diagnose* shows
+the applied value and the one the next revision would use.
+
 ## Image security updates
 
 PHP and Apache live inside the official GLPI image, so recreating containers
