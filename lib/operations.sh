@@ -495,15 +495,21 @@ apply_database_update() {
 # Caddy holds no GLPI data: a new image is applied as a configuration revision,
 # and apply_settings reactivates the previous one when HTTPS does not answer.
 update_proxy() {
-    local lookup target image file
+    local lookup target image file current
+    local -a details=()
     assert_running
     [[ $(cfg tls) != off ]] || { say proxy_update_tls_off; return 0; }
     lookup=$(mktemp "$STATE/.caddy-lookup.XXXXXX"); CLEANUP_PATHS+=("$lookup")
     ui_task caddy_lookup_status caddy_target_lookup "$lookup"
     IFS=$'\t' read -r target image < "$lookup" || die image_missing caddy
     [[ $image != "$(cfg caddy_image)" ]] || { say proxy_update_none "$(proxy_version "$(cfg caddy_image)")"; return 0; }
-    ui_panel "$(t ui_proxy_update)" "$(t proxy_update_versions "$(proxy_version "$(cfg caddy_image)")" "$target")" \
-        "$(t proxy_update_help)"
+    current=$(proxy_version "$(cfg caddy_image)")
+    if [[ $current == "$target" ]]; then
+        details+=("$(t proxy_update_refresh "$target")" "$(t proxy_update_refresh_note)")
+    else
+        details+=("$(t proxy_update_versions "$current" "$target")")
+    fi
+    ui_panel "$(t ui_proxy_update)" "${details[@]}" "$(t proxy_update_help)"
     confirm proxy_update_confirm || exit 10
     file=$(mktemp "$STATE/.caddy.XXXXXX"); CLEANUP_PATHS+=("$file")
     jq --arg image "$image" '.caddy_image=$image' "$CONFIG" > "$file"

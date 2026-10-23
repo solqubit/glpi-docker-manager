@@ -717,6 +717,8 @@ menu_proxy_update	Update HTTPS proxy (Caddy)
 desc_proxy-update	Apply the latest Caddy 2 image; the previous one returns if HTTPS fails.
 ui_proxy_update	Updates · Update HTTPS proxy (Caddy)
 proxy_update_versions	Caddy %s → %s
+proxy_update_refresh	Caddy %s · same version · refreshed image
+proxy_update_refresh_note	The published image has a different identifier (digest). The Caddy version stays the same; this alone does not indicate what changed in the image.
 proxy_update_help	Caddy only serves HTTPS: GLPI data and certificates do not change. Services restart briefly; if HTTPS does not answer, the previous image returns.
 proxy_update_confirm	Apply the new Caddy image now?
 proxy_update_pulling	Downloading the new Caddy image
