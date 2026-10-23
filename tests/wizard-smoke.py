@@ -117,7 +117,7 @@ try:
         device = subprocess.check_output(['docker', 'volume', 'inspect', '--format',
                                            '{{index .Options "device"}}', config['project'] + '_' + role]).decode().strip()
         assert device == str(directory), (role, device)
-    assert locale['ui_install_success'].encode() in output
+    assert ('[+] ' + locale['ui_install_success'].removeprefix('✓ ')).encode() in output
     url = 'https://' + config['hostname'] + ('' if https_port == 443 else ':' + str(https_port))
     assert config['hostname'] != 'localhost', 'LAN address was not detected'
     assert b'[8/8]' in output and url.encode() in output

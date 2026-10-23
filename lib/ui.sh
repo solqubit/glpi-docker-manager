@@ -63,10 +63,10 @@ ui_level_of() {
         *warning*|*notice*|*unknown*|*required*|*manual*|*_failed|cancelled|cleanup_deferred|config_restored|\
         destructive|older_release|security_release|resource_reference|bad_password|bad_root_password|\
         ui_bad_*|ui_invalid_choice|ui_error_log|docker_service_stopped|docker_storage_unavailable|\
-        docker_plugins_missing|update_images_unavailable|update_no_patches|credentials_note|diagnose_note|\
+        docker_plugins_missing|update_images_unavailable|update_no_patches|credentials_note|diagnose_note|logs_note|\
         host_storage_steps|acme_requirements|cert_instructions|releases_stale|install_exists|admin_command|registry_rate_limited|\
         docker_context_help|maint_no_scheduler|maint_skipped|maint_services_stopped|backups_prune_skipped|\
-        cert_expiring|cert_custom_expiring|cert_acme_expiring|cert_auto_renewing|firewall_docker|\
+        cert_expiring|cert_expiring_menu|cert_custom_expiring|cert_acme_expiring|cert_auto_renewing|firewall_docker|\
         self_update_git|self_update_unavailable|self_update_git_dirty|self_update_git_noupstream|cleanup_image_in_use|\
         weekdays_none)
             UI_LEVEL=warning;;

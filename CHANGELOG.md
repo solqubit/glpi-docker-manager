@@ -2,6 +2,20 @@
 
 ## 1.0.2
 
+### Interface
+* *Address* on an installed instance no longer uses installation wording: values
+  show as *current* or *changed*, the actions are *Review changes* / *Leave without
+  applying changes*, leaving without edits asks nothing, and nothing is applied
+  when no value changed.
+* Interrupted updates, backups or settings changes no longer offer *Continue the
+  installation*; that option only appears for an interrupted installation.
+* Context fixes across menus: update prompts ask which version to update to,
+  MySQL/Caddy lookups and "already latest" messages name their component, manual
+  and automatic backups are no longer called recovery backups, sub-screens offer
+  *Back* instead of *Return to the main menu*, confirmation fields show
+  *Enter confirm · Esc cancel*, restoring with no installation says so, and the
+  local CA is no longer called self-signed.
+
 ### Performance
 * The MySQL buffer pool follows the server's RAM: 25 % of it, between 256 MiB and
   8 GiB (whole GiB from 1 GiB), instead of MySQL's fixed 128 MiB. It is recalculated

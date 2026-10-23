@@ -139,6 +139,17 @@ class Setup:
         self.notice_style = 'accent'
         self.defaults = {'hostname': self.data.get('_detected_host', 'localhost')}
         self.defaults.update({key: default for key, _, _, default in FIELDS if default is not None})
+        # An installed instance compares against its current values, not defaults.
+        self.original = {key: self.data[key] for key, _, _, _ in self.fields}
+        # A legacy "localhost" is pre-filled with the detected IP: that is a change.
+        self.original['hostname'] = self.data.pop('_configured_host', self.data['hostname'])
+
+    def text(self, key):
+        """Install wording, or its variant for an installed instance (setup_access_*)."""
+        return self.ui.t(key.replace('setup_', 'setup_access_', 1) if self.access_only else key)
+
+    def changed(self):
+        return any(self.data[key] != value for key, value in self.original.items())
 
     def context(self):
         return f"GLPI {self.data['glpi_version']} · MySQL {self.data['mysql_version']} · db:3306"
@@ -174,8 +185,13 @@ class Setup:
         for key, label, _, _ in self.fields:
             pending = key.endswith('password') and not self.data[key]
             invalid = bool(validate(key, str(self.data[key]), self.data))
-            default = not pending and not key.endswith('password') and self.data[key] == self.defaults[key]
-            state = self.ui.t('setup_pending' if pending else 'setup_invalid' if invalid else 'setup_default' if default else 'setup_valid')
+            if self.access_only:
+                # Unchanged values are "current" and dim; edited ones stand out.
+                default = self.data[key] == self.original[key]
+                state = self.ui.t('setup_invalid' if invalid else 'setup_current' if default else 'setup_changed')
+            else:
+                default = not pending and not key.endswith('password') and self.data[key] == self.defaults[key]
+                state = self.ui.t('setup_pending' if pending else 'setup_invalid' if invalid else 'setup_default' if default else 'setup_valid')
             tone = 'warning' if pending else 'error' if invalid else 'ok'
             marker = '[✗]' if invalid and not pending else '[!]' if pending else '[+]'
             name = self.ui.t(label).split(' · ')[0]
@@ -183,11 +199,11 @@ class Setup:
                                (self.display(key), 'warning' if pending else 'accent'),
                                ('  ' + state, (tone if pending or invalid else 'dim' if default else 'ok') + '>')], tone))
         rows.append((SEPARATOR, '', ''))
-        rows.append(('review', '▶ ' + self.ui.t('setup_continue'), 'ok'))
+        rows.append(('review', '▶ ' + self.text('setup_continue'), 'ok'))
         if not self.access_only:
             rows.append(('version', self.ui.t('setup_version_back'), ''))
         rows += [('ports-default', self.ui.t('setup_standard_ports'), ''),
-                 ('cancel', self.ui.t('setup_cancel'), '')]
+                 ('cancel', self.text('setup_cancel'), '')]
         return rows
 
     def timezone(self):
@@ -231,7 +247,7 @@ class Setup:
                                  [(False, '● ' + self.ui.t('ui_db_expose_no'), 'ok'),
                                   (True, '▲ ' + self.ui.t('ui_db_expose_yes'), 'warning')],
                                  int(self.data[key]), notice=self.ui.t('ui_db_access_body'),
-                                 help_text=self.ui.t('ui_db_access_later'))
+                                 help_text=None if self.access_only else self.ui.t('ui_db_access_later'))
         else:
             def validator(text):
                 error = validate(key, text, self.data)
@@ -305,8 +321,8 @@ class Setup:
                  ('edit', self.ui.t('setup_return_edit'), 'accent')]
         if not self.access_only:
             rows.append(('version', self.ui.t('setup_version_back'), ''))
-        rows.append(('cancel', self.ui.t('setup_cancel'), ''))
-        choice = self.ui.menu(self.ui.t('ui_summary'), rows, actions,
+        rows.append(('cancel', self.text('setup_cancel'), ''))
+        choice = self.ui.menu(self.ui.t('setup_access_summary' if self.access_only else 'ui_summary'), rows, actions,
                               notice=self.ui.t('setup_access', url) + ' · ' + self.ui.t('setup_access_review_hint' if self.access_only else 'setup_review_hint'),
                               help_text=self.ui.t('setup_access_review_keys' if self.access_only else 'setup_review_keys'))
         if choice in {f[0] for f in self.fields}:
@@ -319,11 +335,14 @@ class Setup:
             rows = self.rows()
             choice = self.ui.menu(self.ui.t('setup_access_title' if self.access_only else 'setup_title'), rows, self.selected,
                                   notice=self.notice, notice_style=self.notice_style,
-                                  help_text=self.ui.t('setup_form_help'))
+                                  help_text=self.text('setup_form_help'))
             if choice is None or choice == 'cancel':
-                decision = self.ui.menu(self.ui.t('setup_cancel_confirm'),
+                # Nothing edited on an installed instance: leave without asking.
+                if self.access_only and not self.changed():
+                    return 10
+                decision = self.ui.menu(self.text('setup_cancel_confirm'),
                                         [('stay', self.ui.t('setup_return_edit'), 'accent'),
-                                         ('cancel', self.ui.t('setup_cancel'), 'warning')])
+                                         ('cancel', self.text('setup_cancel'), 'warning')])
                 if decision == 'cancel':
                     return 10
                 continue
@@ -337,6 +356,10 @@ class Setup:
                 self.notice_style = 'ok'
                 continue
             if choice == 'review':
+                if self.access_only and not self.changed():
+                    self.notice = self.ui.t('setup_no_changes')
+                    self.notice_style = 'accent'
+                    continue
                 if self.ready():
                     decision = self.review()
                     if decision == 'deploy' and self.ready():

@@ -231,7 +231,7 @@ maintenance_run() {
     if [[ $MAINT_BACKUPS == true ]] && { [[ $force == true ]] || backup_due; }; then
         if [[ -n $(dc ps --status running --quiet glpi) && -n $(dc ps --status running --quiet db) ]]; then
             journal_begin backup
-            ui_run 0 update_step_backup backup_create true auto
+            ui_run 0 backup_step_create backup_create true auto
             journal_done
             backup_prune_auto
             backup=$LAST_BACKUP
@@ -316,7 +316,7 @@ weekday_picker() {
             if [[ -n ${marked[$day]:-} ]]; then options+=("$day" "$(ui_opt ok "☑ $name")")
             else options+=("$day" "$(ui_opt '' "☐ $name")"); fi
         done
-        options+=(save "$(ui_opt primary "$(t weekdays_save)" "$(t opt_weekdays_save)")" back "$(ui_opt back "$(t ui_back_menu)")")
+        options+=(save "$(ui_opt primary "$(t weekdays_save)" "$(t opt_weekdays_save)")" back "$(ui_opt back "$(t ui_back_previous)")")
         choose pick weekdays_prompt "$last" "${options[@]}" || return 1
         case $pick in
             save) if (( ${#marked[@]} == 0 )); then say weekdays_none; continue; fi; break;;
@@ -333,28 +333,32 @@ frequency_menu() {
     elif [[ $MAINT_WEEKDAYS == '1 2 3 4 5' ]]; then current=work
     elif [[ $MAINT_WEEKDAYS =~ ^[1-7]$ ]]; then current=weekly
     else current=pick; fi
-    choose choice maint_freq_prompt "$current" \
-        d1 "$(ui_opt primary "$(t freq_label_daily) · $(t opt_recommended)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$AUTO_BACKUP_KEEP")")" \
-        d2 "$(ui_opt '' "$(t freq_label_every 2)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$((AUTO_BACKUP_KEEP*2))")")" \
-        d3 "$(ui_opt '' "$(t freq_label_every 3)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$((AUTO_BACKUP_KEEP*3))")")" \
-        work "$(ui_opt '' "$(t freq_label_workdays)" "$(t opt_freq_workdays)")" \
-        weekly "$(ui_opt '' "$(t freq_label_weekly)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$((AUTO_BACKUP_KEEP*7))")")" \
-        pick "$(ui_opt '' "$(t freq_label_pick)" "$(t opt_freq_pick)")" \
-        custom "$(ui_opt '' "$(t freq_label_custom)" "$(t opt_freq_custom)")" \
-        back "$(ui_opt back "$(t ui_back_menu)")" || return 1
-    case $choice in
-        d1|d2|d3) MAINT_MODE=days MAINT_EVERY=${choice#d};;
-        work) MAINT_MODE=weekdays MAINT_WEEKDAYS='1 2 3 4 5';;
-        weekly)
-            for day in 1 2 3 4 5 6 7; do name=$(t "day_long_$day"); days+=("$day" "${name^}"); done
-            choose day maint_weekday_prompt "${MAINT_WEEKDAYS%% *}" "${days[@]}" || return 1
-            MAINT_MODE=weekdays MAINT_WEEKDAYS=$day;;
-        pick) weekday_picker || return 1; MAINT_MODE=weekdays;;
-        custom)
-            ask_value day maint_every_prompt "$MAINT_EVERY" days || return 1
-            MAINT_MODE=days MAINT_EVERY=$day;;
-        *) return 1;;
-    esac
+    while :; do
+        choose choice maint_freq_prompt "$current" \
+            d1 "$(ui_opt primary "$(t freq_label_daily) · $(t opt_recommended)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$AUTO_BACKUP_KEEP")")" \
+            d2 "$(ui_opt '' "$(t freq_label_every 2)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$((AUTO_BACKUP_KEEP*2))")")" \
+            d3 "$(ui_opt '' "$(t freq_label_every 3)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$((AUTO_BACKUP_KEEP*3))")")" \
+            work "$(ui_opt '' "$(t freq_label_workdays)" "$(t opt_freq_workdays)")" \
+            weekly "$(ui_opt '' "$(t freq_label_weekly)" "$(t opt_freq_coverage "$AUTO_BACKUP_KEEP" "$((AUTO_BACKUP_KEEP*7))")")" \
+            pick "$(ui_opt '' "$(t freq_label_pick)" "$(t opt_freq_pick)")" \
+            custom "$(ui_opt '' "$(t freq_label_custom)" "$(t opt_freq_custom)")" \
+            back "$(ui_opt back "$(t ui_back_previous)")" || return 1
+        case $choice in
+            d1|d2|d3) MAINT_MODE=days MAINT_EVERY=${choice#d};;
+            work) MAINT_MODE=weekdays MAINT_WEEKDAYS='1 2 3 4 5';;
+            weekly)
+                days=()
+                for day in 1 2 3 4 5 6 7; do name=$(t "day_long_$day"); days+=("$day" "${name^}"); done
+                choose day maint_weekday_prompt "${MAINT_WEEKDAYS%% *}" "${days[@]}" || continue
+                MAINT_MODE=weekdays MAINT_WEEKDAYS=$day;;
+            pick) weekday_picker || continue; MAINT_MODE=weekdays;;
+            custom)
+                ask_value day maint_every_prompt "$MAINT_EVERY" days || continue
+                MAINT_MODE=days MAINT_EVERY=$day;;
+            *) return 1;;
+        esac
+        return 0
+    done
 }
 # Hours are tagged by impact: GLPI stops for a few minutes during a backup.
 time_menu() {
@@ -440,7 +444,7 @@ logs_menu() {
             glpi "$(ui_opt '' "$(t logs_glpi)" "$(t opt_logs_glpi)")" \
             containers "$(ui_opt warn "$(t logs_containers)" "$(t opt_logs_containers)")" \
             binlog "$(ui_opt warn "$(t logs_binlog)" "$(t opt_logs_binlog)")" \
-            back "$(ui_opt back "$(t ui_back_menu)")" || return 0
+            back "$(ui_opt back "$(t ui_back_previous)")" || return 0
         case $action in
             manager) log_days_choice LOG_MANAGER_DAYS logs_days_prompt 30 || continue;;
             glpi)
@@ -487,7 +491,7 @@ log_binlog_choice() {
     local value
     choose value logs_binlog_prompt "$LOG_BINLOG_DAYS" \
         1 "$(ui_opt '' "$(t logs_days 1)" "$(t opt_binlog_short)")" \
-        3 "$(ui_opt '' "$(t logs_days 3)" "$(t opt_binlog_short)")" \
+        3 "$(ui_opt '' "$(t logs_days 3)" "$(t opt_binlog_low)")" \
         7 "$(ui_opt '' "$(t logs_days 7)" "$(t opt_binlog_week)")" \
         30 "$(ui_opt primary "$(t logs_days 30) · $(t logs_recommended)" "$(t opt_binlog_default)")" || return 1
     LOG_BINLOG_DAYS=$value
@@ -638,7 +642,7 @@ certificates_menu() {
     else help=$(t "cert_help_$mode"); fi
     local -a ca_rows=()
     [[ $mode != self-signed ]] || ca_rows_build
-    ui_panel "$(t cert_title)" "$(t cert_mode)"$'\t'"$(t "ui_tls_$mode")" "$(t ui_host)"$'\t'"$(cfg hostname)" \
+    ui_panel "$(t cert_title)" "$(t cert_mode)"$'\t'"$(t "ui_tls_short_$mode")" "$(t ui_host)"$'\t'"$(cfg hostname)" \
         "$(t cert_expiry)"$'\t'"$expiry" "$help" "${ca_rows[@]}"
     case $mode in
         self-signed) choose action cert_prompt back renew "$(ui_opt warn "$(t cert_renew_now)" "$(t opt_cert_renew)")" \
@@ -657,7 +661,8 @@ certificates_menu() {
         restart) ui_run 0 cert_step_restart dc restart proxy;;
         *) exit 10;;
     esac
-    ui_panel "$(t cert_applied)" "$(t ready "$(installation_url)")"
+    if [[ $action == restart ]]; then ui_panel "$(t cert_proxy_restarted)" "$(t ready "$(installation_url)")"
+    else ui_panel "$(t cert_applied)" "$(t ready "$(installation_url)")"; fi
 }
 
 # ---------------------------------------------------------------- free space

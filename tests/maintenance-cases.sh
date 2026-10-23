@@ -114,4 +114,22 @@ MAINT_WEEKDAYS=''
 maintenance_write
 maintenance_settings
 [[ -z $MAINT_WEEKDAYS && $LOG_GLPI_MB == 50 && $LOG_BINLOG_DAYS == 3 ]]
-printf 'PASS: backup rotation by kind, restore cleanup policy, free-space selection, backup schedules and log rotation settings\n'
+(
+    MAINT_MODE=days MAINT_EVERY=2 MAINT_WEEKDAYS=''
+    frequency_calls=0
+    choose() {
+        local output=$1 prompt=$2 answer
+        frequency_calls=$((frequency_calls+1))
+        [[ ${!#} == "$(ui_opt back "$(t ui_back_previous)")" ]] || exit 1
+        case $frequency_calls:$prompt in
+            1:maint_freq_prompt) answer=pick;;
+            2:weekdays_prompt) answer=back;;
+            3:maint_freq_prompt) answer=back;;
+            *) printf 'Unexpected frequency screen: %s\n' "$prompt" >&2; exit 1;;
+        esac
+        printf -v "$output" '%s' "$answer"
+    }
+    if frequency_menu; then exit 1; fi
+    [[ $frequency_calls == 3 && $MAINT_MODE == days && $MAINT_EVERY == 2 && -z $MAINT_WEEKDAYS ]]
+)
+printf 'PASS: backup rotation by kind, restore cleanup policy, free-space selection, backup schedules, nested Back navigation and log rotation settings\n'

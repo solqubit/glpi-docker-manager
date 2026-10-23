@@ -284,7 +284,7 @@ class Terminal:
                 query += key
                 selected = 0
 
-    def edit(self, title, value, hint, validator, secret=False, default=None, preview=None):
+    def edit(self, title, value, hint, validator, secret=False, default=None, preview=None, keys='setup_edit_keys'):
         """Framed text field. default is shown for reference; preview(text)
         returns a live line such as the resulting URL."""
         visible = os.environ.get('GDM_PASSWORD_VISIBILITY') != 'hidden'
@@ -326,7 +326,7 @@ class Terminal:
                 line = preview(text)
                 if line:
                     self.put(row, self.left, '[*] ' + line, 'accent')
-            self.put(height - 2, self.left, self.t('setup_edit_keys'), 'accent')
+            self.put(height - 2, self.left, self.t(keys), 'accent')
             self.cursor(True)
             self.screen.move(min(top + 1, height - 1), min(self.left + 4 + position - start,
                                                            self.screen.getmaxyx()[1] - 2))

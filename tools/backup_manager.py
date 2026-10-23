@@ -54,13 +54,13 @@ class Backups:
                 if is_recovery and (self.root / 'operation.json').exists():
                     notice, style = self.ui.t('backups_protected'), 'error'; continue
                 answer = self.ui.edit(self.ui.t('backups_delete'), '', self.ui.t('backups_delete_hint', path.name),
-                                      lambda value: '' if value == 'DELETE' else self.ui.t('backups_delete_word'))
+                                      lambda value: '' if value == 'DELETE' else self.ui.t('backups_delete_word'), keys='confirm_edit_keys')
                 if answer is None: continue
             if choice == 'export':
                 def valid(value):
                     target = Path(value)
                     return '' if target.is_absolute() and target.parent.is_dir() and not target.exists() and not target.is_symlink() else self.ui.t('backups_bad_destination')
-                target = self.ui.edit(self.ui.t('backups_export'), '', self.ui.t('backups_export_hint', path.name), valid)
+                target = self.ui.edit(self.ui.t('backups_export'), '', self.ui.t('backups_export_hint', path.name), valid, keys='confirm_edit_keys')
                 if target is None: continue
                 result['destination'] = target
             return result

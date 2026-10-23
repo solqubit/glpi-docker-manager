@@ -176,7 +176,7 @@ select_version() {
     done
     version_options+=(other "$(ui_opt '' "$(t more_versions)" "$(t opt_version_other)")")
     [[ $allow_back != true ]] || version_options+=(back "$(ui_opt back "$(t setup_return_edit)")")
-    if ! choose choice choose_version "${versions[0]}" "${version_options[@]}"; then
+    if ! choose choice "${VERSION_PROMPT:-choose_version}" "${versions[0]}" "${version_options[@]}"; then
         [[ $allow_back != true ]] || return 10
         die cancelled
     fi

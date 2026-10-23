@@ -130,6 +130,7 @@ restore_backup() {
     backup_extract "$archive"
     local replaced='' id
     if restore_can_backup; then note=$(t restore_plan_safe)
+    elif [[ ! -L $STATE/current ]]; then note=$(t restore_plan_fresh)
     else
         note=$(t restore_plan_keep)
         # Only when there is a current installation to keep in its place.

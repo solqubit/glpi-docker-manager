@@ -67,7 +67,7 @@ service_start() {
         ui_run 0 ui_service_starting service_refresh_action
     elif [[ $current == running ]]; then ui_run 0 ui_service_checking service_check_action
     else ui_run 0 ui_service_starting service_start_action; fi
-    ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")" "$(t ui_next_steps)"
+    ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")"
 }
 select_major() {
     # MINIMUM excludes branches at or below it: 10 for new installations. GLPI 10
@@ -210,7 +210,7 @@ check_updates() {
     local newest current next_version
     newest=$(release_versions "$(cfg major)" | head -n 1); current=$(cfg glpi_version)
     [[ -n $newest ]] || die image_missing "$(cfg major)"
-    ui_panel "$(t update_select_title)" "$(t update_latest "$current" "$newest")" "$(t update_select_help)"
+    ui_panel "$(t check_updates_title)" "$(t update_latest "$current" "$newest")"
     if version_gt "$newest" "$current"; then
         release_notice "$newest"
         image_resolve glpi/glpi "$newest" >/dev/null || say update_images_unavailable
@@ -280,6 +280,8 @@ rehearse() (
 )
 update_glpi() {
     local kind=${1:-update} requested=${2:-} target image current file old source_major
+    # Read by select_version (releases.sh): "update to", not "install".
+    local VERSION_PROMPT=choose_version_update
     assert_running
     current=$(cfg glpi_version); source_major=$(cfg major)
     ui_task ui_releases_loading release_fetch
@@ -427,7 +429,9 @@ select_update_target() {
     while IFS=$'\t' read -r version branch image; do
         [[ $branch != "$major" ]] || default=$version
     done < "$UPDATE_CHOICES_FILE"
+    local next_branch=false
     while IFS=$'\t' read -r version branch image; do
+        [[ $branch == "$major" ]] || next_branch=true
         if [[ $version == "$default" ]]; then
             choices+=("$version" "$(ui_opt primary "$(t update_label_patch "GLPI $version" "$branch") · $(t opt_recommended)" "$(t opt_update_patch "$branch")")")
         elif [[ $branch == "$major" ]]; then
@@ -444,7 +448,10 @@ select_update_target() {
         if (( UPDATE_CANDIDATES > 0 )); then say update_images_unavailable; else say update_none; fi
         return 0
     fi
-    if [[ -z $default ]]; then say update_no_patches; default=${choices[0]}; fi
+    if [[ -z $default ]]; then
+        if [[ $next_branch == true ]]; then say update_no_patches; else say update_no_patches_left; fi
+        default=${choices[0]}
+    fi
     choices+=(back "$(ui_opt back "$(t ui_back_menu)")")
     ui_panel "$(t update_select_title)" "$(t opt_installed)"$'\t'"GLPI $current" "$(t update_select_help)"
     choose choice update_select_prompt "$default" "${choices[@]}" || exit 10
@@ -455,9 +462,9 @@ update_database() {
     local target image mysql_lookup
     assert_running
     mysql_lookup=$(mktemp "$STATE/.mysql-lookup.XXXXXX"); CLEANUP_PATHS+=("$mysql_lookup")
-    ui_task setup_loading_images mysql_target_lookup "$mysql_lookup"
+    ui_task mysql_lookup_status mysql_target_lookup "$mysql_lookup"
     IFS=$'\t' read -r target image < "$mysql_lookup" || die image_missing mysql
-    version_gt "$target" "$(cfg mysql_version)" || { say update_none; return; }
+    version_gt "$target" "$(cfg mysql_version)" || { say db_update_none "$(cfg mysql_version)"; return; }
     say db_update_warning
     ui_panel "$(t ui_db_update)" "$(t db_update_versions "$(cfg mysql_version)" "$target")"
     confirm db_update_confirm || die cancelled
@@ -492,7 +499,7 @@ update_proxy() {
     assert_running
     [[ $(cfg tls) != off ]] || { say proxy_update_tls_off; return 0; }
     lookup=$(mktemp "$STATE/.caddy-lookup.XXXXXX"); CLEANUP_PATHS+=("$lookup")
-    ui_task setup_loading_images caddy_target_lookup "$lookup"
+    ui_task caddy_lookup_status caddy_target_lookup "$lookup"
     IFS=$'\t' read -r target image < "$lookup" || die image_missing caddy
     [[ $image != "$(cfg caddy_image)" ]] || { say proxy_update_none "$(proxy_version "$(cfg caddy_image)")"; return 0; }
     ui_panel "$(t ui_proxy_update)" "$(t proxy_update_versions "$(proxy_version "$(cfg caddy_image)")" "$target")" \
@@ -533,7 +540,7 @@ db_exposure_prompt() {
     local exposure_choice current=no state
     [[ $(cfg expose_db) != true ]] || current=yes
     if [[ $current == yes ]]; then state=$(t ui_db_public); else state=$(t ui_db_private); fi
-    ui_panel "$(t ui_db_access_title)" "$(t ui_db_current)"$'\t'"$state" "$(t ui_db_access_body)" "$(t ui_db_access_later)"
+    ui_panel "$(t ui_db_access_title)" "$(t ui_db_current)"$'\t'"$state" "$(t ui_db_access_body)"
     local yes_label no_label
     yes_label=$(t ui_db_expose_yes); no_label=$(t ui_db_expose_no)
     if [[ $current == yes ]]; then yes_label+=" $(t opt_current)"; else no_label+=" $(t opt_current)"; fi
@@ -547,15 +554,15 @@ settings_command() {
     local command=$1 file exposed=false editor_result cleaned
     file=$(mktemp "$STATE/.settings.XXXXXX"); CLEANUP_PATHS+=("$file")
     if [[ $command == address ]]; then
-        jq --arg host "$(server_primary_address)" '._access_only=true | ._detected_host=$host |
+        jq --arg host "$(server_primary_address)" '._access_only=true | ._detected_host=$host | ._configured_host=.hostname |
           ._active_ports=[.http_port,.https_port,(if .expose_db then 3306 else empty end)] |
           if .hostname=="localhost" then .hostname=$host else . end' "$CONFIG" > "$file"
         if python3 "$GDM_ROOT/tools/setup.py" "$file" "$LANGUAGE"; then editor_result=0; else editor_result=$?; fi
         [[ $editor_result == 0 ]] || exit "$editor_result"
         cleaned=$(mktemp "$STATE/.access.XXXXXX"); CLEANUP_PATHS+=("$cleaned")
-        jq 'del(._access_only,._active_ports,._detected_host)' "$file" > "$cleaned"
+        jq 'del(._access_only,._active_ports,._detected_host,._configured_host)' "$file" > "$cleaned"
         ui_run 0 settings_step_apply apply_settings "$cleaned" true
-        ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")"
+        ui_panel "$(t settings_applied)" "$(t ready "$(installation_url)")"
         return
     elif [[ $command == https ]]; then tls_wizard "$CONFIG" "$file"
     else
@@ -564,7 +571,7 @@ settings_command() {
     fi
     confirm config_confirm || exit 10
     ui_run 0 settings_step_apply apply_settings "$file" true
-    ui_panel "$(t ui_service_ready)" "$(t ready "$(installation_url)")"
+    ui_panel "$(t settings_applied)" "$(t ready "$(installation_url)")"
 }
 diagnose_section() { printf '\n' >&2; ui_log info "$1"; }
 diagnose() {
@@ -636,7 +643,7 @@ dispatch() {
                     confirm stop_confirm || return 0
                     ui_run 0 service_step_stop dc stop
                     ui_panel "✓ $(t service_stopped_done)";;
-                logs) say diagnose_note; service_logs;;
+                logs) say logs_note; service_logs;;
                 check-updates) check_updates;;
                 update|migrate|refresh-image) update_glpi "$command" "$argument";;
                 db-update) update_database;;
@@ -651,8 +658,8 @@ dispatch() {
                     fi
                     if [[ $command == transfer ]]; then confirm transfer_confirm || return 0; fi
                     journal_begin "$command"
-                    if [[ $command == transfer ]]; then ui_run 0 update_step_backup backup_create false transfer
-                    else ui_run 0 update_step_backup backup_create; fi
+                    if [[ $command == transfer ]]; then ui_run 0 backup_step_create backup_create false transfer
+                    else ui_run 0 backup_step_create backup_create; fi
                     journal_done
                     backup_title=backup_manual_done
                     [[ $command != transfer ]] || backup_title=backup_transfer_done
@@ -697,7 +704,7 @@ dashboard_environment() {
     export GDM_DASH_PREVIOUS GDM_DASH_UPDATES
     if [[ $(cfg tls) == self-signed || $(cfg tls) == custom ]] && cert_days "$STATE/current/tls/fullchain.pem"; then
         GDM_DASH_CERT_DAYS=$CERT_DAYS
-        (( CERT_DAYS >= 30 )) || say cert_expiring "$CERT_DAYS"
+        (( CERT_DAYS >= 30 )) || say cert_expiring_menu "$CERT_DAYS"
     fi
     export GDM_DASH_CERT_DAYS GDM_DASH_MAINTENANCE
 }
@@ -713,8 +720,14 @@ menu() {
         else
             config_load
             if [[ $(cfg status) != ready || -f $STATE/operation.json ]]; then
-                ui_panel "$(t ui_pending_title)" "$(t ui_pending_body)"
-                choose command ui_menu_prompt install install "$(ui_opt primary "$(t ui_resume_install)" "$(t opt_resume)")" \
+                # Resuming only applies to an interrupted installation; any other
+                # interrupted operation (update, backup, settings) is recovered.
+                local -a resume=()
+                if [[ ! -f $STATE/operation.json ]] || [[ $(jq -r '.action // ""' "$STATE/operation.json" 2>/dev/null) == install ]]; then
+                    resume=(install "$(ui_opt primary "$(t ui_resume_install)" "$(t opt_resume)")")
+                    ui_panel "$(t ui_pending_title)" "$(t ui_pending_body)"
+                else ui_panel "$(t ui_pending_title)" "$(t ui_pending_operation_body)"; fi
+                choose command ui_menu_prompt "${resume[0]:-recover}" "${resume[@]}" \
                     recover "$(ui_opt warn "$(t ui_recover)" "$(t opt_recover)")" \
                     restore "$(ui_opt ok "$(t ui_restore_backup)" "$(t opt_restore)")" \
                     logs "$(ui_opt '' "$(t ui_logs)" "$(t desc_logs)")" diagnose "$(ui_opt '' "$(t ui_diagnose)" "$(t desc_diagnose)")" \

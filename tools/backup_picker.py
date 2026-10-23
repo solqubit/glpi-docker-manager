@@ -35,8 +35,8 @@ def main():
         if selected in (None, 'back'): return 10
         if selected == 'other':
             def valid(value):
-                return '' if Path(value).is_absolute() and Path(value).is_file() else ui.t('backup_invalid')
-            selected = ui.edit(ui.t('backup_path'), '', ui.t('backup_choose_help'), valid)
+                return '' if Path(value).is_absolute() and Path(value).is_file() else ui.t('backup_path_invalid')
+            selected = ui.edit(ui.t('backup_path'), '', ui.t('backup_path_hint'), valid, keys='confirm_edit_keys')
             if selected is None: return 10
         Path(output).write_text(selected + '\n')
         return 0

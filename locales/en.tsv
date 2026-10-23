@@ -6,13 +6,13 @@ need_sudo	Administrative access is required. Install/enable sudo with your admin
 admin_required	WARNING: Installation and administration require sudo/root. No installation or system changes have been started.
 admin_command	Run this command, or use a root shell:
 admin_retry_notice	The administrative command failed. Review its output, resolve the reported problem and retry in this wizard.
-locked	Another manager process is operating on this state directory.
+locked	Another manager process is operating on this installation.
 failed	Operation failed at %s. No credentials are included in this message.
-recovery_notice	An incomplete operation was recorded in %s. Use recover or restore; services may remain stopped.
+recovery_notice	An incomplete operation was recorded in %s. Use Recover an interrupted operation or Restore a backup (recover / restore); services may remain stopped.
 password_prompt	Type your password, or leave it empty to generate one. No minimum length.
 bad_password	Passwords cannot contain control characters.
 bad_root_password	The official MySQL root initialization does not safely accept quotes or backslashes. Use another administrator password without those characters, or press Enter to generate one. The application password supports them.
-destructive	This changes existing data. Type exactly %s to continue:
+destructive	Confirmation required. Type exactly %s to continue:
 cancelled	Cancelled.
 dependencies	Missing dependencies:%s
 install_dependencies	Install the listed dependencies using the detected package manager?
@@ -40,7 +40,7 @@ resource_warning	How would you like to continue with the available resources?
 release_limit	Release pagination exceeded its safety limit. No release list was accepted.
 support_unknown	Support status could not be verified automatically. Review https://github.com/glpi-project/glpi/security/policy
 release_notes	Official release notes for GLPI %s: %s
-security_release	SECURITY RELEASE: upstream recommends upgrading. Review the security fixes and any important notices in the official release notes below.
+security_release	SECURITY RELEASE: upstream recommends upgrading. Review the security fixes and any important notices in the official release notes (link above or the Read option).
 glpi10_warning	WARNING: GLPI 10 is outside ordinary upstream support following GLPI 12. Version 10.0.28 was announced as the final 10.0 release. No further ordinary bug/security fixes are expected. See https://www.glpi-project.org/en/glpi-12/ . Release notes above may describe the policy at their publication date.
 unsupported_confirm	Keep using this unsupported branch after reviewing the warning?
 older_release	A newer stable release exists in this branch: %s. Older patches may lack security fixes.
@@ -54,12 +54,12 @@ foreign_resource	Resource %s does not belong to this installation. Refusing to u
 unhealthy	Service %s did not become healthy. Inspect logs and the recovery journal.
 services_required	GLPI and MySQL must both be running for this operation.
 cert_instructions	Place the PEM certificate followed by intermediate certificates at %s and its matching unencrypted PEM private key at %s. The directory is private; do not place keys in Git. Then rerun HTTPS configuration. Convert PFX/PKCS12 first; see docs/https.md.
-acme_ports	The automatic ACME mode requires host ports 80 and 443. Use custom certificates for another port layout.
+acme_ports	Let's Encrypt requires host ports 80 and 443. Use custom certificates for another port layout.
 acme_requirements	For %s: point public DNS A/AAAA records to this server; allow inbound TCP 80/443 and outbound HTTPS; remove incorrect AAAA records. Certificate issuance/renewal is managed by Caddy.
 self_signed	Server certificate issued by the local CA: %s. GLPI Agents and browsers that trust the CA accept it without changes.
 tls_prompt	How would you like to secure access to GLPI?
 hostname_prompt	Public hostname or IPv4 address (no scheme, path or port):
-language_prompt	Language / Idioma: en / es:
+language_prompt	Language / Idioma
 first_action	What would you like to do?
 major_prompt	Choose the GLPI branch:
 mode_prompt	What will this installation be used for?
@@ -89,7 +89,7 @@ migration_warning	Major migration requires reviewing plugins, inventory, API int
 migration_review	Have you reviewed plugin compatibility and the target release's migration requirements?
 rehearsal_ok	The isolated database migration and schema check succeeded. This does not certify plugins or integrations.
 updated	Update verified. Current GLPI: %s.
-db_update_warning	MySQL maintenance is limited to the recorded 8.4 series. Test the target on a backup first and schedule downtime. Changing engine images can alter database files.
+db_update_warning	MySQL maintenance is limited to the recorded 8.4 series. A backup and rehearsal run first; schedule downtime. Changing engine images can alter database files.
 db_update_confirm	Back up and apply the selected MySQL patch?
 config_confirm	Apply this configuration change? Services may briefly restart.
 config_restored	Previous configuration restored after validation failed. Inspect logs before trying again.
@@ -98,7 +98,7 @@ credentials_note	These are database credentials, not GLPI web account passwords.
 menu	\n  GLPI Docker Manager\n  1) Status                 2) Start                3) Stop\n  4) Logs                   5) Check updates        6) Update GLPI\n  7) Backup                 8) Restore              9) HTTPS\n 10) MySQL exposure        11) Credentials         12) Transfer\n 13) Major migration       14) MySQL patch         15) Language\n 16) Diagnose              17) Refresh GLPI image   18) Recovery\n  0) Exit\n
 stop_confirm	Stop GLPI and MySQL?
 diagnose_note	Diagnostics do not print passwords. Raw Docker/GLPI logs may contain sensitive application data; review before sharing.
-recover_prompt	An operation was interrupted. Inspect operation.json and logs. Restore a known-good backup, or type RESUME only after validating the current image/schema to retry readiness checks. Automatic database rollback is not attempted.
+recover_prompt	An operation was interrupted. Inspect operation.json and logs. Restore a known-good backup, or type RESUME to re-check the current image/schema and retry verification. Automatic database rollback is not attempted.
 recover_done	Current services and schema verified; the operation journal was closed.
 unknown_command	Unknown command: %s. Run ./start.sh help.
 update_boundary	Choose a later version in the current branch or the immediately following major. Downgrades and skipped majors are not supported.
@@ -128,8 +128,8 @@ ui_start	Service · Start
 ui_logs	Service · View logs
 ui_db_update	Updates · Update MySQL patches
 ui_language	Configuration · Language
-ui_diagnose	Help · Diagnose the installation
-ui_recover	Help · Recover an interrupted operation
+ui_diagnose	Manager · Diagnose the installation
+ui_recover	Manager · Recover an interrupted operation
 ui_mode_test	Testing
 ui_mode_production	Production
 ui_tls_off	HTTP only
@@ -145,7 +145,7 @@ ui_db_private	Internal access only
 ui_secrets_hidden	Passwords are protected and are not shown here.
 ui_install_success	✓ GLPI installed and verified
 ui_initial_account	First sign-in: user glpi · password glpi
-ui_next_steps	Change the default GLPI web passwords. Run the manager again to administer this installation.
+ui_next_steps	Change the default passwords of GLPI's web accounts (glpi, tech, normal and post-only).
 ui_step_volumes	Preparing persistent storage
 ui_step_images	Downloading the official images
 ui_step_plugins	Preparing application directories
@@ -164,16 +164,16 @@ ui_bad_hostname	Enter a domain or IPv4 address, without http://, paths or ports.
 ui_plain_keys	Type an option number and press Enter.
 ui_invalid_choice	Choose one of the displayed option numbers.
 ui_release_prompt	Official release notes are available. How would you like to continue?
-ui_release_continue	Continue setup
+ui_release_continue	Continue
 ui_release_details	Read the complete release notes
-ui_continue_setup	Press Enter to continue setup…
+ui_continue_setup	Press Enter to continue…
 ui_app_password	GLPI_DB_PASSWORD · GLPI database password
 ui_root_password	MYSQL_ROOT_PASSWORD · MySQL administrator password
 ui_password_keys	Tab: show / hide · Enter: continue · Ctrl+U: clear
 ui_password_visible	Visible
 ui_password_hidden	Hidden
 ui_password_saved	Password accepted
-ui_default_value	Default: %s · Enter to keep it
+ui_default_value	Current: %s · Enter to keep it
 ui_defaults_title	Standard settings
 ui_settings_prompt	Keep these settings or customize them?
 ui_settings_defaults	Keep defaults · choose only my passwords
@@ -182,12 +182,12 @@ ui_continue_install	Continue installing GLPI
 ui_back_menu	Return to the main menu
 resource_reference	Sizing reference: 4 GiB RAM and 10 GiB free disk. Actual needs depend on usage; the same GLPI is installed in every case.
 docker_storage_space	Filesystem %s: %s MiB free; this operation estimates %s MiB including 512 MiB of headroom.
-docker_storage_unavailable	Cannot inspect the engine storage path %s from this environment. Verify free disk and inodes on the engine host before deploying.
+docker_storage_unavailable	Cannot inspect the engine storage path %s from this environment. Verify free disk and inodes on the engine host before continuing.
 storage_insufficient	Insufficient free space at %s: this operation estimates %s MiB, but %s MiB is available. Free or add capacity before retrying.
 storage_inodes	Too few free inodes at %s. Inspect the filesystem before continuing; existing Docker data was preserved.
 storage_temporary	Docker storage %s is on a temporary/read-only filesystem. Install Linux on a persistent disk before deploying GLPI.
-host_io_error	A host Input/output error was detected. The system could not read or write files; the installation has been stopped.
-host_readonly	The host reported a read-only filesystem. The installation has been stopped.
+host_io_error	A host Input/output error was detected. The system could not read or write files; the operation has been stopped.
+host_readonly	The host reported a read-only filesystem. The operation has been stopped.
 host_no_space	The host reported no space left on the device. Check capacity and free inodes on the Docker/containerd filesystems.
 host_storage_steps	Inspect the step log and storage from the host/hypervisor. When system tools work, check df -h, df -i and kernel logs. If even ls/sudo fail, use the hypervisor or a rescue environment. Resume only after storage is healthy.
 cleanup_deferred	Some private temporary files may remain under %s because cleanup could not complete. Inspect them after restoring storage access.
@@ -222,7 +222,7 @@ setup_return_edit	← Return to settings
 setup_version_back	← Change GLPI version
 setup_cancel	Cancel installation
 setup_cancel_confirm	Leave setup without installing?
-setup_form_help	↑ ↓ choose a field; Enter edits it and returns here. Password values stay out of the summary. Scroll to see every field.
+setup_form_help	↑ ↓ choose a field; Enter edits it and returns here. Passwords stay out of the summary. Scroll to see every field.
 setup_keys	↑ ↓ move · Enter select · Esc back
 setup_search_keys	Type to search · ↑ ↓ move · Enter select · Esc back
 setup_edit_keys	Enter save · Esc discard changes · Ctrl+U clear
@@ -237,7 +237,7 @@ setup_plain_choice	Option number, text search, Enter to select, or b to go back:
 setup_network_hint	Detected address: %s. If it is localhost, enter the server IP for network access. You may also enter a domain.
 setup_port_conflict	HTTP and HTTPS need different ports; external MySQL uses 3306.
 setup_public_domain	Let's Encrypt needs a public domain, not an IP, localhost or a .local name.
-setup_tls_help	Let's Encrypt uses a public domain and ports 80/443. Self-signed certificates are generated automatically. Import custom PEM files under your configured certificates directory.
+setup_tls_help	Let's Encrypt uses a public domain and ports 80/443. With a local CA, certificates are generated automatically. Import custom PEM files under your configured certificates directory.
 setup_access	Access: %s
 setup_review_hint	Review before installing. Choose any value to return to its settings; nothing has been deployed yet.
 setup_review_keys	Enter installs only on Install now. Choose Return to settings or press Esc to correct values.
@@ -265,19 +265,19 @@ menu_versions	Check available versions
 menu_backup	Create backup
 menu_restore	Restore a backup
 menu_address	Access IP / ports / time zone
-menu_https	HTTPS and certificates
+menu_https	Change HTTPS mode
 menu_exposure	Expose / close MySQL port
 menu_credentials	View database credentials
 menu_transfer	Move to another server (stops GLPI)
 menu_database_update	Update MySQL patches
 menu_language	Change language
 menu_diagnose	Diagnose installation
-menu_refresh	Re-download the same GLPI version
+menu_refresh	Refresh the installed version's image
 menu_recover	Recover interrupted operation
 menu_backups	Manage backups
 setup_access_intro	Edit a field with Enter. Return to this screen after each change. Services restart only when you apply the reviewed configuration.
 setup_access_review_hint	Review the changes before restarting the services.
-setup_access_review_keys	Enter applies changes only on Apply changes. Choose Return to configuration or press Esc to correct a field.
+setup_access_review_keys	Enter applies changes only on Apply changes. Choose Return to settings or press Esc to correct a field.
 update_step_apply	Applying the update and verifying GLPI
 settings_step_apply	Applying configuration and verifying web access
 service_step_stop	Stopping the services
@@ -293,15 +293,15 @@ update_latest	Installed GLPI: %s; latest stable in the same branch: %s.
 update_images_unavailable	Later releases exist, but no compatible image could be verified. Check registry access and your architecture before retrying.
 update_no_patches	No later installable patches remain in this branch. You may choose an explicit migration to the next branch below.
 backup_choose_other	Choose an archive from another path
-backup_choose_help	Select a backup, including those created before updates. Its contents will be verified before asking for RESTORE; current volumes are retained.
+backup_choose_help	Select a backup, including those created before updates. Its contents are verified before asking for RESTORE; you will then see what happens to the current installation.
 backup_recovery_ready	✓ Recovery backup is available
 backup_recovery_help	To return to this backup, open Restore a backup in the main menu and choose this archive. Restore uses fresh volumes and the recorded GLPI/MySQL versions.
 update_step_backup	Creating a recovery backup
 update_step_rehearsal	Rehearsing the update on an isolated restored copy
 update_loading	Checking available official update images
 update_select_title	Available GLPI updates
-update_select_help	Choose any later installed-image version. You can update one release at a time. A new branch requires an isolated rehearsal and explicit confirmation.
-update_select_prompt	Which version would you like to install?
+update_select_help	Choose any later version with an available image. You can update one release at a time. A new branch requires an isolated rehearsal and explicit confirmation.
+update_select_prompt	Which version do you want to update to?
 setup_access_title	Web access settings
 layout_code_conflict	Cannot replace an existing unmanaged path: %s. Move it aside or select a different installation root.
 layout_checkout_in_root	Keep the downloaded Git checkout outside %s, or place it in its manager/ subdirectory. The root is reserved for private runtime data; setup installs the operational code there automatically.
@@ -405,7 +405,7 @@ desc_quit	Close the manager; GLPI keeps running.
 desc_backup	A verified manual backup, or the final backup to move to another server.
 desc_backups	Browse, verify, export, restore or delete backups.
 desc_restore	Go back to a backup. The current installation is backed up first and removed afterwards, so nothing piles up.
-desc_schedule	Daily automatic backups (5 kept), log rotation and certificate renewal.
+desc_schedule	Scheduled automatic backups (5 kept), log rotation and certificate renewal.
 desc_address	Server address, web ports and time zone.
 desc_certificates	HTTPS mode, certificate expiry, renewal and reload.
 desc_db-exposure	Publish MySQL on port 3306 or keep it internal.
@@ -417,14 +417,14 @@ dash_age_minutes	%s min ago
 dash_tls_off	HTTPS: off
 dash_tls	HTTPS: %s
 dash_tls_days	HTTPS: %s (%s d left)
-ui_tls_short_self-signed	self-signed
+ui_tls_short_self-signed	local CA
 ui_tls_short_acme	Let's Encrypt
 ui_tls_short_custom	own certificate
 dash_db_public	MySQL: exposed :3306
 dash_db_private	MySQL: internal
 dash_backup	Backup: %s (%s)
 dash_backup_none	No backups yet
-dash_auto_on	Auto backup: %s
+dash_auto_on	Auto backups: %s
 dash_auto_off	Auto backups off
 dash_maintenance_missing	Maintenance not scheduled
 backup_origin_auto	Automatic
@@ -468,7 +468,7 @@ cert_restart_proxy	Restart the HTTPS proxy to retry the renewal
 cert_step_apply	Applying the certificate
 cert_step_restart	Restarting the HTTPS proxy
 cert_applied	✓ Certificate applied
-cert_expiring	The HTTPS certificate expires in %s days. Open Certificates to renew it.
+cert_expiring	The HTTPS certificate expires in %s days.
 cert_auto_renewing	The server certificate expires in %s days; renewing it with the local CA (clients are not affected).
 cert_custom_expiring	The imported certificate expires in %s days; replace the PEM files and reload them.
 cert_acme_expiring	The Let's Encrypt certificate expires in %s days; restarting the proxy to retry. Check that ports 80/443 are reachable.
@@ -493,7 +493,7 @@ self_update_help	Only the manager code is replaced. GLPI, its data and backups a
 self_update_confirm	Download and install this manager version?
 self_update_downloading	Downloading the manager
 self_update_invalid	The downloaded manager is incomplete or invalid; nothing was changed.
-self_update_git	This manager runs from a Git checkout (%s). Update it with: git pull
+self_update_git	This manager runs from a Git checkout (%s), but git is not installed. Install it and run git pull.
 self_update_restart	Restarting with the new manager version…
 setup_timezone_server	Server time zone: %s
 setup_field_values	Current: %s · Default: %s
@@ -527,7 +527,7 @@ opt_tls_self_signed	Encrypted at once. Install the local CA (gdm-ca.pem) once in
 opt_tls_acme	Public domain pointing here with ports 80/443 open: trusted certificate, renewed automatically.
 opt_tls_custom	Use PEM files from your own or corporate certificate authority.
 opt_release_notes	Read the official release notes before continuing.
-opt_maint_enable	One backup per day at the chosen time; the %s newest automatic backups are kept.
+opt_maint_enable	Backups at the chosen frequency and time; the %s newest automatic backups are kept.
 opt_maint_disable	No more automatic backups; existing ones are kept. Log rotation continues.
 opt_maint_run	Rotate logs, check certificates and, if enabled, back up right now.
 opt_cert_renew	New server certificate signed by the same CA; GLPI Agents and browsers keep working.
@@ -535,8 +535,8 @@ opt_cert_reload	Validates the replaced PEM files and restarts the services for a
 opt_cert_restart	Caddy retries the Let's Encrypt renewal on start; GLPI is unreachable for a few seconds.
 opt_uninstall_keep	Deletes containers, volumes and GLPI data. Backups and certificates remain for a later restore.
 opt_uninstall_all	Deletes everything, backups included. This cannot be undone.
-restore_plan_safe	Your current installation will be backed up first ([P] backup) and removed once the restored one is verified, so no copies pile up. To go forward again, restore that backup.
-restore_plan_keep	The current installation cannot be backed up (it is not running), so it is kept stopped as the only return point. Remove it later from Free disk space.
+restore_plan_safe	Your current installation will be backed up first ([P] backup) and removed once the restored one is verified, so installations do not pile up. To undo the restore, restore that backup.
+restore_plan_keep	The current installation cannot be backed up (it is stopped or has a pending operation), so it is kept stopped as the only return point. Remove it later from Free disk space.
 restore_step_backup	Backing up the current installation
 restore_step_cleanup	Removing the replaced installation
 restore_removed_previous	The replaced installation was removed; its data is in the backup %s.
@@ -593,7 +593,7 @@ backup_kind_transfer	Final backup to move to another server
 opt_backup_manual	GLPI stops for a few minutes and starts again. Kept until you delete it.
 opt_backup_transfer	GLPI stays STOPPED afterwards so no new data is written; restore the archive on the new server.
 cert_change_mode	Change HTTPS mode
-opt_cert_mode	HTTP only, self-signed, Let's Encrypt or your own certificate; services restart.
+opt_cert_mode	HTTP only, local CA, Let's Encrypt or your own certificate; services restart.
 dash_disk_low	Disk: %s GB free
 dash_maintenance_failed	Maintenance FAILED %s
 dash_maintenance_warning	Maintenance warnings %s
@@ -700,7 +700,7 @@ logs_saved	✓ Log rotation saved
 restore_file	File
 restore_folder	Folder
 restore_section_plan	What will happen
-ui_field_keys	Enter accept · Esc back · ←/→ edit · Ctrl+U clear
+ui_field_keys	Enter accept · Esc back · ←/→ move cursor · Ctrl+U clear
 ui_typed_keys	Type the word exactly and press Enter · Esc cancels
 ca_created	Local certificate authority created (valid 20 years): %s. Give this file (gdm-ca.pem) to GLPI Agents and browsers once.
 cert_new_ca	Create a NEW local CA
@@ -724,4 +724,30 @@ proxy_update_none	Caddy %s is already the latest image.
 proxy_update_tls_off	HTTPS is off: no proxy is in use.
 proxy_updated	Caddy %s applied
 dash_updates	Updates: %s
-dash_image_refresh	%s (renewed image)
+dash_image_refresh	%s (refreshed image)
+setup_current	current
+setup_changed	changed
+setup_no_changes	No value has changed: there is nothing to apply.
+setup_access_continue	Continue · Review changes
+setup_access_cancel	Leave without applying changes
+setup_access_cancel_confirm	Leave without applying the changes? The current configuration stays as it is.
+setup_access_form_help	↑ ↓ choose a field; Enter edits it and brings you back here. Nothing changes until you confirm in the review.
+setup_access_summary	Review the changes
+check_updates_title	Available GLPI versions
+choose_version_update	Which GLPI version do you want to update to?
+update_no_patches_left	No later patches remain in this branch.
+mysql_lookup_status	Looking up the latest official MySQL 8.4 image…
+caddy_lookup_status	Looking up the latest official Caddy 2 image…
+db_update_none	MySQL %s is already the latest 8.4 patch.
+settings_applied	✓ Changes applied and access verified
+logs_note	Logs may contain sensitive application data; review them before sharing.
+backup_step_create	Creating the backup
+cert_expiring_menu	The HTTPS certificate expires in %s days. Check it in HTTPS and certificates.
+ui_pending_operation_body	A previous operation did not finish. Recover it, restore a backup or review the logs.
+ui_back_previous	Back
+opt_binlog_low	Low disk use. Backups are full copies, so restoring loses nothing.
+cert_proxy_restarted	✓ HTTPS proxy restarted
+restore_plan_fresh	No active installation: the backup is restored as a new installation.
+confirm_edit_keys	Enter confirm · Esc cancel · Ctrl+U clear
+backup_path_hint	Type the absolute path of the .tar.gz file.
+backup_path_invalid	That file does not exist or the path is not absolute.
