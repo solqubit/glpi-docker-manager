@@ -16,14 +16,14 @@ destructive	Confirmación necesaria. Escribe exactamente %s para continuar:
 cancelled	Cancelado.
 dependencies	Faltan dependencias:%s
 install_dependencies	¿Instalar las dependencias indicadas con el gestor de paquetes detectado?
-manual_dependencies	Instala curl, jq, openssl, tar, gzip, coreutils, util-linux e iproute2 manualmente y vuelve a ejecutar.
-docker_service_stopped	El motor local de Docker no responde. Se iniciará su servicio existente y se volverá a comprobar; sudo puede pedir tu contraseña.
-docker_retry_confirm	Después de revisar las instrucciones, ¿reintentar y continuar este asistente?
-docker_start_failed	Docker no pudo iniciarse o sigue sin estar disponible. Con systemd, revisa: sudo systemctl status docker --no-pager ; sudo journalctl -u docker -n 50 --no-pager . Con service, revisa: sudo service docker status . Resuelve el problema del motor/socket indicado y vuelve a ejecutar el gestor.
+manual_dependencies	Instala curl, jq, openssl, tar, gzip, coreutils, util-linux, iproute2, python3 y gawk manualmente y vuelve a ejecutar.
+docker_service_stopped	El motor local de Docker no responde. Se iniciará su servicio existente y se volverá a comprobar.
+docker_retry_confirm	¿Reintentar ahora?
+docker_start_failed	Docker no pudo iniciarse o sigue sin estar disponible. Con systemd, revisa: sudo systemctl status docker --no-pager ; sudo journalctl -u docker -n 50 --no-pager . Con service, revisa: sudo service docker status . Resuelve el problema del motor/socket indicado y elige Sí para reintentar.
 docker_context_help	El endpoint actual es %s. Para Docker rootless, prueba: systemctl --user start docker ; docker info . Para Docker Desktop, inicia Desktop y verifica su integración/contexto Linux. El gestor no puede iniciar el servicio predeterminado del anfitrión para un socket personalizado. Consulta https://docs.docker.com/engine/security/rootless/
 docker_plugins_missing	Docker funciona, pero falta Compose V2 o Buildx. El gestor puede instalar los paquetes de plugins disponibles en tus repositorios configurados.
 docker_plugins_confirm	¿Instalar los plugins Docker que faltan mediante el gestor de paquetes detectado?
-docker_plugins_manual	No se encontraron paquetes de plugins compatibles en los repositorios configurados. Sigue https://docs.docker.com/compose/install/linux/ y https://docs.docker.com/build/install/buildx/ ; comprueba docker compose version y docker buildx version y vuelve a ejecutar.
+docker_plugins_manual	No se encontraron paquetes de plugins compatibles en los repositorios configurados. Sigue https://docs.docker.com/compose/install/linux/ y https://docs.docker.com/build/install/buildx/ ; comprueba docker compose version y docker buildx version y elige Sí para reintentar.
 plugin_packages	Paquetes de plugins: %s
 manual_docker	La instalación automática de Docker no está documentada para esta distribución. Instala Docker Engine, Buildx y Compose siguiendo las instrucciones de tu distribución: https://docs.docker.com/engine/install/ . Después vuelve a ejecutar; se permiten distribuciones fuera de la lista.
 docker_plan	Se instalarán Docker Engine, Buildx y Compose para %s. Procedimiento: %s . No se eliminarán paquetes existentes que entren en conflicto.
@@ -52,16 +52,16 @@ image_missing	No se pudo verificar una imagen oficial compatible para %s. Revisa
 not_installed	No existe una instalación administrada en este directorio. Usa install o restore.
 foreign_resource	El recurso %s no pertenece a esta instalación. Se rechaza su uso.
 unhealthy	El servicio %s no alcanzó un estado saludable. Revisa registros y el diario de recuperación.
-services_required	GLPI y MySQL deben estar ejecutándose para esta operación.
+services_required	GLPI y MySQL deben estar en ejecución para esta operación. Usa Iniciar / verificar GLPI y vuelve a intentarlo.
 cert_instructions	Coloca el certificado PEM seguido de los certificados intermedios en %s y su clave privada PEM correspondiente, sin contraseña, en %s. El directorio es privado; no guardes claves en Git. Después vuelve a configurar HTTPS. Convierte primero los PFX/PKCS12; consulta docs/https.md.
 acme_ports	Let's Encrypt requiere los puertos 80 y 443 del servidor. Para otros puertos utiliza certificados importados.
 acme_requirements	Para %s: apunta los registros DNS públicos A/AAAA a este servidor; permite TCP 80/443 entrante y HTTPS saliente; elimina registros AAAA incorrectos. Caddy gestiona la emisión y renovación.
 self_signed	Certificado del servidor emitido por la CA local: %s. Los agentes GLPI y navegadores que confían en la CA lo aceptan sin cambios.
 tls_prompt	¿Cómo quieres proteger el acceso a GLPI?
-hostname_prompt	Dominio público o dirección IPv4 (sin protocolo, ruta ni puerto):
+hostname_prompt	Dominio o dirección IPv4 del servidor (sin protocolo, ruta ni puerto):
 language_prompt	Idioma / Language
 first_action	¿Qué quieres hacer?
-major_prompt	Selecciona la rama de GLPI:
+major_prompt	¿Qué rama de GLPI quieres usar?
 mode_prompt	¿Para qué utilizarás esta instalación?
 port_prompt	Puerto HTTP del servidor:
 db_name_prompt	Nombre de la base de datos:
@@ -72,7 +72,7 @@ ready	Abre GLPI en tu navegador: %s
 port_busy	Un puerto necesario del servidor ya está ocupado: %s
 install_exists	Ya existe una instalación. Se conservaron configuración y credenciales.
 install_resume	La configuración existe pero la instalación no terminó. ¿Reanudarla sin regenerar credenciales?
-backup_started	Se detendrán GLPI y sus tareas automáticas para un respaldo consistente. El acceso estará interrumpido durante esta operación.
+backup_started	GLPI y sus tareas automáticas se detienen mientras se crea el respaldo para que sea consistente.
 backup_ready	Respaldo terminado y sumas verificadas: %s . Contiene secretos; guarda una copia privada fuera del servidor.
 backup_invalid	El respaldo no pasó la validación. No se intentó restaurarlo.
 backup_list	Respaldos disponibles:
@@ -85,24 +85,24 @@ backup_space	No hay espacio suficiente para respaldar y verificar. Libera espaci
 update_current	GLPI instalado: %s → versión seleccionada: %s.
 update_none	No existe una versión estable posterior en esta rama.
 update_confirm	¿Crear un respaldo nuevo y actualizar GLPI a la versión seleccionada?
-migration_warning	Una migración principal exige revisar plugins, inventario, integraciones API y notas de versión. GLPI 12 cambia permisos de la base de conocimiento y manejo del proxy. El ensayo usa volúmenes aislados, sin puertos publicados ni red exterior; las tareas automáticas están desactivadas. Aún es necesaria una revisión funcional.
+migration_warning	Un cambio de rama exige revisar plugins, inventario, integraciones API y notas de versión. El ensayo usa volúmenes aislados, sin puertos publicados ni red exterior, y con las tareas automáticas desactivadas. Aún es necesaria una revisión funcional.
 migration_review	¿Revisaste la compatibilidad de plugins y los requisitos de migración de la versión destino?
 rehearsal_ok	La migración de base de datos y comprobación del esquema en la copia aislada fueron correctas. Esto no certifica plugins ni integraciones.
 updated	Actualización verificada. GLPI actual: %s.
-db_update_warning	El mantenimiento MySQL se limita a la serie 8.4 registrada. Se respalda y se ensaya antes de aplicarlo; programa una interrupción. Cambiar la imagen del motor puede modificar sus archivos de datos.
-db_update_confirm	¿Respaldar y aplicar el parche MySQL seleccionado?
+db_update_warning	Solo se aplican parches de MySQL 8.4. Antes se crea un respaldo y se ensaya en una copia aislada; GLPI no estará disponible unos minutos.
+db_update_confirm	¿Respaldar y aplicar este parche de MySQL?
 config_confirm	¿Aplicar este cambio de configuración? Los servicios pueden reiniciarse brevemente.
 config_restored	Se restauró la configuración anterior al fallar la validación. Revisa registros antes de reintentar.
-credentials_warning	Las credenciales de base están ocultas. ¿Mostrarlas en esta terminal?
+credentials_warning	Las credenciales de la base de datos están ocultas. ¿Mostrarlas en esta terminal?
 credentials_note	Son credenciales de base de datos, distintas de las cuentas web GLPI. Editar .env no cambia las contraseñas existentes en MySQL.
 menu	\n  GLPI Docker Manager\n  1) Estado                 2) Iniciar              3) Detener\n  4) Registros              5) Buscar versiones     6) Actualizar GLPI\n  7) Respaldo               8) Restaurar            9) HTTPS\n 10) Publicación MySQL     11) Credenciales         12) Traslado\n 13) Migración principal   14) Parche MySQL         15) Idioma\n 16) Diagnóstico           17) Renovar imagen GLPI  18) Recuperación\n  0) Salir\n
-stop_confirm	¿Detener GLPI y MySQL?
+stop_confirm	¿Detener GLPI, MySQL y el proxy HTTPS?
 diagnose_note	El diagnóstico no muestra contraseñas. Los registros originales de Docker/GLPI pueden contener datos sensibles; revísalos antes de compartirlos.
-recover_prompt	Se interrumpió una operación. Revisa operation.json y los registros. Restaura un respaldo válido o escribe RESUME para comprobar la imagen/esquema actuales y reintentar la verificación. No se intentará revertir automáticamente la base de datos.
+recover_prompt	Se comprobarán la imagen y el esquema actuales y se cerrará la operación pendiente; la base de datos no se revierte. Si prefieres volver a un respaldo, pulsa Esc y elige Restaurar un respaldo.
 recover_done	Se verificaron servicios y esquema actuales y se cerró el diario de operación.
 unknown_command	Comando desconocido: %s. Ejecuta ./start.sh help.
 update_boundary	Elige una versión posterior de la misma rama o la siguiente rama principal. No se permite retroceder ni saltar ramas principales.
-same_image	El digest de la imagen no ha cambiado.
+same_image	La imagen de esta versión no ha cambiado; no hay nada que renovar.
 language_saved	Idioma guardado.
 ui_keys	↑ ↓ mover · Enter elegir · Esc cancelar
 ui_keys_short	↑ ↓ · Enter · Esc
@@ -110,7 +110,7 @@ ui_yes	Sí
 ui_no	No
 ui_subtitle	Instala y administra GLPI, paso a paso.
 ui_checking	Comprobando el sistema y Docker…
-ui_prerequisites_done	✓ El sistema y Docker están listos. Puedes continuar.
+ui_prerequisites_done	✓ El sistema y Docker están listos.
 ui_first_title	Comencemos
 ui_first_body	Todavía no hay un GLPI instalado por este gestor. Elige una opción; el asistente te guiará durante la configuración.
 ui_install	Instalar GLPI
@@ -118,18 +118,18 @@ ui_restore_backup	Restaurar un respaldo
 ui_exit	Salir
 ui_menu_prompt	Selecciona una acción:
 ui_pending_title	Una operación necesita atención
-ui_pending_body	La instalación aún no está lista. Retoma la configuración o revisa sus registros antes de continuar.
+ui_pending_body	La instalación aún no está lista. Elige Continuar la instalación o revisa los registros.
 ui_resume_install	Continuar la instalación
 ui_status_running	En ejecución
 ui_status_stopped	Detenido
 ui_status_unknown	Estado no disponible
 ui_status	Servicio · Ver estado
 ui_start	Servicio · Iniciar
-ui_logs	Servicio · Ver registros
+ui_logs	Ver registros de servicios
 ui_db_update	Actualizaciones · Actualizar parches MySQL
 ui_language	Configuración · Idioma
-ui_diagnose	Gestor · Diagnosticar la instalación
-ui_recover	Gestor · Recuperar una operación interrumpida
+ui_diagnose	Diagnosticar la instalación
+ui_recover	Recuperar una operación interrumpida
 ui_mode_test	Pruebas
 ui_mode_production	Producción
 ui_tls_off	Solo HTTP
@@ -167,8 +167,8 @@ ui_release_prompt	Las notas oficiales están disponibles. ¿Cómo quieres contin
 ui_release_continue	Continuar
 ui_release_details	Leer las notas completas de la versión
 ui_continue_setup	Pulsa Enter para continuar…
-ui_app_password	GLPI_DB_PASSWORD · Contraseña de la base de GLPI
-ui_root_password	MYSQL_ROOT_PASSWORD · Contraseña del administrador MySQL
+ui_app_password	Contraseña de la base de GLPI · GLPI_DB_PASSWORD
+ui_root_password	Contraseña del administrador MySQL · MYSQL_ROOT_PASSWORD
 ui_password_keys	Tab: mostrar / ocultar · Enter: continuar · Ctrl+U: borrar
 ui_password_visible	Visible
 ui_password_hidden	Oculta
@@ -200,12 +200,12 @@ ui_letsencrypt_title	Certificado público de Let's Encrypt
 ui_letsencrypt_body	Para una VPS o servidor accesible públicamente con dominio propio: Caddy solicitará y renovará automáticamente el certificado de Let's Encrypt.
 ui_letsencrypt_ports	Apunta el dominio a este servidor y permite TCP 80/443 entrante. Se usarán esos puertos para HTTP/HTTPS. Escribe el dominio a continuación.
 setup_title	Configuración de la instalación
-setup_intro	Edita cualquier fila con Enter. Los valores por defecto están listos; debes confirmar ambas contraseñas. MySQL interno: db:3306.
+setup_intro	Edita cualquier fila con Enter. Los valores por defecto ya son válidos; solo faltan las dos contraseñas (escríbelas o genéralas).
 setup_host	Dirección de acceso / IP
 setup_http	Puerto HTTP
 setup_https	Puerto HTTPS
 setup_timezone	Zona horaria
-setup_tls	Certificado HTTPS
+setup_tls	HTTPS
 setup_exposure	Acceso externo a MySQL
 setup_database	Nombre de la base
 setup_user	Usuario de la base
@@ -213,12 +213,12 @@ setup_pending	pendiente
 setup_invalid	por corregir
 setup_default	por defecto
 setup_valid	validado
-setup_secret_set	Introducida y confirmada
-setup_secret_empty	Enter para escribir o generar
+setup_secret_set	Definida
+setup_secret_empty	Escribir / generar
 setup_password_required	Escribe una contraseña o genérala con Enter.
 setup_continue	Continuar · Revisar instalación
 setup_deploy	Instalar ahora
-setup_return_edit	← Volver a la configuración
+setup_return_edit	Volver a la configuración
 setup_version_back	← Cambiar versión de GLPI
 setup_cancel	Cancelar instalación
 setup_cancel_confirm	¿Salir de la configuración sin instalar?
@@ -237,10 +237,10 @@ setup_plain_choice	Número, texto para buscar, Enter para elegir o b para volver
 setup_network_hint	Dirección detectada: %s. Si es localhost, escribe la IP del servidor para acceder desde la red. También puedes escribir un dominio.
 setup_port_conflict	HTTP y HTTPS deben usar puertos distintos; el MySQL externo utiliza 3306.
 setup_public_domain	Let's Encrypt necesita un dominio público, no una IP, localhost ni un nombre .local.
-setup_tls_help	Let's Encrypt usa un dominio público y los puertos 80/443. Con CA local los certificados se generan automáticamente. Importa tus PEM en el directorio de certificados configurado.
+setup_tls_help	Let's Encrypt usa un dominio público y los puertos 80/443. Con CA local los certificados se generan automáticamente. Con certificados propios, copia fullchain.pem y privkey.pem en %s.
 setup_access	Acceso: %s
 setup_review_hint	Revisa antes de instalar. Elige cualquier dato para volver a su configuración; todavía no se ha desplegado nada.
-setup_review_keys	Enter instala solo sobre Instalar ahora. Elige Volver a la configuración o pulsa Esc para corregir datos.
+setup_review_keys	Enter sobre «Instalar ahora» inicia la instalación; sobre un dato, vuelve a editarlo. Esc vuelve a la configuración.
 setup_loading_images	Resolviendo las imágenes oficiales de MySQL y del proxy antes de abrir la configuración…
 ui_service_ready	✓ GLPI está iniciado y verificado
 ui_service_starting	Iniciando y comprobando tu instalación de GLPI
@@ -264,7 +264,7 @@ menu_update	Actualizar GLPI / cambiar rama
 menu_versions	Consultar versiones disponibles
 menu_backup	Crear respaldo
 menu_restore	Restaurar un respaldo
-menu_address	IP / puertos / zona horaria
+menu_address	Dirección, puertos y zona horaria
 menu_https	Cambiar el modo HTTPS
 menu_exposure	Exponer / cerrar puerto MySQL
 menu_credentials	Ver credenciales de la base
@@ -273,7 +273,7 @@ menu_database_update	Actualizar parches MySQL
 menu_language	Cambiar idioma
 menu_diagnose	Diagnosticar instalación
 menu_refresh	Renovar la imagen de la versión instalada
-menu_recover	Recuperar operación pendiente
+menu_recover	Recuperar una operación interrumpida
 menu_backups	Administrar respaldos
 setup_access_intro	Edita un campo con Enter y regresa aquí tras cada cambio. Los servicios se reinician solo al aplicar la configuración revisada.
 setup_access_review_hint	Revisa los cambios antes de reiniciar los servicios.
@@ -286,21 +286,21 @@ backup_step_restore	Restaurando el respaldo en volúmenes nuevos y verificando G
 backup_selected	Respaldo seleccionado · revisa antes de restaurar
 backup_none	Todavía no hay respaldos guardados aquí.
 ui_health_ok	Verificada
-menu_all_options	Todas las acciones · ← → cambia columna · ↑ ↓ mueve · Enter elige
+menu_all_options	← → columna · ↑ ↓ mover · Enter elegir · Esc salir
 menu_state_path	Configuración: %s/current
 menu_backups_path	Respaldos: %s
 update_latest	GLPI instalado: %s; última versión estable de la misma rama: %s.
 update_images_unavailable	Hay versiones posteriores, pero no se pudo verificar ninguna imagen compatible. Revisa el acceso al registro y la arquitectura antes de reintentar.
 update_no_patches	No quedan parches posteriores instalables en esta rama. Puedes elegir una migración explícita a la siguiente rama en la lista.
 backup_choose_other	Elegir un archivo desde otra ruta
-backup_choose_help	Selecciona un respaldo, incluidos los creados antes de actualizar. Se verificará su contenido antes de pedir RESTORE; después verás qué pasa con la instalación actual.
-backup_recovery_ready	✓ Respaldo de recuperación disponible
+backup_choose_help	Selecciona un respaldo. Se comprobará su contenido y verás qué va a pasar antes de escribir RESTORE.
+backup_recovery_ready	✓ Respaldo previo [P] creado
 backup_recovery_help	Para regresar a este respaldo, abre Restaurar un respaldo en el menú y elige este archivo. Se usarán volúmenes nuevos y las versiones GLPI/MySQL registradas.
-update_step_backup	Creando un respaldo de recuperación
+update_step_backup	Creando el respaldo previo [P]
 update_step_rehearsal	Ensayando la actualización en una copia restaurada y aislada
 update_loading	Comprobando las imágenes oficiales disponibles para actualizar
 update_select_title	Actualizaciones de GLPI disponibles
-update_select_help	Elige cualquier versión posterior con imagen disponible. Puedes actualizar una por una. Una rama nueva requiere ensayo aislado y confirmación explícita.
+update_select_help	Elige cualquier versión posterior con imagen disponible; no hace falta pasar por las intermedias. Cada actualización se respalda y se ensaya antes; una rama nueva pide además confirmación escrita.
 update_select_prompt	¿A qué versión quieres actualizar?
 setup_access_title	Configuración del acceso web
 layout_code_conflict	No se puede reemplazar una ruta existente ajena al gestor: %s. Aparta esa carpeta o elige otra raíz de instalación.
@@ -313,7 +313,7 @@ backup_manual_done	✓ Respaldo manual creado y verificado
 backup_transfer_done	✓ Respaldo de traslado creado y verificado
 backup_manual_help	Abre Administrar respaldos para ver detalles, verificar, exportar, restaurar o eliminar este archivo.
 backups_overview	Administrar respaldos · %s archivos · %s MiB
-backups_help	Elige un archivo para ver sus detalles y administrar el respaldo. Los archivos se conservan hasta que elimines uno explícitamente.
+backups_help	Elige un archivo para ver sus detalles y acciones. Los manuales [M] se conservan hasta que los elimines; se guardan los 3 previos [P] y los 5 automáticos [A] más recientes.
 backups_details	Detalles y acciones del respaldo
 backups_detail_help	Elige Verificar, Restaurar, Exportar o Eliminar. Esc regresa a la lista de archivos.
 backups_origin	Origen: %s
@@ -323,7 +323,7 @@ backups_target	Versión de destino de la operación que lo creó: %s
 backups_verified	✓ Contenido y sumas de comprobación verificados: %s
 backups_invalid	La verificación falló o el archivo está dañado. Vuelve a verificarlo antes de restaurar.
 backups_unverified	Pendiente de verificar este archivo.
-backups_recovery_point	Punto de recuperación registrado por el gestor.
+backups_recovery_point	Punto de recuperación: respaldo asociado a la última actualización o restauración.
 backups_verify	Verificar integridad · sin restaurar
 backups_restore	Restaurar este respaldo
 backups_export	Exportar una copia verificada
@@ -394,7 +394,7 @@ help_group_manager	Gestor
 help_cmd_maintenance	Ejecutar ahora el mantenimiento diario
 desc_status	Servicios, salud, versiones y puertos publicados.
 desc_start	Inicia GLPI si está detenido y verifica base, esquema y acceso web.
-desc_stop	Detiene GLPI y MySQL; los datos se conservan.
+desc_stop	Detiene GLPI, MySQL y el proxy HTTPS; los datos se conservan.
 desc_logs	Registros recientes de los contenedores, con desplazamiento.
 desc_update	Parches nuevos, la siguiente rama o una imagen renovada de la misma versión; antes se respalda y se ensaya.
 desc_db-update	Aplica el último parche de MySQL 8.4 con respaldo y ensayo.
@@ -404,9 +404,9 @@ desc_uninstall	Elimina contenedores, volúmenes y datos de GLPI (pide UNINSTALL)
 desc_quit	Cierra el gestor; GLPI sigue funcionando.
 desc_backup	Un respaldo manual verificado, o el respaldo final para trasladar a otro servidor.
 desc_backups	Explora, verifica, exporta, restaura o elimina respaldos.
-desc_restore	Vuelve a un respaldo. La instalación actual se respalda antes y se elimina después, así nada se acumula.
+desc_restore	Vuelve a un respaldo. Si la instalación actual está en marcha, se respalda antes y se elimina después.
 desc_schedule	Respaldos automáticos programados (se guardan 5), rotación de registros y renovación de certificados.
-desc_address	Dirección del servidor, puertos web y zona horaria.
+desc_address	Dirección, puertos web, zona horaria, modo HTTPS y acceso a MySQL, con revisión antes de aplicar.
 desc_certificates	Modo HTTPS, caducidad del certificado, renovación y recarga.
 desc_db-exposure	Publica MySQL en el puerto 3306 o lo mantiene interno.
 desc_credentials	Muestra las credenciales de la base tras confirmar.
@@ -428,7 +428,7 @@ dash_auto_on	Respaldos auto: %s
 dash_auto_off	Respaldos auto: no
 dash_maintenance_missing	Mantenimiento sin programar
 backup_origin_auto	Automático
-backups_counts	%s manuales [M] · %s previos a actualizar/restaurar [P] · %s automáticos [A].
+backups_counts	%s manuales [M] · %s previos [P] · %s automáticos [A].
 ui_db_current	Estado actual
 ui_db_unchanged	Sin cambios: el acceso a MySQL se mantiene igual.
 firewall_docker	Docker publica el puerto %s directamente en iptables y se salta las reglas de ufw/firewalld. Restringe el acceso en la cadena DOCKER-USER o en el firewall de tu red.
@@ -438,7 +438,7 @@ maint_on	Activados
 maint_off	Desactivados
 maint_scheduler	Programador
 maint_scheduler_missing	Sin instalar
-maint_prompt	¿Qué quieres cambiar?
+maint_prompt	¿Qué quieres hacer?
 maint_enable	Activar respaldos automáticos
 maint_disable	Desactivar respaldos automáticos
 maint_run_now	Ejecutar el mantenimiento ahora
@@ -448,7 +448,7 @@ maint_no_scheduler	No se pudo programar el mantenimiento automático (sin system
 maint_skipped	Mantenimiento omitido: la instalación no está lista o hay una operación pendiente.
 maint_services_stopped	Respaldo automático omitido: GLPI no está en ejecución.
 maint_done	Mantenimiento completado
-backups_prune_skipped	Se conserva un respaldo automático antiguo porque está protegido: %s
+backups_prune_skipped	Se conserva un respaldo antiguo porque está protegido o no se pudo eliminar: %s
 cert_title	Certificado HTTPS
 cert_mode	Modo
 cert_expiry	Caduca
@@ -459,7 +459,7 @@ cert_checking	Leyendo el certificado HTTPS
 cert_off	HTTPS está desactivado; no hay certificado que renovar.
 cert_prompt	¿Qué quieres hacer?
 cert_enable_https	Configurar HTTPS
-cert_help_self-signed	El certificado del servidor (825 días) está firmado por la CA local (20 años) y se renueva solo 30 días antes de caducar o al cambiar la dirección. Los equipos que confían en la CA no necesitan cambios.
+cert_help_self-signed	El certificado del servidor (825 días) está firmado por la CA local (20 años) y se renueva automáticamente 30 días antes de caducar o al cambiar la dirección. Los equipos que confían en la CA no necesitan cambios.
 cert_help_custom	El gestor no renueva certificados importados. Sustituye %s y %s por los archivos nuevos y elige Recargar.
 cert_help_acme	Caddy renueva automáticamente los certificados de Let's Encrypt unos 30 días antes de caducar. Mantén el dominio apuntando aquí y TCP 80/443 accesibles desde Internet.
 cert_renew_now	Renovar ahora el certificado del servidor (los servicios se reinician)
@@ -529,20 +529,20 @@ opt_tls_custom	Usa archivos PEM de tu propia autoridad certificadora o la de tu 
 opt_release_notes	Lee las notas oficiales de la versión antes de continuar.
 opt_maint_enable	Respaldos según la frecuencia y la hora elegidas; se guardan los %s automáticos más recientes.
 opt_maint_disable	Dejan de crearse respaldos automáticos; los existentes se conservan. La rotación de registros continúa.
-opt_maint_run	Rota registros, revisa certificados y, si están activados, respalda ahora mismo.
+opt_maint_run	Rota registros, revisa certificados, busca actualizaciones y, si están activados, respalda ahora mismo.
 opt_cert_renew	Certificado de servidor nuevo firmado por la misma CA; los agentes GLPI y navegadores siguen funcionando.
 opt_cert_reload	Valida los archivos PEM sustituidos y reinicia los servicios unos segundos.
 opt_cert_restart	Caddy reintenta la renovación de Let's Encrypt al arrancar; GLPI no responde durante unos segundos.
 opt_uninstall_keep	Borra contenedores, volúmenes y datos de GLPI. Los respaldos y certificados quedan para restaurar después.
-opt_uninstall_all	Borra todo, incluidos los respaldos. No se puede deshacer.
-restore_plan_safe	Primero se respalda tu instalación actual (respaldo [P]) y se elimina cuando la restaurada esté verificada, así no se acumulan instalaciones. Para deshacer la restauración, restaura ese respaldo.
-restore_plan_keep	La instalación actual no se puede respaldar (está detenida o tiene una operación pendiente), así que se conserva detenida como único punto de retorno. Podrás eliminarla después desde Liberar espacio.
+opt_uninstall_all	Borra todo, incluidos respaldos, certificados y la CA local (los agentes GLPI tendrían que importar una nueva). No se puede deshacer.
+restore_plan_safe	Primero se crea un respaldo previo [P] de la instalación actual. Cuando la restaurada esté verificada, la instalación actual se elimina y el respaldo [P] se conserva. Para deshacer la restauración, restaura ese respaldo.
+restore_plan_keep	La instalación actual no se puede respaldar (está detenida o tiene una operación pendiente), así que se conserva detenida para poder volver a ella. Podrás eliminarla después desde Liberar espacio.
 restore_step_backup	Respaldando la instalación actual
 restore_step_cleanup	Eliminando la instalación reemplazada
 restore_removed_previous	La instalación reemplazada se eliminó; sus datos están en el respaldo %s.
-restore_kept_previous	La instalación reemplazada se conserva detenida como punto de retorno (nunca se guarda más de una). Elimínala desde Liberar espacio cuando ya no la necesites.
+restore_kept_previous	La instalación reemplazada se conserva detenida para poder volver a ella (nunca se guarda más de una). Elimínala desde Liberar espacio cuando ya no la necesites.
 backup_origin_restore	Antes de restaurar
-backup_origin_pre	Previo a una actualización o restauración
+backup_origin_pre	Previo a un cambio
 dash_previous	%s instalación reemplazada conservada
 menu_cleanup	Liberar espacio
 desc_cleanup	Imágenes sin usar, instalaciones reemplazadas, respaldos y revisiones antiguas, con su tamaño.
@@ -577,9 +577,9 @@ plugin_inactive	inactivo
 plugin_other	requiere atención (sin instalar o pendiente)
 rollback_title	La actualización no terminó
 rollback_body	Los servicios pueden estar detenidos y el diario de operación sigue abierto. Puedes restaurar el respaldo hecho justo antes de actualizar, o dejarlo todo como está para revisar primero los registros.
-rollback_backup	Respaldo previo
+rollback_backup	Respaldo previo [P]
 rollback_prompt	¿Cómo quieres continuar?
-rollback_restore	Restaurar el respaldo previo a la actualización
+rollback_restore	Restaurar el respaldo previo [P]
 rollback_keep	Dejarlo así y revisar los registros
 opt_rollback_restore	Vuelve a la versión anterior con los datos del momento del respaldo. La instalación fallida se conserva como punto de retorno.
 opt_rollback_keep	No cambia nada ahora. Después usa Restaurar o Recuperar desde el menú.
@@ -656,7 +656,7 @@ maint_section_logs	Registros
 maint_state	Estado
 maint_kept	Se conservan
 maint_task_does	Cada día
-maint_task_list	rota registros, revisa certificados y respalda cuando toca
+maint_task_list	rota registros, revisa certificados, busca actualizaciones y respalda cuando toca
 logs_summary_label	Rotación
 logs_summary	GLPI %s días · binlog MySQL %s días · detalle en Rotación de registros
 maint_logs_option	Rotación de registros…
@@ -666,7 +666,7 @@ logs_recommended	recomendado
 logs_manager	Registros del gestor
 logs_glpi	Registros técnicos de GLPI
 logs_containers	Registros de contenedores
-logs_binlog	Binary logs de MySQL
+logs_binlog	Registros binarios (binlog) de MySQL
 logs_history	Historial de operaciones
 logs_days	%s días
 logs_glpi_value	rotar al superar %s MB · conservar %s días
@@ -690,7 +690,7 @@ logs_container_prompt	Límite de registros por contenedor
 opt_logs_container_default	Hasta 30 MB por servicio; suficiente para problemas recientes.
 opt_logs_container_more	Más historia de la salida de los contenedores.
 opt_logs_container_large	Hasta 500 MB por servicio: comprueba que el disco lo soporte.
-logs_binlog_prompt	¿Cuántos días de binary logs de MySQL?
+logs_binlog_prompt	¿Cuántos días se conservan los registros binarios (binlog) de MySQL?
 opt_binlog_short	El menor uso de disco. Los respaldos son copias completas: restaurar no pierde nada.
 opt_binlog_week	Una semana de cambios; uso de disco moderado.
 opt_binlog_default	Valor por defecto de MySQL.
@@ -753,3 +753,35 @@ restore_plan_fresh	No hay una instalación activa: el respaldo se restaura como 
 confirm_edit_keys	Enter confirmar · Esc cancelar · Ctrl+U borrar
 backup_path_hint	Escribe la ruta absoluta del archivo .tar.gz.
 backup_path_invalid	Ese archivo no existe o la ruta no es absoluta.
+typed_mismatch	No coincide. Escribe exactamente %s o pulsa Esc para cancelar.
+install_incomplete	La instalación no terminó. Vuelve a abrir el gestor y elige Continuar la instalación; se reutilizan la configuración y las contraseñas.
+dash_group_updates	Actualizaciones
+menu_keys_single	↑ ↓ mover · Enter elegir · Esc salir
+view_help	↑ ↓ / RePág AvPág desplazan · Enter o Esc vuelven al menú.
+plain_back_hint	Escribe :back para volver.
+releases_unavailable	No se pudo consultar la lista de versiones de GLPI en GitHub y no hay una copia guardada. Comprueba el acceso a api.github.com (o define GITHUB_TOKEN si se alcanzó el límite) y vuelve a intentarlo.
+ui_back_branches	Volver a elegir la rama
+setup_acme_ports	Let's Encrypt usa los puertos 80/443; se han ajustado.
+setup_cert_missing	Copia el certificado PEM (con los intermedios) en %s y su clave privada sin contraseña en %s; después elige Continuar. Para PFX/PKCS12 consulta docs/https.md.
+cert_pair_invalid	Los certificados importados no sirven para %s: comprueba que no estén caducados, que incluyan esa dirección y que privkey.pem corresponda a fullchain.pem.
+cert_bad_expiry	El certificado importado caduca en menos de 24 h o ya caducó.
+cert_bad_host	El certificado importado no es válido para %s. Sustituye los archivos PEM o cambia la dirección.
+cert_bad_key	La clave privada (privkey.pem) no corresponde al certificado (fullchain.pem).
+backup_pick_prompt	¿Qué respaldo quieres restaurar?
+backup_none_other	Elige «Elegir un archivo desde otra ruta» para usar uno copiado de otro servidor.
+restore_checking	Comprobando y extrayendo el respaldo
+restore_contents	Contenido
+restore_installed	Instalado ahora
+restore_step_keep	Conservando la instalación reemplazada
+restore_done_title	Restauración completada y verificada
+restore_new_server	Si este servidor tiene otra dirección, cámbiala en Dirección, puertos y zona horaria.
+update_refresh_current	GLPI %s: se aplicará la imagen renovada de la misma versión; la base de datos no cambia.
+update_refresh_confirm	¿Crear un respaldo nuevo y aplicar la imagen renovada?
+update_not_applied	No se aplicó ningún cambio. El respaldo previo [P] se conserva: %s
+self_update_git_invalid	El código actualizado con git en %s no supera la comprobación de sintaxis. El gestor en ejecución no se cambió; revisa git log y git status.
+diag_buffer_applied	Memoria de MySQL en uso (innodb_buffer_pool_size): %s MiB
+diag_buffer_unavailable	Memoria de MySQL en uso: no disponible (MySQL detenido o inaccesible)
+diag_buffer_next	Próxima configuración: %s MiB según la RAM del servidor
+maint_step_images	Buscando imágenes nuevas de GLPI, MySQL y Caddy
+maint_backups_off	Los respaldos automáticos están desactivados; no se creó ningún respaldo.
+cert_restart_confirm	El proxy HTTPS se reiniciará unos segundos. ¿Continuar?

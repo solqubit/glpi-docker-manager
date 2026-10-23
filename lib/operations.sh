@@ -77,6 +77,7 @@ select_major() {
     local -a major_options=()
     while IFS= read -r major_value; do
         (( major_value > major_minimum )) || continue
+        [[ $major_mode != migrate ]] || (( major_value == major_minimum + 1 )) || continue
         if [[ $major_mode == migrate ]]; then
             major_options+=("$major_value" "$(ui_opt warn "GLPI $major_value" "$(t opt_update_major "$major_minimum" "$major_value")")")
         elif [[ $major_first == true ]]; then
@@ -117,19 +118,24 @@ install_wizard() {
         config_load
         [[ $(cfg status) != ready ]] || die install_exists
         [[ ! -f $STATE/operation.json || $(jq -r .action "$STATE/operation.json") == install ]] || die recovery_notice "$STATE/operation.json"
-        confirm install_resume || die cancelled
+        [[ ${GDM_IN_MENU:-false} == true ]] || confirm install_resume || die cancelled
         [[ -f $STATE/operation.json ]] || journal_begin install
         installation_finish
         return
     fi
     check_resources
     ui_task ui_releases_loading release_fetch
-    if [[ -n $requested ]]; then major=${requested%%.*}
+    if [[ -n $requested ]]; then
+        major=${requested%%.*}
+        [[ $major =~ ^[1-9][0-9]{1,2}$ ]] || die invalid major
+        select_version "$major" "$requested"
     else
-        select_major major "$(jq -r '[.[].version|split(".")[0]|tonumber]|max' "$STATE/cache/releases.json")" 10 false install
+        while :; do
+            select_major major "$(jq -r '[.[].version|split(".")[0]|tonumber]|max' "$STATE/cache/releases.json")" 10 false install
+            [[ $major =~ ^[1-9][0-9]{1,2}$ ]] || die invalid major
+            if select_version "$major" '' true ui_back_branches; then break; fi
+        done
     fi
-    [[ $major =~ ^[1-9][0-9]{1,2}$ ]] || die invalid major
-    select_version "$major" "$requested"
     ui_task setup_loading_images support_images_lookup
     id=$(openssl rand -hex 8)
     file=$(mktemp "$STATE/.install.XXXXXX"); clean_file=$(mktemp "$STATE/.validated.XXXXXX")
@@ -148,9 +154,17 @@ install_wizard() {
         case $editor_result in
             0)
                 config_validate "$file"
-                if draft_ports_check "$file"; then break; fi
-                jq --arg notice "$(t port_busy "$BUSY_PORT")" '._notice=$notice' "$file" > "$clean_file"
-                cp -- "$clean_file" "$file";;
+                if ! draft_ports_check "$file"; then
+                    jq --arg notice "$(t port_busy "$BUSY_PORT")" --argjson port "$BUSY_PORT" \
+                        '._notice=$notice | ._busy_port=$port' "$file" > "$clean_file"
+                    cp -- "$clean_file" "$file"; continue
+                fi
+                if [[ $(jq -r .tls "$file") == custom ]] &&
+                   ! ( tls_validate_pair "$(jq -r .cert_dir "$file")/custom" "$(jq -r .hostname "$file")" ) >/dev/null 2>&1; then
+                    jq --arg notice "$(t cert_pair_invalid "$(jq -r .hostname "$file")")" '._notice=$notice | ._busy_port=0' "$file" > "$clean_file"
+                    cp -- "$clean_file" "$file"; continue
+                fi
+                break;;
             10|130) exit "$editor_result";;
             20)
                 select_major major "$(jq -r .major "$file")" 10 true install
@@ -169,7 +183,7 @@ install_wizard() {
 # Validation, certificates and Compose checks take a few seconds after the form.
 install_stage() {
     local file=$1 clean_file=$2
-    jq 'del(._detected_host,._notice)' "$file" > "$clean_file"
+    jq 'del(._detected_host,._notice,._busy_port)' "$file" > "$clean_file"
     config_validate "$clean_file"
     draft_ports_check "$clean_file" || die port_busy "$BUSY_PORT"
     config_stage "$clean_file"
@@ -212,7 +226,7 @@ check_updates() {
     [[ -n $newest ]] || die image_missing "$(cfg major)"
     ui_panel "$(t check_updates_title)" "$(t update_latest "$current" "$newest")"
     if version_gt "$newest" "$current"; then
-        release_notice "$newest"
+        release_notice "$newest" info
         image_resolve glpi/glpi "$newest" >/dev/null || say update_images_unavailable
     else say update_none; fi
     next_version=$(release_versions "$(( $(cfg major)+1 ))" | head -n 1)
@@ -294,7 +308,7 @@ update_glpi() {
     if [[ $kind == update && -n $requested ]] && valid_version "$requested" && (( ${requested%%.*} > source_major )); then kind=migrate; fi
     if [[ $kind == refresh-image ]]; then
         target=$current; image=$(image_resolve glpi/glpi "$target") || die image_missing "$target"
-        [[ $image != "$(cfg glpi_image)" ]] || { say same_image; return; }
+        [[ $image != "$(cfg glpi_image)" ]] || { menu_done same_image; return; }
         release_notice "$target"
     elif [[ $kind == migrate ]]; then
         if [[ -n $requested ]]; then
@@ -308,6 +322,7 @@ update_glpi() {
             select_version "$major"
         fi
         target=$SELECTED_VERSION; image=$SELECTED_IMAGE
+        say update_current "$current" "$target"
         say migration_warning
         plugins_panel "${target%%.*}"
         confirm migration_review || die cancelled
@@ -317,15 +332,22 @@ update_glpi() {
         select_version "$source_major" "$target"
         image=$SELECTED_IMAGE
     fi
-    say update_current "$current" "$target"
-    confirm update_confirm || die cancelled
+    if [[ $kind == refresh-image ]]; then
+        say update_refresh_current "$current"
+        confirm update_refresh_confirm || die cancelled
+    elif [[ $kind != migrate ]]; then
+        say update_current "$current" "$target"
+        confirm update_confirm || die cancelled
+    fi
     ui_run 1/3 update_step_backup backup_create true "$kind" "$target"
     printf '%s\n' "$LAST_BACKUP" > "$STATE/recovery-backup"
     backup_extract "$LAST_BACKUP"
-    ui_panel "$(t backup_recovery_ready)" "$LAST_BACKUP" "$(t backup_recovery_help)"
     # Rehearse every application version change, including patch updates.
     ui_run 2/3 update_step_rehearsal rehearse "$EXTRACTED" "$target" "$image"
-    [[ $kind != migrate ]] || typed_confirm "MIGRATE-$source_major-${target%%.*}"
+    # Cancelling here changed nothing: say so, since a backup was just made.
+    if [[ $kind == migrate ]] && ! typed_confirm "MIGRATE-$source_major-${target%%.*}" soft; then
+        menu_done update_not_applied "$LAST_BACKUP"; exit 1
+    fi
     update_apply_guarded apply_glpi_update "$kind" "$target" "$image" "$source_major"
     ui_panel "✓ $(t updated "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
 }
@@ -445,7 +467,7 @@ select_update_target() {
         choices+=(refresh "$(ui_opt ok "$(t update_label_refresh "GLPI $current")" "$(t opt_update_refresh)")")
     fi
     if (( ${#choices[@]} == 0 )); then
-        if (( UPDATE_CANDIDATES > 0 )); then say update_images_unavailable; else say update_none; fi
+        if (( UPDATE_CANDIDATES > 0 )); then menu_done update_images_unavailable; else menu_done update_none; fi
         return 0
     fi
     if [[ -z $default ]]; then
@@ -464,15 +486,14 @@ update_database() {
     mysql_lookup=$(mktemp "$STATE/.mysql-lookup.XXXXXX"); CLEANUP_PATHS+=("$mysql_lookup")
     ui_task mysql_lookup_status mysql_target_lookup "$mysql_lookup"
     IFS=$'\t' read -r target image < "$mysql_lookup" || die image_missing mysql
-    version_gt "$target" "$(cfg mysql_version)" || { say db_update_none "$(cfg mysql_version)"; return; }
+    version_gt "$target" "$(cfg mysql_version)" || { menu_done db_update_none "$(cfg mysql_version)"; return; }
     say db_update_warning
     ui_panel "$(t ui_db_update)" "$(t db_update_versions "$(cfg mysql_version)" "$target")"
     confirm db_update_confirm || die cancelled
     ui_run 1/3 update_step_backup backup_create true db-update "$target"
     backup_extract "$LAST_BACKUP"
-    ui_panel "$(t backup_recovery_ready)" "$LAST_BACKUP" "$(t backup_recovery_help)"
     ui_run 2/3 update_step_rehearsal rehearse "$EXTRACTED" "$(cfg glpi_version)" "$(cfg glpi_image)" "$target" "$image"
-    typed_confirm UPDATE-MYSQL
+    if ! typed_confirm UPDATE-MYSQL soft; then menu_done update_not_applied "$LAST_BACKUP"; exit 1; fi
     update_apply_guarded apply_database_update "$target" "$image"
     ui_panel "✓ $(t db_updated "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
 }
@@ -498,11 +519,11 @@ update_proxy() {
     local lookup target image file current
     local -a details=()
     assert_running
-    [[ $(cfg tls) != off ]] || { say proxy_update_tls_off; return 0; }
+    [[ $(cfg tls) != off ]] || { menu_done proxy_update_tls_off; return 0; }
     lookup=$(mktemp "$STATE/.caddy-lookup.XXXXXX"); CLEANUP_PATHS+=("$lookup")
     ui_task caddy_lookup_status caddy_target_lookup "$lookup"
     IFS=$'\t' read -r target image < "$lookup" || die image_missing caddy
-    [[ $image != "$(cfg caddy_image)" ]] || { say proxy_update_none "$(proxy_version "$(cfg caddy_image)")"; return 0; }
+    [[ $image != "$(cfg caddy_image)" ]] || { menu_done proxy_update_none "$(proxy_version "$(cfg caddy_image)")"; return 0; }
     current=$(proxy_version "$(cfg caddy_image)")
     if [[ $current == "$target" ]]; then
         details+=("$(t proxy_update_refresh "$target")" "$(t proxy_update_refresh_note)")
@@ -552,7 +573,7 @@ db_exposure_prompt() {
     if [[ $current == yes ]]; then yes_label+=" $(t opt_current)"; else no_label+=" $(t opt_current)"; fi
     choose exposure_choice expose_prompt "$current" \
         no "$(ui_opt ok "$no_label" "$(t opt_db_internal)")" yes "$(ui_opt warn "$yes_label" "$(t opt_db_public)")" || exit 10
-    if [[ $exposure_choice == "$current" ]]; then say ui_db_unchanged; exit 10; fi
+    [[ $exposure_choice != "$current" ]] || exit 10
     [[ $exposure_choice != yes ]] || say firewall_docker 3306
     [[ $exposure_choice == yes ]]
 }
@@ -601,12 +622,12 @@ diagnose() {
         # shellcheck disable=SC2016
         if buffer_bytes=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql --protocol=TCP -h 127.0.0.1 --connect-timeout=5 -u"$GDM_DB_USER" -Nse "SELECT @@innodb_buffer_pool_size"' </dev/null 2>/dev/null) &&
            [[ $buffer_bytes =~ ^[0-9]+$ ]]; then
-            printf 'applied: innodb_buffer_pool_size=%s bytes (%s MiB)\n' "$buffer_bytes" "$((buffer_bytes/1024/1024))"
+            t diag_buffer_applied "$((buffer_bytes/1024/1024))"
         else
-            printf 'applied: unavailable (MySQL stopped or unreachable)\n'
+            t diag_buffer_unavailable
         fi
         jq -r '.services.db.command[]?' "$STATE/current/compose.json"
-        printf 'next revision: --innodb-buffer-pool-size=%sM\n' "$(mysql_buffer_pool_mb)"
+        t diag_buffer_next "$(mysql_buffer_pool_mb)"
         if [[ -f $STATE/current/tls/fullchain.pem ]]; then
             diagnose_section TLS
             openssl x509 -in "$STATE/current/tls/fullchain.pem" -noout -subject -issuer -dates
@@ -646,10 +667,10 @@ dispatch() {
                 status) service_status; [[ ! -f $STATE/operation.json ]] || say recovery_notice "$STATE/operation.json";;
                 start) service_start;;
                 stop)
-                    confirm stop_confirm || return 0
+                    confirm stop_confirm || exit 10
                     ui_run 0 service_step_stop dc stop
                     ui_panel "✓ $(t service_stopped_done)";;
-                logs) say logs_note; service_logs;;
+                logs) service_logs;;
                 check-updates) check_updates;;
                 update|migrate|refresh-image) update_glpi "$command" "$argument";;
                 db-update) update_database;;
@@ -662,35 +683,35 @@ dispatch() {
                             back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
                         [[ $command != back ]] || exit 10
                     fi
-                    if [[ $command == transfer ]]; then confirm transfer_confirm || return 0; fi
+                    if [[ $command == transfer ]]; then confirm transfer_confirm || exit 10; fi
                     journal_begin "$command"
                     if [[ $command == transfer ]]; then ui_run 0 backup_step_create backup_create false transfer
                     else ui_run 0 backup_step_create backup_create; fi
                     journal_done
-                    backup_title=backup_manual_done
-                    [[ $command != transfer ]] || backup_title=backup_transfer_done
-                    ui_panel "$(t "$backup_title")" "$LAST_BACKUP" "$(t backup_manual_help)"
-                    [[ $command != transfer ]] || say transfer "$LAST_BACKUP";;
+                    if [[ $command == transfer ]]; then ui_panel "$(t backup_transfer_done)" "$LAST_BACKUP" "$(t transfer "$LAST_BACKUP")"
+                    else ui_panel "$(t backup_manual_done)" "$LAST_BACKUP" "$(t backup_manual_help)"; fi;;
                 https|db-exposure|address) settings_command "$command";;
                 certificates) certificates_menu;;
                 cleanup) cleanup_menu;;
                 schedule) schedule_menu;;
                 credentials)
                     say credentials_note
-                    if confirm credentials_warning; then
-                        # Plain stdout lines: never truncated by a card and never kept
-                        # in UI_CONTEXT, so the values can be copied exactly.
-                        ui_log info "$(t menu_credentials)"
-                        jq -r '["GLPI_DB_NAME",.db_name],["GLPI_DB_USER",.db_user],["GLPI_DB_PASSWORD",.db_password],
-                               ["MYSQL_ROOT_PASSWORD",.root_password] | "      \(.[0])\t\(.[1])"' "$CONFIG"
-                    fi;;
+                    confirm credentials_warning || exit 10
+                    # Plain stdout lines: never truncated by a card and never kept
+                    # in UI_CONTEXT, so the values can be copied exactly.
+                    ui_log info "$(t menu_credentials)"
+                    jq -r '["GLPI_DB_NAME",.db_name],["GLPI_DB_USER",.db_user],["GLPI_DB_PASSWORD",.db_password],
+                           ["MYSQL_ROOT_PASSWORD",.root_password] | "      \(.[0])\t\(.[1])"' "$CONFIG";;
                 language)
                     choose_language || die cancelled
                     tmp=$(mktemp "$STATE/.language.XXXXXX"); CLEANUP_PATHS+=("$tmp")
                     jq --arg language "$LANGUAGE" '.language=$language' "$CONFIG" > "$tmp"
-                    mv -- "$tmp" "$(readlink -f "$CONFIG")"; cfg_cache; tr_load; say language_saved;;
+                    mv -- "$tmp" "$(readlink -f "$CONFIG")"; cfg_cache; tr_load; menu_done language_saved;;
                 recover)
-                    say recover_prompt; typed_confirm RESUME
+                    ui_panel "$(t ui_recover)" \
+                        "operation.json"$'\t'"$(jq -r '(.action // "?")+" · "+(.phase // "-")' "$STATE/operation.json" 2>/dev/null)" \
+                        "$(t recover_prompt)"
+                    typed_confirm RESUME
                     ui_run 0 ui_service_starting recover_services; say recover_done;;
                 *) die unknown_command "$command";;
             esac;;
@@ -710,15 +731,21 @@ dashboard_environment() {
     export GDM_DASH_PREVIOUS GDM_DASH_UPDATES
     if [[ $(cfg tls) == self-signed || $(cfg tls) == custom ]] && cert_days "$STATE/current/tls/fullchain.pem"; then
         GDM_DASH_CERT_DAYS=$CERT_DAYS
-        (( CERT_DAYS >= 30 )) || say cert_expiring_menu "$CERT_DAYS"
     fi
     export GDM_DASH_CERT_DAYS GDM_DASH_MAINTENANCE
 }
 menu() {
-    local command menu_result action_file GDM_IN_MENU=true
+    local command menu_result action_file GDM_IN_MENU=true first_pass=true
+    # Results with nothing more to read come back as a dashboard notice (menu_done).
+    local GDM_MENU_NOTICE="$STATE/cache/.menu-notice"
+    GDM_DASH_NOTICE='' GDM_DASH_LAST=''
     while :; do
-        # Start-up checks and earlier actions must not reappear inside the next action.
-        UI_NOTICES=() UI_CONTEXT=()
+        # Start-up checks and earlier actions must not reappear inside the next
+        # action. On a fresh server the first screen still shows the checks.
+        if [[ $first_pass != true || -L $STATE/current ]]; then UI_NOTICES=(); fi
+        UI_CONTEXT=() first_pass=false
+        [[ -z $GDM_DASH_NOTICE ]] || UI_NOTICES+=("$GDM_DASH_NOTICE")
+        rm -f -- "$GDM_MENU_NOTICE"
         if [[ ! -L $STATE/current ]]; then
             ui_panel "$(t ui_first_title)" "$(t ui_first_body)"
             choose command first_action install install "$(ui_opt primary "$(t ui_install)" "$(t opt_install)")" \
@@ -741,13 +768,21 @@ menu() {
             else
                 service_snapshot
                 dashboard_environment
+                # Read by main_menu.py: the last result and the action to select.
+                export GDM_DASH_NOTICE GDM_DASH_LAST
                 action_file=$(mktemp "$STATE/.action.XXXXXX"); CLEANUP_PATHS+=("$action_file")
                 if python3 "$GDM_ROOT/tools/main_menu.py" "$CONFIG" "$SERVICE_DATA" "$LANGUAGE" "$action_file"; then :
                 else menu_result=$?; [[ $menu_result != 130 ]] || ui_interrupted; return 0; fi
                 IFS= read -r command < "$action_file"
             fi
         fi
-        [[ $command != quit ]] || return 0
+        GDM_DASH_NOTICE=''
+        if [[ $command == quit ]]; then
+            # curses leaves a blank terminal: end with where GLPI is reachable.
+            [[ ! -L $STATE/current || $(cfg status) != ready ]] || ui_log info "$(t ready "$(installation_url)")"
+            return 0
+        fi
+        GDM_DASH_LAST=$command
         # Never put dispatch in an if/|| condition: Bash would disable errexit
         # throughout the called functions, allowing a failed migration to continue.
         set +e
@@ -766,6 +801,11 @@ menu() {
         [[ $menu_result != 130 ]] || return 0
         [[ $menu_result != 10 ]] || continue
         [[ $menu_result != 75 ]] || manager_handover
+        if [[ $menu_result == 11 ]]; then
+            [[ ! -s $GDM_MENU_NOTICE ]] || GDM_DASH_NOTICE=$(< "$GDM_MENU_NOTICE")
+            if [[ $command == language ]]; then LANGUAGE_OVERRIDE=''; config_load; fi
+            continue
+        fi
         if [[ $command == uninstall && $menu_result == 0 ]]; then return 0; fi
         if [[ $menu_result == 74 ]]; then GDM_STORAGE_FAILURE=true; exit 74; fi
         if [[ $command == language && $menu_result == 0 ]]; then

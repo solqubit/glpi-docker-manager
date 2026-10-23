@@ -57,13 +57,13 @@ ui_level_of() {
         failed|invalid|unhealthy|docker_start_failed|host_io_error|host_readonly|host_no_space|port_busy|\
         storage_insufficient|storage_inodes|storage_temporary|backup_invalid|backup_space|low_resources|\
         foreign_resource|bad_path|locked|permissions|image_missing|remote_docker|linux_only|architecture|\
-        update_boundary|unknown_command|services_required|not_installed|need_sudo|ui_interrupted|\
+        update_boundary|unknown_command|releases_unavailable|cert_bad_expiry|cert_bad_host|cert_bad_key|self_update_git_invalid|services_required|not_installed|need_sudo|ui_interrupted|\
         self_update_invalid)
             UI_LEVEL=error;;
         *warning*|*notice*|*unknown*|*required*|*manual*|*_failed|cancelled|cleanup_deferred|config_restored|\
         destructive|older_release|security_release|resource_reference|bad_password|bad_root_password|\
         ui_bad_*|ui_invalid_choice|ui_error_log|docker_service_stopped|docker_storage_unavailable|\
-        docker_plugins_missing|update_images_unavailable|update_no_patches|credentials_note|diagnose_note|logs_note|\
+        docker_plugins_missing|update_images_unavailable|update_no_patches|credentials_note|diagnose_note|logs_note|typed_mismatch|update_not_applied|install_incomplete|maint_backups_off|\
         host_storage_steps|acme_requirements|cert_instructions|releases_stale|install_exists|admin_command|registry_rate_limited|\
         docker_context_help|maint_no_scheduler|maint_skipped|maint_services_stopped|backups_prune_skipped|\
         cert_expiring|cert_expiring_menu|cert_custom_expiring|cert_acme_expiring|cert_auto_renewing|firewall_docker|\
@@ -747,8 +747,19 @@ ui_pause() {
     fi
     printf '\n' >&2
 }
+# Prints the warnings and errors queued inside a step that failed: its own
+# output went to the step log, so they would never reach the screen.
+ui_notices_flush() {
+    local ui_entry
+    for ui_entry in "${UI_NOTICES[@]}"; do
+        [[ ${ui_entry%%$'\t'*} == info ]] || ui_log "${ui_entry%%$'\t'*}" "${ui_entry#*$'\t'}"
+    done
+    UI_NOTICES=()
+}
 ui_progress_note() {
-    say "$@"
+    # Logged and shown live, never queued: it describes the running step and
+    # would be stale on the next page.
+    ui_level_of "$1"; ui_say "$UI_LEVEL" "$@"
     if [[ -n ${UI_PROGRESS_FD:-} ]]; then
         printf '\r\033[2K' >&"$UI_PROGRESS_FD"
         ui_say info "$@" 2>&"$UI_PROGRESS_FD"

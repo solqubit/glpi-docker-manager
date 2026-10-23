@@ -226,7 +226,7 @@ maintenance_run() {
     # Not in an if/|| context: errexit must stay active while services restart.
     tls_auto_renew
     glpi_logs_rotate
-    image_updates_check
+    ui_task maint_step_images image_updates_check
     maintenance_settings
     if [[ $MAINT_BACKUPS == true ]] && { [[ $force == true ]] || backup_due; }; then
         if [[ -n $(dc ps --status running --quiet glpi) && -n $(dc ps --status running --quiet db) ]]; then
@@ -239,6 +239,7 @@ maintenance_run() {
     elif [[ $MAINT_BACKUPS == true ]]; then
         next=$(maintenance_next_runs 1)
         say maint_backup_not_due "$next"
+    elif [[ $force == true ]]; then say maint_backups_off
     fi
     maintenance_record "$MAINT_STATUS" "$backup"
     say maint_done
@@ -349,7 +350,9 @@ frequency_menu() {
             weekly)
                 days=()
                 for day in 1 2 3 4 5 6 7; do name=$(t "day_long_$day"); days+=("$day" "${name^}"); done
+                days+=(back "$(ui_opt back "$(t ui_back_previous)")")
                 choose day maint_weekday_prompt "${MAINT_WEEKDAYS%% *}" "${days[@]}" || continue
+                [[ $day != back ]] || continue
                 MAINT_MODE=weekdays MAINT_WEEKDAYS=$day;;
             pick) weekday_picker || continue; MAINT_MODE=weekdays;;
             custom)
@@ -373,14 +376,22 @@ time_menu() {
         esac
         hours+=("$hour" "$(ui_opt "$kind" "$(printf '%02d:00' "$hour")${label:+ · $label}" "$help")")
     done
-    choose hour maint_hour_prompt "$MAINT_HOUR" "${hours[@]}" || return 1
-    for minute in 0 15 30 45; do minutes+=("$minute" "$(printf '%02d:%02d' "$hour" "$minute")"); done
-    choose minute maint_minute_prompt "$((MAINT_MINUTE/15*15))" "${minutes[@]}" || return 1
+    hours+=(back "$(ui_opt back "$(t ui_back_previous)")")
+    while :; do
+        choose hour maint_hour_prompt "$MAINT_HOUR" "${hours[@]}" || return 1
+        [[ $hour != back ]] || return 1
+        minutes=()
+        for minute in 0 15 30 45; do minutes+=("$minute" "$(printf '%02d:%02d' "$hour" "$minute")"); done
+        minutes+=(back "$(ui_opt back "$(t ui_back_previous)")")
+        choose minute maint_minute_prompt "$((MAINT_MINUTE/15*15))" "${minutes[@]}" || continue
+        [[ $minute != back ]] || continue
+        break
+    done
     MAINT_HOUR=$hour MAINT_MINUTE=$minute
 }
 # Settings in three clear sections with a preview of the next backup dates.
 schedule_menu() {
-    local action state toggle next=''
+    local action state toggle next='' last=toggle
     local -a runs=() scheduler_row=()
     while :; do
         maintenance_settings
@@ -408,27 +419,27 @@ schedule_menu() {
             "${scheduler_row[@]}" \
             "§$(t maint_section_logs)" \
             "$(t logs_summary_label)"$'\t'"$(t logs_summary "$LOG_GLPI_DAYS" "$LOG_BINLOG_DAYS")"
-        choose action maint_prompt toggle toggle "$toggle" \
+        choose action maint_prompt "$last" toggle "$toggle" \
             frequency "$(ui_opt '' "$(t maint_frequency_option "$(maintenance_frequency_text)")" "$(t opt_maint_frequency)")" \
             time "$(ui_opt '' "$(t maint_time_option "$(maintenance_time_text)")" "$(t opt_maint_time)")" \
             logs "$(ui_opt '' "$(t maint_logs_option)" "$(t opt_maint_logs)")" \
             run "$(ui_opt ok "$(t maint_run_now)" "$(t opt_maint_run)")" back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
+        last=$action
         case $action in
-            toggle) if [[ $MAINT_BACKUPS == true ]]; then MAINT_BACKUPS=false; else MAINT_BACKUPS=true; fi;;
+            toggle) last=back; if [[ $MAINT_BACKUPS == true ]]; then MAINT_BACKUPS=false; else MAINT_BACKUPS=true; fi;;
             frequency) frequency_menu || continue;;
             time) time_menu || continue;;
             logs) logs_menu; continue;;
-            run) maintenance_run true; return;;
+            run) ui_panel "$(t maint_run_now)" "$(t opt_maint_run)"; maintenance_run true; return;;
             *) exit 10;;
         esac
         maintenance_write
-        scheduler_install || say maint_no_scheduler
-        say maint_saved
+        if scheduler_install; then say maint_saved; else say maint_no_scheduler; fi
     done
 }
 # One row per kind of log: where it lives, current value and the recommended one.
 logs_menu() {
-    local action recommended
+    local action='' recommended
     recommended=$(t logs_recommended)
     while :; do
         maintenance_settings
@@ -439,7 +450,7 @@ logs_menu() {
             "$(t logs_binlog)"$'\t'"$(t logs_days "$LOG_BINLOG_DAYS")$( (( LOG_BINLOG_DAYS == 30 )) && printf ' · %s' "$recommended")" \
             "$(t logs_history)"$'\t'"$(t logs_history_value)" \
             "$(t logs_body)"
-        choose action logs_prompt manager \
+        choose action logs_prompt "${action:-manager}" \
             manager "$(ui_opt '' "$(t logs_manager)" "$(t opt_logs_manager)")" \
             glpi "$(ui_opt '' "$(t logs_glpi)" "$(t opt_logs_glpi)")" \
             containers "$(ui_opt warn "$(t logs_containers)" "$(t opt_logs_containers)")" \
@@ -448,8 +459,10 @@ logs_menu() {
         case $action in
             manager) log_days_choice LOG_MANAGER_DAYS logs_days_prompt 30 || continue;;
             glpi)
+                local before="$LOG_GLPI_MB:$LOG_GLPI_DAYS"
                 log_size_choice || continue
-                log_days_choice LOG_GLPI_DAYS logs_days_prompt 30 || continue;;
+                log_days_choice LOG_GLPI_DAYS logs_days_prompt 30 || true
+                [[ "$LOG_GLPI_MB:$LOG_GLPI_DAYS" != "$before" ]] || continue;;
             containers) log_container_choice || continue; log_apply_services || continue;;
             binlog) log_binlog_choice || continue; log_apply_services || continue;;
             *) return 0;;
@@ -467,7 +480,9 @@ log_days_choice() {
         elif (( days < recommended )); then options+=("$days" "$(ui_opt '' "$(t logs_days "$days")" "$(t opt_logs_days_short)")")
         else options+=("$days" "$(ui_opt '' "$(t logs_days "$days")" "$(t opt_logs_days_long)")"); fi
     done
+    options+=(back "$(ui_opt back "$(t ui_back_previous)")")
     choose value "$prompt" "${!variable}" "${options[@]}" || return 1
+    [[ $value != back && $value != "${!variable}" ]] || return 1
     printf -v "$variable" '%s' "$value"
 }
 log_size_choice() {
@@ -475,7 +490,9 @@ log_size_choice() {
     choose value logs_size_prompt "$LOG_GLPI_MB" \
         10 "$(ui_opt '' '10 MB' "$(t opt_logs_size_small)")" \
         20 "$(ui_opt primary "20 MB · $(t logs_recommended)" "$(t opt_logs_size_default)")" \
-        50 "$(ui_opt '' '50 MB' "$(t opt_logs_size_large)")" || return 1
+        50 "$(ui_opt '' '50 MB' "$(t opt_logs_size_large)")" \
+        back "$(ui_opt back "$(t ui_back_previous)")" || return 1
+    [[ $value != back ]] || return 1
     LOG_GLPI_MB=$value
 }
 log_container_choice() {
@@ -484,7 +501,9 @@ log_container_choice() {
         10:3 "$(ui_opt primary "$(t logs_container_value 10 3) · $(t logs_recommended)" "$(t opt_logs_container_default)")" \
         20:3 "$(ui_opt '' "$(t logs_container_value 20 3)" "$(t opt_logs_container_more)")" \
         50:5 "$(ui_opt '' "$(t logs_container_value 50 5)" "$(t opt_logs_container_more)")" \
-        100:5 "$(ui_opt warn "$(t logs_container_value 100 5)" "$(t opt_logs_container_large)")" || return 1
+        100:5 "$(ui_opt warn "$(t logs_container_value 100 5)" "$(t opt_logs_container_large)")" \
+        back "$(ui_opt back "$(t ui_back_previous)")" || return 1
+    [[ $value != back && $value != "$LOG_CONTAINER_MB:$LOG_CONTAINER_FILES" ]] || return 1
     LOG_CONTAINER_MB=${value%%:*} LOG_CONTAINER_FILES=${value#*:}
 }
 log_binlog_choice() {
@@ -493,7 +512,9 @@ log_binlog_choice() {
         1 "$(ui_opt '' "$(t logs_days 1)" "$(t opt_binlog_short)")" \
         3 "$(ui_opt '' "$(t logs_days 3)" "$(t opt_binlog_low)")" \
         7 "$(ui_opt '' "$(t logs_days 7)" "$(t opt_binlog_week)")" \
-        30 "$(ui_opt primary "$(t logs_days 30) · $(t logs_recommended)" "$(t opt_binlog_default)")" || return 1
+        30 "$(ui_opt primary "$(t logs_days 30) · $(t logs_recommended)" "$(t opt_binlog_default)")" \
+        back "$(ui_opt back "$(t ui_back_previous)")" || return 1
+    [[ $value != back && $value != "$LOG_BINLOG_DAYS" ]] || return 1
     LOG_BINLOG_DAYS=$value
 }
 # Container and MySQL limits live in the generated Compose file: save, then
@@ -633,6 +654,7 @@ certificates_menu() {
         settings_command https
         return
     fi
+    while :; do
     ui_task cert_checking tls_days_lookup
     if [[ -z $CERT_DAYS ]]; then expiry=$(t cert_unknown)
     elif (( CERT_DAYS < 0 )); then expiry=$(t cert_expired "$((-CERT_DAYS))" "$CERT_END_DATE")
@@ -655,14 +677,25 @@ certificates_menu() {
     esac
     if [[ $action == mode ]]; then settings_command https; return; fi
     case $action in
-        renew) ui_run 0 cert_step_apply tls_force_renew;;
-        newca) typed_confirm NEW-CA; ui_run 0 cert_step_apply tls_new_ca;;
-        reload) ui_run 0 cert_step_apply tls_reapply;;
-        restart) ui_run 0 cert_step_restart dc restart proxy;;
+        renew|reload|restart) confirm cert_restart_confirm || continue;;
+        newca) typed_confirm NEW-CA soft || continue;;
         *) exit 10;;
     esac
+    case $action in
+        renew) ui_run 0 cert_step_apply tls_force_renew;;
+        newca) ui_run 0 cert_step_apply tls_new_ca;;
+        reload) ui_run 0 cert_step_apply tls_reapply;;
+        restart) ui_run 0 cert_step_restart dc restart proxy;;
+    esac
     if [[ $action == restart ]]; then ui_panel "$(t cert_proxy_restarted)" "$(t ready "$(installation_url)")"
+    elif [[ $action == newca ]]; then
+        # Every client must import the new CA: show where and how to verify it.
+        ca_rows=()
+        ca_rows_build
+        ui_panel "$(t cert_applied)" "$(t ready "$(installation_url)")" "${ca_rows[@]}"
     else ui_panel "$(t cert_applied)" "$(t ready "$(installation_url)")"; fi
+    return
+    done
 }
 
 # ---------------------------------------------------------------- free space
@@ -778,9 +811,10 @@ cleanup_option() {
 cleanup_menu() {
     local action previous_text id
     local -a CLEAN_IMAGES=() CLEAN_PREVIOUS=() CLEAN_BACKUPS=() CLEAN_REVISIONS=() CLEAN_RELEASES=() options=()
-    local CLEAN_IMAGES_BYTES=0
+    local CLEAN_IMAGES_BYTES=0 rescan=true
     while :; do
-        ui_task cleanup_scanning cleanup_scan
+        [[ $rescan == false ]] || ui_task cleanup_scanning cleanup_scan
+        rescan=true
         previous_text=''
         for id in "${CLEAN_PREVIOUS[@]}"; do previous_text+="${previous_text:+, }GLPI $(installation_version "$id")"; done
         ui_panel "$(t cleanup_title)" "$(t cleanup_body)"
@@ -799,11 +833,11 @@ cleanup_menu() {
         choose action cleanup_prompt back "${options[@]}" || exit 10
         case $action in
             images) ui_run 0 cleanup_step_images cleanup_images;;
-            previous) typed_confirm DELETE; ui_run 0 cleanup_step_previous cleanup_previous;;
+            previous) typed_confirm DELETE soft || continue; ui_run 0 cleanup_step_previous cleanup_previous;;
             backups) confirm cleanup_backups_confirm || continue; ui_run 0 cleanup_step_backups cleanup_backups;;
             revisions) ui_run 0 cleanup_step_files cleanup_paths "${CLEAN_REVISIONS[@]}";;
             releases) ui_run 0 cleanup_step_files cleanup_paths "${CLEAN_RELEASES[@]}";;
-            nothing) say cleanup_nothing; continue;;
+            nothing) say cleanup_nothing; rescan=false; continue;;
             *) exit 10;;
         esac
         say cleanup_done
@@ -928,15 +962,15 @@ manager_git_update() {
         say self_update_git_noupstream "$GDM_ROOT"; return 0
     fi
     ui_task self_update_checking manager_git_fetch
-    [[ $GIT_BEHIND != error ]] || { say self_update_unavailable; return 0; }
+    [[ $GIT_BEHIND != error ]] || { menu_done self_update_unavailable; return 0; }
     GIT_BEHIND=$(git_as_owner rev-list --count 'HEAD..@{u}')
     branch=$(git_as_owner rev-parse --abbrev-ref HEAD)
-    if [[ $GIT_BEHIND == 0 ]]; then say self_update_git_none "$branch"; return 0; fi
+    if [[ $GIT_BEHIND == 0 ]]; then menu_done self_update_git_none "$branch"; return 0; fi
     ui_panel "$(t self_update_title)" "$(t self_update_git_behind "$GIT_BEHIND" "$branch")" \
         "$GDM_ROOT" "$(t self_update_help)"
     confirm self_update_confirm || exit 10
     ui_task self_update_downloading manager_git_pull
-    bash -n "$GDM_ROOT/start.sh" || die self_update_invalid
+    bash -n "$GDM_ROOT/start.sh" || die self_update_git_invalid "$GDM_ROOT"
     printf '%s\n' "$GDM_ROOT" > "$STATE/cache/manager-update.pending"
     say self_update_restart
 }
@@ -956,8 +990,8 @@ manager_self_update() {
     if [[ -e $GDM_ROOT/.git ]]; then manager_git_update; return; fi
     MANAGER_LATEST=''
     ui_task self_update_checking manager_latest_lookup
-    if [[ -z $MANAGER_LATEST ]]; then say self_update_unavailable; return 0; fi
-    if ! version_gt "$MANAGER_LATEST" "$GDM_VERSION"; then say self_update_none "$GDM_VERSION"; return 0; fi
+    if [[ -z $MANAGER_LATEST ]]; then menu_done self_update_unavailable; return 0; fi
+    if ! version_gt "$MANAGER_LATEST" "$GDM_VERSION"; then menu_done self_update_none "$GDM_VERSION"; return 0; fi
     ui_panel "$(t self_update_title)" "$(t self_update_versions "$GDM_VERSION" "$MANAGER_LATEST")" "$(t self_update_help)"
     confirm self_update_confirm || exit 10
     ui_task self_update_downloading manager_download

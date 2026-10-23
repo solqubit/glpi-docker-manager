@@ -9,15 +9,15 @@ tls_is_ip() { [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
 tls_validate_pair() {
     local dir=$1 hostname=$2 certificate_key private_key
     [[ -f $dir/fullchain.pem && -f $dir/privkey.pem ]] || die cert_instructions "$dir/fullchain.pem" "$dir/privkey.pem"
-    openssl x509 -in "$dir/fullchain.pem" -noout -checkend 86400 >/dev/null || die invalid certificate
+    openssl x509 -in "$dir/fullchain.pem" -noout -checkend 86400 >/dev/null || die cert_bad_expiry
     if tls_is_ip "$hostname"; then
-        openssl x509 -in "$dir/fullchain.pem" -noout -checkip "$hostname" | grep -q 'does match' || die invalid certificate_hostname
+        openssl x509 -in "$dir/fullchain.pem" -noout -checkip "$hostname" | grep -q 'does match' || die cert_bad_host "$hostname"
     else
-        openssl x509 -in "$dir/fullchain.pem" -noout -checkhost "$hostname" | grep -q 'does match' || die invalid certificate_hostname
+        openssl x509 -in "$dir/fullchain.pem" -noout -checkhost "$hostname" | grep -q 'does match' || die cert_bad_host "$hostname"
     fi
     certificate_key=$(openssl x509 -in "$dir/fullchain.pem" -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum)
     private_key=$(openssl pkey -in "$dir/privkey.pem" -passin pass: -pubout -outform DER | sha256sum)
-    [[ $certificate_key == "$private_key" ]] || die invalid certificate_key
+    [[ $certificate_key == "$private_key" ]] || die cert_bad_key
 }
 # Creates the local CA once (or when it is about to expire / on request).
 tls_ca_ensure() {
@@ -122,19 +122,35 @@ tls_prepare() {
             "$host" "$host" "$redirect" "$host" > "$revision/Caddyfile"
     fi
 }
+# The mode in use is marked, as in the other settings screens.
+tls_mode_label() {
+    local text
+    text=$(t "ui_tls_$1")
+    [[ $1 != "$2" ]] || text+=" $(t opt_current)"
+    printf '%s' "$text"
+}
 tls_wizard() {
-    local input=$1 output=$2 mode host
-    choose mode tls_prompt "$(jq -r .tls "$input")" \
-        off "$(ui_opt '' "$(t ui_tls_off)" "$(t opt_tls_off)")" \
-        self-signed "$(ui_opt ok "$(t ui_tls_self-signed)" "$(t opt_tls_self_signed)")" \
-        acme "$(ui_opt primary "$(t ui_tls_acme)" "$(t opt_tls_acme)")" \
-        custom "$(ui_opt '' "$(t ui_tls_custom)" "$(t opt_tls_custom)")" || die cancelled
+    local input=$1 output=$2 mode host current
+    current=$(jq -r .tls "$input")
+    choose mode tls_prompt "$current" \
+        off "$(ui_opt '' "$(tls_mode_label off "$current")" "$(t opt_tls_off)")" \
+        self-signed "$(ui_opt ok "$(tls_mode_label self-signed "$current")" "$(t opt_tls_self_signed)")" \
+        acme "$(ui_opt primary "$(tls_mode_label acme "$current")" "$(t opt_tls_acme)")" \
+        custom "$(ui_opt '' "$(tls_mode_label custom "$current")" "$(t opt_tls_custom)")" || die cancelled
     case $mode in off|self-signed|acme|custom) ;; *) die invalid tls;; esac
+    # Imported files must exist before anything is asked or restarted.
+    if [[ $mode == custom && ! ( -f $CERT_ROOT/custom/fullchain.pem && -f $CERT_ROOT/custom/privkey.pem ) ]]; then
+        die cert_instructions "$CERT_ROOT/custom/fullchain.pem" "$CERT_ROOT/custom/privkey.pem"
+    fi
     if [[ $mode == acme ]]; then
         ui_panel "$(t ui_letsencrypt_title)" "$(t ui_letsencrypt_body)" "$(t ui_letsencrypt_ports)"
-        ask_value host hostname_prompt '' hostname || exit 10
-    else ask_value host hostname_prompt "$(jq -r .hostname "$input")" hostname || exit 10; fi
-    [[ $mode != custom ]] || say cert_instructions "$CERT_ROOT/custom/fullchain.pem" "$CERT_ROOT/custom/privkey.pem"
+        # A public name is required: an IP, localhost or .local would only fail later.
+        while :; do
+            ask_value host hostname_prompt '' hostname || die cancelled
+            [[ $host == *.* && ! $host =~ ^[0-9.]+$ && $host != *.local && $host != *.localhost ]] && break
+            say setup_public_domain
+        done
+    else ask_value host hostname_prompt "$(jq -r .hostname "$input")" hostname || die cancelled; fi
     [[ $mode != acme ]] || say acme_requirements "$host"
     jq --arg mode "$mode" --arg host "$host" --arg cert_dir "$CERT_ROOT" \
        '.tls=$mode | .hostname=$host | .cert_dir=$cert_dir | if $mode=="acme" then .http_port=80 | .https_port=443 else . end' "$input" > "$output"

@@ -45,7 +45,10 @@ class Backups:
         while True:
             choice = self.ui.menu(self.ui.t('backups_details'), info + actions, len(info),
                                   notice=notice, notice_style=style, help_text=self.ui.t('setup_keys'))
-            if choice is None or choice == 'list': return None
+            if choice is None or choice == 'list':
+                # The list shows its own counts and help again.
+                self.notice = ''
+                return None
             if choice == 'info': continue
             result = dict(action=choice, archive=str(path))
             if choice == 'restore' and data.get('error'):

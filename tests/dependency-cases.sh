@@ -27,4 +27,4 @@ bootstrap_dependencies
 grep -qx 'dnf install -y iproute' "$work/calls"
 PKG=pacman; missing_tool=python3
 bootstrap_dependencies
-grep -qx 'pacman -S --needed python' "$work/calls"
+grep -qx 'pacman -S --needed --noconfirm python' "$work/calls"

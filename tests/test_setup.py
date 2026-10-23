@@ -41,7 +41,15 @@ with tempfile.TemporaryDirectory() as directory:
     path.write_text(json.dumps(data))
     form = Setup(path, translations(root, 'es'))
     assert 'abc' not in repr(form.rows())
-    assert 'Introducida' in form.display('db_password')
+    assert form.display('db_password') == form.ui.t('setup_secret_set')
+    with socket.socket() as listener:
+        listener.bind(('0.0.0.0', 0)); listener.listen()
+        form.data['http_port'] = listener.getsockname()[1]
+        assert not form.ready()
+        row = next(row for row in form.rows() if row[0] == 'http_port')
+        assert row[2] == 'error' and '[✗]' in row[1][0][0]
+    assert form.ready() and not form.invalid_field
+    form.data['http_port'] = data['http_port']
     form.data['timezone'] = 'America/Guayaquil'; form.save()
     assert json.loads(path.read_text())['timezone'] == 'America/Guayaquil'
     assert path.stat().st_mode & 0o077 == 0

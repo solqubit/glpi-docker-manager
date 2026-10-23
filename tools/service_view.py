@@ -89,8 +89,11 @@ def main():
         rows = [(None, clean(line), '') for line in Path(data_path).read_text(errors='replace').splitlines()]
         title = ui.t('ui_logs_details')
     if interactive == 'true' and sys.stdin.isatty() and sys.stdout.isatty():
+        # Logs open at the newest line; both views say how to scroll and leave.
         ui.run(lambda: ui.menu(title, rows + [('back', ui.t('ui_status_back'), 'accent')],
-                              help_text=ui.t('ui_status_back')))
+                               len(rows) if mode == 'logs' else 0,
+                               notice=ui.t('logs_note') if mode == 'logs' else '',
+                               notice_style='warning', help_text=ui.t('view_help')))
     else:
         print(title + '\n')
         for _, label, _ in rows:

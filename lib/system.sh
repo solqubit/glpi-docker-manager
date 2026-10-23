@@ -36,7 +36,9 @@ as_root() {
 admin_command_retry() {
     while ! as_root "$@"; do
         say admin_retry_notice
-        confirm docker_retry_confirm || die cancelled
+        # Let the command's output be read before the question clears the page.
+        ui_pause ui_continue_setup
+        confirm docker_retry_confirm y || die cancelled
     done
 }
 bootstrap_dependencies() {
@@ -68,7 +70,7 @@ bootstrap_dependencies() {
         apt-get) admin_command_retry apt-get update; admin_command_retry apt-get install -y --no-remove --no-upgrade "${packages[@]}";;
         dnf|yum) admin_command_retry "$PKG" install -y "${packages[@]}";;
         zypper) admin_command_retry zypper --non-interactive install "${packages[@]}";;
-        pacman) admin_command_retry pacman -S --needed "${packages[@]}";;
+        pacman) admin_command_retry pacman -S --needed --noconfirm "${packages[@]}";;
         apk) admin_command_retry apk add "${packages[@]}";;
         *) die manual_dependencies;;
     esac
@@ -135,7 +137,7 @@ docker_require_access() {
                 say docker_start_failed
             fi
         fi
-        confirm docker_retry_confirm || die cancelled
+        confirm docker_retry_confirm y || die cancelled
     done
 }
 plugin_package_available() {
@@ -158,7 +160,7 @@ bootstrap_docker_plugins() {
         say docker_plugins_missing
         case $PKG in
             apt-get|dnf|yum) ;;
-            *) say docker_plugins_manual; confirm docker_retry_confirm || die cancelled; continue;;
+            *) say docker_plugins_manual; confirm docker_retry_confirm y || die cancelled; continue;;
         esac
         confirm docker_plugins_confirm || die cancelled
         [[ $PKG != apt-get ]] || admin_command_retry apt-get update
@@ -171,7 +173,7 @@ bootstrap_docker_plugins() {
             for candidate in "${compose_candidates[@]}"; do
                 if plugin_package_available "$candidate"; then selected=$candidate; break; fi
             done
-            if [[ -z $selected ]]; then say docker_plugins_manual; confirm docker_retry_confirm || die cancelled; continue; fi
+            if [[ -z $selected ]]; then say docker_plugins_manual; confirm docker_retry_confirm y || die cancelled; continue; fi
             packages+=("$selected")
         fi
         if [[ $buildx == true ]]; then
@@ -179,7 +181,7 @@ bootstrap_docker_plugins() {
             for candidate in "${buildx_candidates[@]}"; do
                 if plugin_package_available "$candidate"; then selected=$candidate; break; fi
             done
-            if [[ -z $selected ]]; then say docker_plugins_manual; confirm docker_retry_confirm || die cancelled; continue; fi
+            if [[ -z $selected ]]; then say docker_plugins_manual; confirm docker_retry_confirm y || die cancelled; continue; fi
             packages+=("$selected")
         fi
         say plugin_packages "${packages[*]}"

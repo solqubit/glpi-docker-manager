@@ -15,7 +15,7 @@ GROUPS = [
                             ('stop', 'menu_stop'), ('logs', 'menu_logs')]),
     # Update GLPI also lists newer releases and a refreshed image of the same
     # version; Create backup also offers the final backup for a server move.
-    ('help_group_updates', [('update', 'menu_update'), ('db-update', 'menu_database_update'),
+    ('dash_group_updates', [('update', 'menu_update'), ('db-update', 'menu_database_update'),
                             ('proxy-update', 'menu_proxy_update')]),
     ('help_group_manager', [('diagnose', 'menu_diagnose'), ('self-update', 'menu_self_update'),
                             ('uninstall', 'menu_uninstall'), ('quit', 'ui_exit')]),
@@ -27,6 +27,8 @@ GROUPS = [
                              ('language', 'menu_language')]),
 ]
 STYLES = {'uninstall': 'warning', 'quit': 'accent'}
+# Result of the previous action (Bash menu_done): "level<TAB>text".
+NOTICE_STYLES = {'success': ('[+] ', 'ok'), 'warning': ('[!] ', 'warning'), 'error': ('[✗] ', 'error')}
 
 
 def age(ui, moment):
@@ -104,7 +106,7 @@ def status_line(ui, config, state_folder):
     return ' · '.join(parts), style
 
 
-def layout(ui):
+def layout(ui, hidden=()):
     """Cells (value, label, column, row) and group headers for the current width."""
     columns = [GROUPS[:3], GROUPS[3:]] if ui.width >= 66 else [GROUPS]
     cells, headers = [], []
@@ -114,6 +116,8 @@ def layout(ui):
             headers.append((column, row, ui.t(title)))
             row += 1
             for value, label in actions:
+                if value in hidden:
+                    continue
                 cells.append(dict(value=value, label=ui.t(label), column=column, row=row))
                 row += 1
     return cells, headers, len(columns)
@@ -137,19 +141,26 @@ def dashboard(ui, config, services, state_folder):
     key = {'running': 'ui_status_running', 'starting': 'ui_status_starting',
            'unhealthy': 'ui_status_unhealthy'}.get(current, 'ui_status_stopped')
     ui.context = f"GLPI {config['glpi_version']} · MySQL {config['mysql_version']} · {ui.t(key)}"
-    initial = 'start' if current in ('stopped', 'missing') else 'status'
+    # Without HTTPS there is no proxy to update.
+    hidden = ('proxy-update',) if config.get('tls') == 'off' else ()
+    values = [value for _, actions in GROUPS for value, _ in actions if value not in hidden]
+    # Back on the action just used, so a repeated task is one Enter away.
+    last = os.environ.get('GDM_DASH_LAST', '')
+    initial = last if last in values and last != 'quit' else 'start' if current in ('stopped', 'missing') else 'status'
     status, status_style = status_line(ui, config, state_folder)
+    level, _, result = os.environ.get('GDM_DASH_NOTICE', '').partition('\t')
     if ui.screen is None:
         rows = [(value, ui.t(title) + ' · ' + ui.t(label), STYLES.get(value, ''))
-                for title, actions in GROUPS for value, label in actions]
+                for title, actions in GROUPS for value, label in actions if value not in hidden]
         selected = next(i for i, row in enumerate(rows) if row[0] == initial)
-        return ui.menu(ui.t('ui_menu_prompt'), rows, selected, notice=status) or 'quit'
+        return ui.menu(ui.t('ui_menu_prompt'), rows, selected,
+                       notice=(result + ' · ' if result else '') + status) or 'quit'
     selected = None
     while True:
         # The status is truncated to one line, so the width must be known first.
         ui.measure()
         top, height = ui.frame(ui.t('ui_menu_prompt'), status[:ui.width - 4], status_style)
-        cells, headers, columns = layout(ui)
+        cells, headers, columns = layout(ui, hidden)
         if selected is None or selected >= len(cells):
             selected = next(i for i, cell in enumerate(cells) if cell['value'] == initial)
         width = ui.width // columns
@@ -164,10 +175,16 @@ def dashboard(ui, config, services, state_folder):
                 text = ('> ' if active else '  ') + cell['label']
                 ui.put(top + cell['row'] - offset, ui.left + cell['column'] * width,
                        text[:width - 2].ljust(width - 2), 'selected' if active else STYLES.get(cell['value'], ''))
-        ui.put(height - 2, ui.left, '[*] ' + ui.t('desc_' + cells[selected]['value']), 'dim')
-        ui.put(height - 1, ui.left, ui.t('menu_all_options'), 'accent')
+        if result:
+            # The previous action's result stays until the first key press.
+            marker, style = NOTICE_STYLES.get(level, ('[*] ', 'accent'))
+            ui.put(height - 2, ui.left, (marker + result)[:ui.width - 2], style)
+        else:
+            ui.put(height - 2, ui.left, '[*] ' + ui.t('desc_' + cells[selected]['value']), 'dim')
+        ui.put(height - 1, ui.left, ui.t('menu_all_options' if columns > 1 else 'menu_keys_single'), 'accent')
         ui.screen.refresh()
         key = ui.key()
+        result = ''
         if key in ('\n', '\r', curses.KEY_ENTER): return cells[selected]['value']
         if key == '\x1b': return 'quit'
         if key == curses.KEY_DOWN: selected = move(cells, selected, 1)

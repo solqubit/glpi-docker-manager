@@ -193,7 +193,8 @@ class Terminal:
         """A row is plain text or segments [(text, style)]; a style ending in
         '>' right-aligns that segment. The active row is one selection bar."""
         if active:
-            self.put(y, self.left, ('> ' + plain(label)).ljust(self.width), 'selected')
+            self.put(y, self.left, ('> ' + plain(label)).ljust(self.width),
+                     'error' if style == 'error' else 'selected')
             return
         if not isinstance(label, (list, tuple)):
             self.put(y, self.left, '  ' + label, style)
@@ -289,7 +290,8 @@ class Terminal:
         returns a live line such as the resulting URL."""
         visible = os.environ.get('GDM_PASSWORD_VISIBILITY') != 'hidden'
         if self.screen is None:
-            print('\n' + title + '\n' + hint, file=sys.stderr)
+            # Without curses there is no Esc: ":back" goes back.
+            print('\n' + title + '\n' + hint + ' ' + self.t('plain_back_hint'), file=sys.stderr)
             while True:
                 text = getpass.getpass('> ') if secret and not visible else input('> ')
                 if text == ':back':

@@ -180,7 +180,7 @@ try:
         assert changed['db_password'] == config['db_password']
         subprocess.run(['docker', 'exec', config['project'] + '-glpi-1', 'sh', '-c',
                         'printf after-backup > /var/glpi/files/gdm-wizard-marker'], check=True)
-        drive(['restore'], [('backup_list', b'\n'), ('destructive', b'RESTORE\n')], 'restore.log')
+        drive(['restore'], [('backup_pick_prompt', b'\n'), ('destructive', b'RESTORE\n')], 'restore.log')
         restored = json.loads((state / 'current/config.json').read_text())
         test_projects.append(restored['project'])
         assert restored['project'] != config['project'] and restored['status'] == 'ready'

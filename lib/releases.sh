@@ -31,7 +31,7 @@ release_fetch() {
         ui_status "$(t status_release_page "$page")"
         if ! part=$(http_get "https://api.github.com/repos/glpi-project/glpi/releases?per_page=100&page=$page") ||
            ! jq -e 'type=="array"' <<< "$part" >/dev/null 2>&1; then
-            release_cache_age >/dev/null || return 1
+            release_cache_age >/dev/null || die releases_unavailable
             say releases_stale
             return 0
         fi
@@ -113,7 +113,8 @@ official_image_lookup() {
     printf '%s\t%s\n' "$version" "$reference"
 }
 release_notice() {
-    local version=$1 major=${1%%.*} body url note_action
+    local version=$1 mode=${2:-} major=${1%%.*} body url note_action
+    RELEASE_BACK=false
     body=$(jq -r --arg v "$version" '.[]|select(.version==$v)|.body // ""' "$STATE/cache/releases.json")
     url="https://github.com/glpi-project/glpi/releases/tag/$version"
     say release_notes "$version" "$url"
@@ -122,7 +123,10 @@ release_notice() {
     fi
     if [[ $major == 10 ]]; then
         say glpi10_warning
-        confirm unsupported_confirm || die cancelled
+        if [[ $mode != info ]] && ! confirm unsupported_confirm; then
+            [[ $mode == back ]] || die cancelled
+            RELEASE_BACK=true; return 0
+        fi
     elif [[ ! -s $STATE/cache/security.md ]]; then say support_unknown
     elif ! grep -Eq "\\|[[:space:]]*$major\\.0\\.x[[:space:]]*\\|.*(✔|✅)" "$STATE/cache/security.md"; then
         say support_unknown
@@ -130,10 +134,16 @@ release_notice() {
     local newest
     newest=$(release_versions "$major" | head -n 1)
     [[ $newest == "$version" ]] || say older_release "$newest"
-    if [[ -t 0 ]]; then
-        choose note_action ui_release_prompt continue continue "$(ui_opt primary "$(t ui_release_continue)")" \
-            notes "$(ui_opt '' "$(t ui_release_details)" "$(t opt_release_notes)")" || die cancelled
+    if [[ -t 0 && $mode != info ]]; then
+        if ! choose note_action ui_release_prompt continue continue "$(ui_opt primary "$(t ui_release_continue)")" \
+            notes "$(ui_opt '' "$(t ui_release_details)" "$(t opt_release_notes)")"; then
+            [[ $mode == back ]] || die cancelled
+            RELEASE_BACK=true; return 0
+        fi
         if [[ $note_action == notes ]]; then
+            # A clean page: the notes must not mix with the previous menu.
+            ui_page
+            ui_log info "$(t release_notes "$version" "$url")"
             # Upstream text is data, never terminal control sequences or code.
             printf '%s\n' "$body" | LC_ALL=C tr -d '\000-\010\013-\037\177' >&2
             ui_pause ui_continue_setup
@@ -157,15 +167,16 @@ select_version_candidates() {
     done
 }
 select_version() {
-    local major=$1 requested=${2:-} version reference choice limit=3 allow_back=${3:-false}
+    local major=$1 requested=${2:-} version reference choice limit=3 allow_back=${3:-false} back_key=${4:-setup_return_edit}
     local -a versions=() refs=() version_options=()
     if [[ -n $requested ]]; then
         if ! valid_version "$requested" || [[ ${requested%%.*} != "$major" ]]; then die invalid version; fi
         jq -e --arg v "$requested" 'any(.[]; .version==$v)' "$STATE/cache/releases.json" >/dev/null || die invalid version
         SELECTED_VERSION=$requested
         SELECTED_IMAGE=$(image_resolve glpi/glpi "$requested") || die image_missing "$requested"
-        release_notice "$requested"
-        return
+        release_notice "$requested" "$([[ $allow_back == true ]] && printf back)"
+        [[ ${RELEASE_BACK:-false} != true ]] || return 10
+        return 0
     fi
     ui_task task_versions select_version_candidates "$major" "$limit"
     (( ${#versions[@]} > 0 )) || die image_missing "$major"
@@ -175,25 +186,29 @@ select_version() {
         else version_options+=("${versions[i]}" "$(ui_opt '' "GLPI ${versions[i]}" "$(t opt_version_older)")"); fi
     done
     version_options+=(other "$(ui_opt '' "$(t more_versions)" "$(t opt_version_other)")")
-    [[ $allow_back != true ]] || version_options+=(back "$(ui_opt back "$(t setup_return_edit)")")
-    if ! choose choice "${VERSION_PROMPT:-choose_version}" "${versions[0]}" "${version_options[@]}"; then
-        [[ $allow_back != true ]] || return 10
-        die cancelled
-    fi
-    [[ $choice != back ]] || return 10
-    if [[ $choice == other ]]; then
+    [[ $allow_back != true ]] || version_options+=(back "$(ui_opt back "$(t "$back_key")")")
+    while :; do
+        if ! choose choice "${VERSION_PROMPT:-choose_version}" "${versions[0]}" "${version_options[@]}"; then
+            [[ $allow_back != true ]] || return 10
+            die cancelled
+        fi
+        [[ $choice != back ]] || return 10
+        [[ $choice == other ]] || break
         # Keep the list visible: ask() opens a new page that redraws this panel.
+        requested=''
         while :; do
             ui_panel "$(t version_list_title "$major")" "$(release_versions "$major" | tr '\n' ' ')"
-            ask requested exact_version || exit 10
-            jq -e --arg v "$requested" 'any(.[]; .version==$v)' "$STATE/cache/releases.json" >/dev/null && break
+            # Esc goes back to the version list, not out of the wizard.
+            ask requested exact_version || { requested=''; break; }
+            grep -Fxq -- "$requested" < <(release_versions "$major") && break
             say invalid "$requested"
         done
-        select_version "$major" "$requested"
-        return
-    fi
+        [[ -z $requested ]] || { select_version "$major" "$requested" "$allow_back"; return; }
+    done
     for i in "${!versions[@]}"; do
         if [[ $choice == "${versions[i]}" ]]; then SELECTED_VERSION=${versions[i]}; SELECTED_IMAGE=${refs[i]}; break; fi
     done
-    release_notice "$SELECTED_VERSION"
+    release_notice "$SELECTED_VERSION" "$([[ $allow_back == true ]] && printf back)"
+    [[ ${RELEASE_BACK:-false} != true ]] || return 10
+    return 0
 }

@@ -102,6 +102,9 @@ terminal_case('ask', b'old\x15new\n', b'RESULT=new')
 terminal_case('ask-cancel', b'edited\x1b', b'CANCELLED')
 terminal_case('typed', b'RESTORE\n', b'CONFIRMED')
 terminal_case('typed', b'\x1b', b'Cancelado.', expected_code=1)
+# A typo asks again instead of cancelling.
+retyped = terminal_case('typed', b'restore\nRESTORE\n', b'CONFIRMED')
+assert 'No coincide'.encode() in retyped
 terminal_case('pause', b'\x1b[B', b'PAUSE_DONE', ready=b'Pulsa Enter', remain_open=True)
 terminal_case('pause', b'\x1b', b'PAUSE_DONE', ready=b'Pulsa Enter')
 terminal_case('valid-port', b'bad\n18080\n', b'RESULT=18080')
@@ -133,11 +136,12 @@ terminal_case('select', b'', b'\x1b[?25h', expected_code=130, interrupt=True)
 screen = terminal_case('screen', b'\x1b[F\n', b'RESULT=quit')
 assert 'Todavía no hay un GLPI'.encode() in screen
 assert 'Instalar GLPI'.encode() in screen and 'Restaurar un respaldo'.encode() in screen
+# A cancellation inside the menu returns straight to it, without "press Enter".
 cancelled = terminal_case('menu-cancel', b'\n', b'MENU_CLOSED', followups=[
-    (b'Pulsa Enter para volver', b'\n'),
     ('¿Qué quieres hacer?'.encode(), b'\x1b'),
 ])
 assert 'La operación falló'.encode() not in cancelled
+assert 'Pulsa Enter para volver'.encode() not in cancelled
 returned = terminal_case('menu-back', b'\n', b'MENU_CLOSED', followups=[
     ('¿Qué quieres hacer?'.encode(), b'\x1b'),
 ])

@@ -132,4 +132,27 @@ maintenance_settings
     if frequency_menu; then exit 1; fi
     [[ $frequency_calls == 3 && $MAINT_MODE == days && $MAINT_EVERY == 2 && -z $MAINT_WEEKDAYS ]]
 )
+(
+    # Cancelling RESTORE returns to the file list without reopening its details.
+    calls="$STATE/restore-cancel-calls"
+    python3() {
+        [[ $1 == "$GDM_ROOT/tools/backup_manager.py" ]] || return 1
+        printf 'call\n' >> "$calls"
+        if [[ $(wc -l < "$calls") == 1 ]]; then
+            printf '{"action":"restore","archive":"%s/backups/cancel.tar.gz"}\n' "$STATE" > "$4"
+        else
+            [[ -z ${5:-} ]] || exit 1
+            printf '{"action":"back"}\n' > "$4"
+        fi
+    }
+    restore_backup() { RESTORE_CANCELLED=true; }
+    ui_pause() { exit 1; }
+    backup_manage
+    [[ $(wc -l < "$calls") == 2 ]]
+    rm -- "$calls"
+    restore_backup() { RESTORE_CANCELLED=false; }
+    ui_pause() { printf 'read\n' > "$STATE/restore-result-read"; }
+    backup_manage
+    [[ $(wc -l < "$calls") == 2 && -f $STATE/restore-result-read ]]
+)
 printf 'PASS: backup rotation by kind, restore cleanup policy, free-space selection, backup schedules, nested Back navigation and log rotation settings\n'

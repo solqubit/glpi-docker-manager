@@ -127,6 +127,15 @@ def port_errors(data):
     return None
 
 
+def port_field(port, data):
+    """Form field that owns a busy port."""
+    if port == 3306:
+        return 'expose_db'
+    if port == 0:
+        return 'tls'
+    return 'https_port' if port == data.get('https_port') and data.get('tls') != 'off' else 'http_port'
+
+
 class Setup:
     def __init__(self, path, messages):
         self.path = path
@@ -135,8 +144,14 @@ class Setup:
         self.fields = FIELDS[:6] if self.access_only else FIELDS
         self.ui = Terminal(messages, self.context())
         self.selected = 0
-        self.notice = self.data.pop('_notice', '') or self.ui.t('setup_access_intro' if self.access_only else 'setup_intro')
-        self.notice_style = 'accent'
+        # A problem found by Bash (busy port, invalid certificate) is an error at its field.
+        notice = self.data.pop('_notice', '')
+        busy = self.data.pop('_busy_port', None)
+        self.invalid_field = port_field(busy, self.data) if busy is not None else ''
+        self.notice = notice or self.ui.t('setup_access_intro' if self.access_only else 'setup_intro')
+        self.notice_style = 'error' if notice else 'accent'
+        if busy is not None:
+            self.selected = self.field_index(port_field(busy, self.data))
         self.defaults = {'hostname': self.data.get('_detected_host', 'localhost')}
         self.defaults.update({key: default for key, _, _, default in FIELDS if default is not None})
         # An installed instance compares against its current values, not defaults.
@@ -144,15 +159,22 @@ class Setup:
         # A legacy "localhost" is pre-filled with the detected IP: that is a change.
         self.original['hostname'] = self.data.pop('_configured_host', self.data['hostname'])
 
+    def field_index(self, key):
+        return next((i for i, row in enumerate(self.fields) if row[0] == key), 0)
+
     def text(self, key):
         """Install wording, or its variant for an installed instance (setup_access_*)."""
         return self.ui.t(key.replace('setup_', 'setup_access_', 1) if self.access_only else key)
+
+    def cert_missing(self, folder):
+        key = 'cert_instructions' if self.access_only else 'setup_cert_missing'
+        return self.ui.t(key, str(folder / 'fullchain.pem'), str(folder / 'privkey.pem'))
 
     def changed(self):
         return any(self.data[key] != value for key, value in self.original.items())
 
     def context(self):
-        return f"GLPI {self.data['glpi_version']} · MySQL {self.data['mysql_version']} · db:3306"
+        return f"GLPI {self.data['glpi_version']} · MySQL {self.data['mysql_version']}"
 
     def save(self):
         handle, temporary = tempfile.mkstemp(prefix='.setup-', dir=self.path.parent)
@@ -165,8 +187,8 @@ class Setup:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
-    def display(self, key):
-        value = self.data[key]
+    def display(self, key, value=None):
+        value = self.data[key] if value is None else value
         if key.endswith('password'):
             return self.ui.t('setup_secret_set' if value else 'setup_secret_empty')
         if key == 'tls':
@@ -184,7 +206,7 @@ class Setup:
         width = self.label_width()
         for key, label, _, _ in self.fields:
             pending = key.endswith('password') and not self.data[key]
-            invalid = bool(validate(key, str(self.data[key]), self.data))
+            invalid = key == self.invalid_field or bool(validate(key, str(self.data[key]), self.data))
             if self.access_only:
                 # Unchanged values are "current" and dim; edited ones stand out.
                 default = self.data[key] == self.original[key]
@@ -239,7 +261,7 @@ class Setup:
             value = self.ui.menu(self.ui.t('setup_tls'),
                                  [(v, glyph + ' ' + self.ui.t('ui_tls_' + v), style)
                                   for v, glyph, style in zip(values, '·●▶·', ('', 'ok', 'accent', ''))],
-                                 values.index(self.data[key]), help_text=self.ui.t('setup_tls_help'))
+                                 values.index(self.data[key]), help_text=self.ui.t('setup_tls_help', str(Path(self.data['cert_dir']) / 'custom')))
             if value == 'acme':
                 self.data['http_port'], self.data['https_port'] = 80, 443
         elif kind == 'exposure':
@@ -273,15 +295,18 @@ class Setup:
                     generated = True
         if value is not None:
             self.data[key] = value
+            if key == self.invalid_field:
+                self.invalid_field = ''
             self.save()
             self.notice = self.ui.t('setup_saved', self.ui.t(label).split(' · ')[0])
             self.notice_style = 'ok'
             if generated:
                 self.notice = self.ui.t('setup_password_generated', self.ui.t(label).split(' · ')[0])
             if key == 'tls' and value == 'custom':
-                folder = Path(self.data['cert_dir']) / 'custom'
-                self.notice = self.ui.t('cert_instructions', str(folder / 'fullchain.pem'), str(folder / 'privkey.pem'))
+                self.notice = self.cert_missing(Path(self.data['cert_dir']) / 'custom')
                 self.notice_style = 'warning'
+            elif key == 'tls' and value == 'acme':
+                self.notice = self.ui.t('setup_acme_ports')
 
     def ready(self):
         errors = form_errors(self.data)
@@ -292,16 +317,18 @@ class Setup:
             self.notice_style = 'error'
             return False
         busy = port_errors(self.data)
+        self.invalid_field = port_field(busy, self.data) if busy is not None else ''
         if busy:
             self.notice = self.ui.t('port_busy', busy)
             self.notice_style = 'error'
+            self.selected = self.field_index(port_field(busy, self.data))
             return False
         if self.data['tls'] == 'custom':
             folder = Path(self.data['cert_dir']) / 'custom'
             if not all((folder / filename).is_file() for filename in ('fullchain.pem', 'privkey.pem')):
-                self.notice = self.ui.t('cert_instructions', str(folder / 'fullchain.pem'), str(folder / 'privkey.pem'))
+                self.notice = self.cert_missing(folder)
                 self.notice_style = 'error'
-                self.selected = 4
+                self.selected = self.field_index('tls')
                 return False
         return True
 
@@ -314,11 +341,16 @@ class Setup:
                 ('hostname', [('URL'.ljust(width + 4), 'dim'), (url, 'accent')], '')]
         for key, label, _, _ in self.fields:
             name = self.ui.t(label).split(' · ')[0]
-            rows.append((key, [(name.ljust(width + 4), 'dim'), (self.display(key), 'accent')], ''))
+            if self.access_only and self.data[key] != self.original[key]:
+                before = self.display(key, self.original[key])
+                rows.append((key, [(name.ljust(width + 4), 'dim'), (before + ' → ', 'dim'), (self.display(key), 'ok')], ''))
+            else:
+                rows.append((key, [(name.ljust(width + 4), 'dim'),
+                                   (self.display(key), 'dim' if self.access_only else 'accent')], ''))
         rows.append((SEPARATOR, '', ''))
         actions = len(rows)
         rows += [('deploy', '▶ ' + self.ui.t('setup_apply' if self.access_only else 'setup_deploy'), 'ok'),
-                 ('edit', self.ui.t('setup_return_edit'), 'accent')]
+                 ('edit', '← ' + self.ui.t('setup_return_edit'), 'accent')]
         if not self.access_only:
             rows.append(('version', self.ui.t('setup_version_back'), ''))
         rows.append(('cancel', self.text('setup_cancel'), ''))
@@ -341,7 +373,7 @@ class Setup:
                 if self.access_only and not self.changed():
                     return 10
                 decision = self.ui.menu(self.text('setup_cancel_confirm'),
-                                        [('stay', self.ui.t('setup_return_edit'), 'accent'),
+                                        [('stay', '← ' + self.ui.t('setup_return_edit'), 'accent'),
                                          ('cancel', self.text('setup_cancel'), 'warning')])
                 if decision == 'cancel':
                     return 10
@@ -367,7 +399,10 @@ class Setup:
                         return 0
                     if decision == 'version':
                         return 20
-                    if decision == 'cancel':
+                    if decision == 'cancel' and self.ui.menu(
+                            self.text('setup_cancel_confirm'),
+                            [('stay', '← ' + self.ui.t('setup_return_edit'), 'accent'),
+                             ('cancel', self.text('setup_cancel'), 'warning')]) == 'cancel':
                         return 10
                 continue
             self.selected = next(i for i, row in enumerate(self.fields) if row[0] == choice)

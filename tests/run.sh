@@ -118,10 +118,10 @@ dc() {
 }
 for mysql_state in running stopped; do
     diagnose > "$STATE/$mysql_state.log" 2>&1
-    grep -Fq 'next revision: --innodb-buffer-pool-size=1024M' "$STATE/$mysql_state.log"
+    grep -Fq "$(t diag_buffer_next 1024)" "$STATE/$mysql_state.log"
 done
-grep -Fq 'applied: innodb_buffer_pool_size=134217728 bytes (128 MiB)' "$STATE/running.log"
-grep -Fq 'applied: unavailable (MySQL stopped or unreachable)' "$STATE/stopped.log"
+grep -Fq "$(t diag_buffer_applied 128)" "$STATE/running.log"
+grep -Fq "$(t diag_buffer_unavailable)" "$STATE/stopped.log"
 BASH
 ok 'MySQL diagnosis reports the live buffer without an explicit argument and handles a stopped database'
 

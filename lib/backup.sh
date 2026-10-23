@@ -50,7 +50,7 @@ backup_create() {
     case $origin in auto) tag=auto-;; update|migrate|db-update|refresh-image|restore) tag=pre-;; *) tag='';; esac
     archive="$STATE/backups/glpi-$(cfg glpi_version)-$(date -u +%Y%m%dT%H%M%S)-$tag$(openssl rand -hex 3).tar.gz"
     CLEANUP_PATHS+=("$archive.partial")
-    say backup_started
+    ui_progress_note backup_started
     if [[ $(cfg tls) != off && -n $(dc ps --status running --quiet proxy) ]]; then was_proxy=true; dc stop proxy; fi
     dc stop glpi
     RESUME_GLPI_ON_EXIT=true
@@ -127,7 +127,8 @@ restore_backup() {
         [[ $picker_result == 0 ]] || exit "$picker_result"
         IFS= read -r archive < "$selection"
     fi
-    backup_extract "$archive"
+    # Extracting and checking a large archive takes a while: show it.
+    ui_task restore_checking backup_extract "$archive"
     local replaced='' id
     if restore_can_backup; then note=$(t restore_plan_safe)
     elif [[ ! -L $STATE/current ]]; then note=$(t restore_plan_fresh)
@@ -139,23 +140,38 @@ restore_backup() {
             [[ -z $replaced ]] || note+=" $(t restore_replaces_kept "$replaced")"
         fi
     fi
+    local contents installed=''
+    contents="GLPI $(jq -r '.glpi_version // "?"' "$EXTRACTED/metadata.json" 2>/dev/null) · $(jq -r '.created_at // "?"' "$EXTRACTED/metadata.json" 2>/dev/null)"
+    [[ ! -L $STATE/current ]] || installed="$(t restore_installed)"$'\t'"GLPI $(cfg glpi_version)"
     ui_panel "$(t backup_selected)" \
         "$(t restore_file)"$'\t'"${archive##*/}" "$(t restore_folder)"$'\t'"${archive%/*}" \
+        "$(t restore_contents)"$'\t'"$contents" ${installed:+"$installed"} \
         "§$(t restore_section_plan)" "$(t restore_effect)" "$note"
-    typed_confirm RESTORE
-    local first=1/2 second=2/2
+    # From the backup list, Esc returns to it instead of leaving.
+    if ! typed_confirm RESTORE soft; then
+        [[ ${RESTORE_FROM_LIST:-false} == true ]] || die cancelled
+        RESTORE_CANCELLED=true; return 0
+    fi
+    local first=1/2 second=2/2 fresh=false
+    [[ -L $STATE/current ]] || fresh=true
     if restore_can_backup; then
         RESTORE_PREVIOUS_ID=$(cfg id)
         ui_run 1/3 restore_step_backup backup_create true restore
         pre_backup=$LAST_BACKUP first=2/3 second=3/3
     fi
-    ui_run "$first" backup_step_restore restore_selected_backup "$archive"
-    ui_run "$second" restore_step_cleanup restore_cleanup "$pre_backup"
+    if [[ $fresh == true ]]; then ui_run 0 backup_step_restore restore_selected_backup "$archive"
+    else
+        ui_run "$first" backup_step_restore restore_selected_backup "$archive"
+        # Only announce a removal when one happens; otherwise it is kept.
+        if [[ -n $pre_backup ]]; then ui_run "$second" restore_step_cleanup restore_cleanup "$pre_backup"
+        else ui_run "$second" restore_step_keep restore_cleanup ''; fi
+    fi
     maintenance_ensure
     if [[ -n $pre_backup ]]; then note=$(t restore_removed_previous "$pre_backup")
     elif [[ -n $RESTORE_KEPT ]]; then note=$(t restore_kept_previous)
     else note=''; fi
-    ui_panel "✓ $(t restore_done)" "$(t ready "$(installation_url)")" "$archive" ${note:+"$note"}
+    [[ $fresh != true ]] || note+="${note:+ }$(t restore_new_server)"
+    ui_panel "✓ $(t restore_done_title)" "$(t ready "$(installation_url)")" "$(t restore_done)" "$archive" ${note:+"$note"}
 }
 # The running installation can be backed up before it is replaced.
 restore_can_backup() {
@@ -180,7 +196,9 @@ restore_selected_backup() {
     tmp=$(mktemp "$STATE/.restore-config.XXXXXX"); CLEANUP_PATHS+=("$tmp")
     local new_id
     new_id=$(openssl rand -hex 8)
-    jq --arg id "$new_id" --arg cert_dir "$CERT_ROOT" '.id=$id | .project=("gdm_"+$id) | .cert_dir=$cert_dir | .storage="directory" | .status="configured"' "$EXTRACTED/config.json" > "$tmp"
+    jq --arg id "$new_id" --arg cert_dir "$CERT_ROOT" --arg language "$LANGUAGE" --argjson fresh "$([[ $had_install == true ]] && echo false || echo true)" \
+        '.id=$id | .project=("gdm_"+$id) | .cert_dir=$cert_dir | .storage="directory" | .status="configured" |
+         if $fresh then .language=$language else . end' "$EXTRACTED/config.json" > "$tmp"
     if [[ -d $EXTRACTED/tls ]]; then
         local cert_mode name
         cert_mode=$(jq -r .tls "$tmp")
@@ -234,7 +252,7 @@ backup_manage() {
     request=$(mktemp "$STATE/.backup-action.XXXXXX"); CLEANUP_PATHS+=("$request")
     while :; do
         if python3 "$GDM_ROOT/tools/backup_manager.py" "$STATE" "$LANGUAGE" "$request" "$focus" "$notice"; then :
-        else return 0; fi
+        else local rc=$?; (( rc != 130 )) || exit 130; return 0; fi
         action=$(jq -er .action "$request")
         [[ $action != back ]] || return 0
         archive=$(jq -er .archive "$request"); focus=$archive; notice=''
@@ -243,7 +261,13 @@ backup_manage() {
             verify)
                 ui_run 0 backups_step_verify python3 "$GDM_ROOT/tools/backup_ops.py" verify "$STATE" "$archive"
                 notice=$(t backups_check_done);;
-            restore) restore_backup "$archive"; notice=$(t restore_done);;
+            restore)
+                RESTORE_FROM_LIST=true RESTORE_CANCELLED=false
+                restore_backup "$archive"
+                if [[ $RESTORE_CANCELLED == true ]]; then focus=''; continue; fi
+                ui_pause
+                focus=''
+                notice=$(t restore_done_title);;
             delete)
                 ui_run 0 backups_step_delete python3 "$GDM_ROOT/tools/backup_ops.py" delete "$STATE" "$archive"
                 focus=''; notice=$(t backups_deleted);;

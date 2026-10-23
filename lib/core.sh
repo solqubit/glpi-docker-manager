@@ -41,7 +41,11 @@ die() {
     if [[ -n $UI_PROGRESS_FD ]]; then
         exec 2>&"$UI_PROGRESS_FD"
         ui_restore
+        ui_notices_flush
     fi
+    # Inside the menu, answering No or cancelling returns straight to it (code
+    # 10: no message, no "press Enter"); the command line still reports it.
+    if [[ $1 == cancelled && ${GDM_IN_MENU:-false} == true ]]; then exit 10; fi
     if [[ $1 == cancelled ]]; then say_as warning "$@"
     else
         [[ -z $UI_CURRENT_STEP ]] || ui_log error "$UI_CURRENT_STEP"
@@ -73,23 +77,39 @@ confirm() {
     case $1 in
         stop_confirm|transfer_confirm|update_confirm|migration_review|db_update_confirm|config_confirm|\
         unsupported_confirm|credentials_warning|self_update_confirm|install_docker|install_dependencies|logs_restart_confirm|\
-        docker_plugins_confirm) kind=warn;;
+        docker_plugins_confirm|proxy_update_confirm|update_refresh_confirm|cert_restart_confirm) kind=warn;;
     esac
     choose answer "$1" "$default" yes "$(ui_opt "$kind" "$(t ui_yes)")" no "$(ui_opt back "$(t ui_no)")" || return 1
     [[ $answer == yes ]]
 }
 typed_confirm() {
-    local answer
-    say destructive "$1"
+    local answer word=$1 soft=${2:-}
+    # Printed only: queued, it would reappear on the pages after the confirmation.
+    ui_level_of destructive; ui_say "$UI_LEVEL" destructive "$word"
     [[ -t 0 ]] || die interactive_required
-    if ui_interactive; then
-        printf '  ' >&2; ui_color 2; printf '%s' "$(t ui_typed_keys)" >&2; ui_color 0; printf '\n' >&2
-        ui_read_line answer '> ' '1;31' || die cancelled
-    else
-        printf '  > ' >&2
-        IFS= read -r answer || die cancelled
+    while :; do
+        if ui_interactive; then
+            printf '  ' >&2; ui_color 2; printf '%s' "$(t ui_typed_keys)" >&2; ui_color 0; printf '\n' >&2
+            if ! ui_read_line answer '> ' '1;31'; then [[ $soft == soft ]] && return 1; die cancelled; fi
+        else
+            printf '  > ' >&2
+            if ! IFS= read -r answer; then [[ $soft == soft ]] && return 1; die cancelled; fi
+        fi
+        [[ $answer != "$word" ]] || return 0
+        # A typo is not a cancellation: say so and ask again.
+        ui_say warning typed_mismatch "$word"
+    done
+}
+# A result with nothing more to read (already up to date, nothing to apply,
+# saved): inside the menu it returns at once and the dashboard shows it (code
+# 11); on the command line it is printed as usual and the caller continues.
+menu_done() {
+    if [[ ${GDM_IN_MENU:-false} == true && -n ${GDM_MENU_NOTICE:-} ]]; then
+        ui_level_of "$1"
+        printf '%s\t%s\n' "$UI_LEVEL" "$(t "$@")" > "$GDM_MENU_NOTICE"
+        exit 11
     fi
-    [[ $answer == "$1" ]] || die cancelled
+    say "$@"
 }
 secret_prompt() {
     local var=$1 answer secret_label=ui_app_password
@@ -148,14 +168,17 @@ cleanup() {
     done
     if [[ $rc == 130 ]]; then ui_interrupted; fi
     if [[ -f ${STATE:-/nonexistent}/operation.json ]]; then
-        say recovery_notice "$STATE/operation.json" >&2
+        if [[ $(jq -r '.action // ""' "$STATE/operation.json" 2>/dev/null) == install ]]; then say install_incomplete >&2
+        else say recovery_notice "$STATE/operation.json" >&2; fi
     fi
     exit "$rc"
 }
 on_error() {
     local rc=$?
+    local in_step=${UI_PROGRESS_FD:-}
     [[ -z $UI_PROGRESS_FD ]] || exec 2>&"$UI_PROGRESS_FD"
     ui_restore
+    [[ -z $in_step ]] || ui_notices_flush
     [[ -z $UI_CURRENT_STEP ]] || ui_log error "$UI_CURRENT_STEP"
     say failed "${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]}" >&2
     [[ -z $UI_LAST_LOG ]] || say ui_error_log "$UI_LAST_LOG"
