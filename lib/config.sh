@@ -43,6 +43,7 @@ config_validate() {
       (.https_port|type=="number" and .>=1 and .<=65535 and floor==.) and
       (.http_port!=.https_port) and
       (.expose_db|type=="boolean") and
+      ((has("agent_enabled")|not) or (.agent_enabled|type=="boolean")) and
       (if .expose_db then .http_port!=3306 and .https_port!=3306 else true end) and
       (.timezone|test("^[A-Za-z0-9_+/-]+$")) and
       (.language=="en" or .language=="es") and
@@ -104,6 +105,7 @@ config_render() {
     [[ " 1 3 7 30 " == *" $binlog_days "* ]] || binlog_days=30
     buffer_mb=$(mysql_buffer_pool_mb)
     mkdir -p -- "$dir"
+    if agent_enabled "$file"; then mkdir -p "$dir/public/agent"; fi
     cp -- "$file" "$dir/config.json"
     major=$(jq -r .major "$file"); tls=$(jq -r .tls "$file")
     source_prefix=${GDM_BIND_STATE:-$STATE}/revisions/$(basename "$dir")
@@ -170,6 +172,9 @@ EOF
           .[$v]={name:($c.project+"_"+$v),external:true})),
        networks:{backend:{},proxy:{}}}
       | if $c.expose_db then .services.db.ports=["3306:3306"] else . end
+      | if $c.agent_enabled!=false and $c.tls=="off" then
+          .services.glpi.volumes += [mount($root+"/public/agent";"/var/www/glpi/public/agent")]
+        else . end
       | if $c.tls=="off" then .services.glpi.ports=[($c.http_port|tostring)+":80"]
         else
           .services.glpi.networks += ["proxy"] |
@@ -179,7 +184,7 @@ EOF
             networks:["proxy"],
             volumes:([mount($root+"/Caddyfile";"/etc/caddy/Caddyfile"),"caddy_data:/data","caddy_config:/config"] +
               (if $c.tls=="acme" then [] else [mount($root+"/tls";"/etc/gdm/tls")] end) +
-              (if $c.tls=="self-signed" then [mount($root+"/public";"/etc/gdm/public")] else [] end))}
+              (if $c.tls=="self-signed" or $c.agent_enabled!=false then [mount($root+"/public";"/etc/gdm/public")] else [] end))}
         end
       # Container logs rotate (default 3 x 10 MiB per service); MySQL binary logs
       # expire after the chosen days (default 30, the MySQL default). The buffer
@@ -198,6 +203,7 @@ config_stage() {
     REVISION="$STATE/revisions/$(date -u +%Y%m%dT%H%M%S)-$(openssl rand -hex 4)"
     config_render "$file" "$REVISION"
     tls_prepare "$REVISION/config.json" "$REVISION"
+    agent_prepare "$REVISION/config.json" "$REVISION"
     docker compose --env-file "$REVISION/.env" -f "$REVISION/compose.json" config --quiet
 }
 config_activate() {
@@ -214,3 +220,5 @@ config_set_status() {
     mv -- "$tmp" "$(readlink -f "$CONFIG")"
     cfg_cache
 }
+# shellcheck source=lib/agent.sh
+source "$GDM_ROOT/lib/agent.sh"

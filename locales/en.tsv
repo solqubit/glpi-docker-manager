@@ -1,3 +1,41 @@
+agent_title	Automatic Linux agent installation
+agent_state_on	[+] Installer publication: enabled
+agent_state_off	[!] Installer publication: disabled
+menu_agent_setup	Linux agent · Automatic installation
+desc_agent-setup	Copy the Linux agent command, refresh public installer resources or disable publication.
+agent_publish	Enable or refresh the installer
+agent_disable	Disable installer publication
+agent_upgrade_step	Publishing Linux agent resources for this existing installation (brief service restart)
+agent_intro	Install the agent on another Linux computer using a command from this server. HTTP, public HTTPS and local CA are configured automatically. Linux x86_64; systemd for the persistent service.
+agent_custom_ca	For a private imported certificate, place its PEM CA chain at %s before publishing. Public certificates need no extra CA.
+agent_ca_invalid	The agent CA is expired, invalid or does not verify the configured server certificate.
+agent_not_published	Publish the Linux installer first: sudo ./start.sh agent-setup.
+agent_show	Show the installation command
+agent_publish_confirm	Apply the publication change? Services restart briefly; GLPI data and credentials are preserved.
+agent_disabled	Linux agent installer is no longer published. Installed agents keep working.
+agent_ready	[+] Linux agent installation command ready
+agent_copy	Copy the complete line below to the Linux computer you want to inventory. Run it there, not on the GLPI server. It needs curl or wget and sudo/root.
+agent_trust_note	Copy this command through a trusted server session: its SHA-256 authenticates the HTTP download and the public CA. Regenerate it after changing the server address, CA or installer. No private keys are published.
+agent_client_root	[!] Run this installer as root (sudo bash install.sh).
+agent_client_architecture	[!] This installer requires Linux x86_64 with glibc. No official ARM AppImage is configured.
+agent_client_usage	Usage: bash install.sh [--once]. --once installs and sends one inventory without a service (containers).
+agent_client_systemd	[!] A running systemd is required for automatic inventories. For a container, use --once explicitly.
+agent_client_failed	[!] Installation failed. Review the error above; success has not been reported.
+agent_client_dependencies	[*] Installing only missing dependencies: %s
+agent_client_packages	[!] No supported package manager. Install these dependencies and retry: %s
+agent_client_certificate	[*] Downloading and verifying the public CA certificate
+agent_client_checksum	[!] SHA-256 mismatch. The downloaded file will not be used.
+agent_client_certificate_invalid	[!] Invalid or expired CA certificate.
+agent_client_checking	[*] Checking the configured address and TLS: %s
+agent_client_unreachable	[!] Cannot verify access to GLPI. Check the address, network and CA; SSL validation remains enabled.
+agent_client_downloading	[*] Downloading and verifying official GLPI Agent %s
+agent_client_runtime	[!] The extracted AppImage cannot run on this Linux. See the error above.
+agent_client_existing	[!] An unmanaged agent or application directory already exists. It was not replaced. Use its original installation method or review the conflict first.
+agent_client_installing	[*] Installing and configuring GLPI Agent (existing identity is preserved)
+agent_client_inventory	[*] Sending the first inventory; this can take a few minutes
+agent_client_inventory_failed	[!] Inventory reported an error. Details: %s
+agent_client_done	[+] Agent configured for %s. First inventory run completed. Log: %s
+agent_client_import_note	[*] Check the computer in GLPI: import rules and inventory settings decide whether the submitted inventory is accepted. Later inventories run automatically when the service is enabled.
 interactive_required	This operation needs an interactive terminal. Run ./start.sh in a terminal.
 invalid	Invalid value: %s
 bad_path	State directory must be an absolute, non-symlink directory other than /.

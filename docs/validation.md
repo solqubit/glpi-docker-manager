@@ -1,4 +1,63 @@
-# Validation evidence for 1.0.0
+# Validation evidence
+
+## 2026-10-28: Linux agent bootstrap (working tree)
+
+Validated from Windows with Docker Desktop's Linux engine; no production server
+was used. The clean unit container was Ubuntu 24.04, Bash 5.2.21, Python 3.12.3
+and OpenSSL 3.0.13. ShellCheck on `start.sh`, `lib/*.sh`, `templates/*.sh` and
+`tests/*.sh` completed with no diagnostics. The complete `tests/run.sh` passed
+**29 groups**; Python compilation of `tools` and `tests` also passed. Locale
+duplicate/key/format checks are included in that suite.
+
+Real disposable integration: official GLPI **12.0.0**, MySQL **8.4.13**, Caddy
+**2.11.7**, GLPI Agent **1.21-1** (release 1.21). The clients had no `/dev/fuse`
+or `fusermount`, no privileged mode and no Docker socket.
+
+| Case | Result / actual evidence |
+| --- | --- |
+| Ubuntu 24.04 → HTTP | Agent installed from the generated, hash-verified command; computer imported into GLPI. |
+| Repeated command | Same GLPI agent device ID; still one computer, no identity reset. |
+| Debian 12 → HTTPS / local CA | Public CA downloaded and pinned; inventory imported with TLS validation enabled. |
+| Rocky Linux 9 → HTTPS / imported private CA | Optional CA bundle used; inventory imported with TLS validation enabled. |
+| Modified CA download | Rejected by SHA-256 before changing the existing client configuration, for both HTTPS cases. |
+| Modified installer over HTTP | Bootstrap rejected it before execution; injected marker was not created. |
+| Public HTTPS / ACME | URL, absence of private CA, Compose mounts and Caddy routing covered by unit tests; no real ACME certificate issued because no test domain was provided. |
+| Default publication / older installation | Unit tests cover a missing flag enabling publication, one transition for a running installation, no repeat, preservation of explicit disablement and no start of a stopped installation. This was not applied to the user's VM. |
+| Persistent systemd service | Service registration and failed-inventory handling exercised with a controlled `systemctl` in the client container. Real inventory runs also cover explicit `--once`; boot-time systemd execution was not exercised. |
+
+Final integration output:
+
+```text
+OK: off installation and inventory imported; no FUSE
+OK: off installation and inventory imported; no FUSE
+OK: repeated command preserves identity
+OK: service registration and failed-inventory handling (controlled systemctl)
+OK: self-signed installation and inventory imported; no FUSE
+OK: CA tampering rejected; installed configuration preserved
+OK: custom installation and inventory imported; no FUSE
+OK: CA tampering rejected; installed configuration preserved
+OK: installer tampering rejected before execution
+Imported computers: 3
+```
+
+Earlier attempts found setup issues in the new integration fixture: the official
+GLPI image needs `GLPI_DB_PORT`, inventory is configured using the `inventory`
+context's `enabled_inventory` key, and inventory must be enabled before sending.
+These were corrected in the fixture. The client correctly reported the initial
+HTTP 403 instead of announcing success. Identity is verified against GLPI's
+actual agent records rather than assuming an agent state filename.
+
+Reproduce with the commands in [Linux agent setup](linux-agent.md). Optional
+image overrides are `GDM_AGENT_TEST_GLPI`, `GDM_AGENT_TEST_MYSQL` and
+`GDM_AGENT_TEST_CADDY`. The validated GLPI image digest was
+`sha256:4efa3bdb8072e2333c77a5d6a5e0e3cec4ddf649e3e35cba0d3e45fb6a0f7cc4`.
+Private transient evidence is ignored under
+`tests/.runtime/gdm_agent_09052e2082/results.log`; test containers, network,
+anonymous volumes and generated image tags were removed. Existing unrelated
+containers were preserved. Optional older wizard integration scripts were not
+part of this new-feature integration run.
+
+## Historical validation for 1.0.0
 
 Validated on **2026-10-19 (America/Guayaquil)** from a Windows development host
 using Docker Desktop's Linux engine. These results apply to the 1.0.0 working

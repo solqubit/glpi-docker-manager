@@ -786,7 +786,7 @@ ui_help() {
         "help_group_service;status=menu_status;start=menu_start;stop=menu_stop;logs=menu_logs"
         "help_group_updates;install [x.y.z]=help_cmd_install;check-updates=menu_versions;update [x.y.z]=menu_update;migrate [x.y.z]=help_cmd_migrate;refresh-image=menu_refresh;db-update=menu_database_update;proxy-update=menu_proxy_update"
         "help_group_data;backup=menu_backup;backups=menu_backups;restore [file]=menu_restore;schedule=menu_schedule;cleanup=menu_cleanup;transfer=menu_transfer"
-        "help_group_settings;address=menu_address;https=menu_https;certificates=menu_certificates;db-exposure=menu_exposure;credentials=menu_credentials;language=menu_language"
+        "help_group_settings;address=menu_address;https=menu_https;certificates=menu_certificates;db-exposure=menu_exposure;credentials=menu_credentials;language=menu_language;agent-setup [disable]=agent_title;agent-command=agent_show"
         "help_group_manager;diagnose=menu_diagnose;recover=menu_recover;maintenance=help_cmd_maintenance;self-update=menu_self_update;uninstall=menu_uninstall;version=help_opt_version;help=help_opt_help"
     )
     local -a entries=()

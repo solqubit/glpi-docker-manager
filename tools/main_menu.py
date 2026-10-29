@@ -24,7 +24,7 @@ GROUPS = [
                          ('cleanup', 'menu_cleanup')]),
     ('help_group_settings', [('address', 'menu_address'), ('certificates', 'menu_certificates'),
                              ('db-exposure', 'menu_exposure'), ('credentials', 'menu_credentials'),
-                             ('language', 'menu_language')]),
+                             ('language', 'menu_language'), ('agent-setup', 'menu_agent_setup')]),
 ]
 STYLES = {'uninstall': 'warning', 'quit': 'accent'}
 # Result of the previous action (Bash menu_done): "level<TAB>text".

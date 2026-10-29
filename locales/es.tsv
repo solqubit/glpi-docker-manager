@@ -1,3 +1,41 @@
+agent_title	Instalación automática del agente Linux
+agent_state_on	[+] Publicación del instalador: activada
+agent_state_off	[!] Publicación del instalador: desactivada
+menu_agent_setup	Agente Linux · Instalación automática
+desc_agent-setup	Copia el comando del agente Linux, renueva los recursos públicos o desactiva su publicación.
+agent_publish	Activar o renovar el instalador
+agent_disable	Desactivar la publicación del instalador
+agent_upgrade_step	Publicando recursos del agente Linux en esta instalación existente (reinicio breve de servicios)
+agent_intro	Instala el agente en otro equipo Linux con un comando de este servidor. HTTP, HTTPS público y CA local se configuran automáticamente. Linux x86_64; systemd para el servicio permanente.
+agent_custom_ca	Con un certificado privado importado, coloca su cadena CA PEM en %s antes de publicar. Los certificados públicos no necesitan una CA adicional.
+agent_ca_invalid	La CA del agente está vencida, no es válida o no verifica el certificado del servidor configurado.
+agent_not_published	Publica primero el instalador Linux: sudo ./start.sh agent-setup.
+agent_show	Mostrar el comando de instalación
+agent_publish_confirm	¿Aplicar el cambio de publicación? Los servicios se reinician brevemente; se conservan los datos y las credenciales de GLPI.
+agent_disabled	El instalador del agente Linux dejó de publicarse. Los agentes instalados siguen funcionando.
+agent_ready	[+] Comando de instalación del agente Linux preparado
+agent_copy	Copia la línea completa de abajo al equipo Linux que quieres inventariar. Ejecútala allí, no en el servidor GLPI. Necesita curl o wget y sudo/root.
+agent_trust_note	Copia este comando desde una sesión de confianza del servidor: su SHA-256 autentica la descarga HTTP y la CA pública. Genéralo de nuevo tras cambiar la dirección, la CA o el instalador. No se publican claves privadas.
+agent_client_root	[!] Ejecuta este instalador como root (sudo bash install.sh).
+agent_client_architecture	[!] Este instalador necesita Linux x86_64 con glibc. No hay una AppImage oficial ARM configurada.
+agent_client_usage	Uso: bash install.sh [--once]. --once instala y envía un inventario sin servicio (contenedores).
+agent_client_systemd	[!] Se necesita systemd activo para los inventarios automáticos. En un contenedor, usa --once explícitamente.
+agent_client_failed	[!] La instalación falló. Revisa el error anterior; no se ha anunciado éxito.
+agent_client_dependencies	[*] Instalando solo las dependencias que faltan: %s
+agent_client_packages	[!] No se encontró un gestor de paquetes compatible. Instala estas dependencias y reintenta: %s
+agent_client_certificate	[*] Descargando y verificando el certificado público de la CA
+agent_client_checksum	[!] SHA-256 no coincide. No se utilizará el archivo descargado.
+agent_client_certificate_invalid	[!] Certificado CA no válido o vencido.
+agent_client_checking	[*] Comprobando la dirección configurada y TLS: %s
+agent_client_unreachable	[!] No se pudo verificar el acceso a GLPI. Revisa la dirección, la red y la CA; la validación SSL sigue activa.
+agent_client_downloading	[*] Descargando y verificando GLPI Agent %s oficial
+agent_client_runtime	[!] La AppImage extraída no puede ejecutarse en este Linux. Revisa el error anterior.
+agent_client_existing	[!] Ya existe un agente o directorio de aplicación ajeno al gestor. No se reemplazó. Usa su método de instalación original o revisa primero el conflicto.
+agent_client_installing	[*] Instalando y configurando GLPI Agent (se conserva la identidad existente)
+agent_client_inventory	[*] Enviando el primer inventario; puede tardar unos minutos
+agent_client_inventory_failed	[!] El inventario indicó un error. Detalles: %s
+agent_client_done	[+] Agente configurado para %s. Primera ejecución de inventario terminada. Registro: %s
+agent_client_import_note	[*] Revisa el equipo en GLPI: las reglas de importación y los ajustes de inventario deciden si se acepta el envío. Los siguientes inventarios se ejecutan automáticamente cuando el servicio está activo.
 interactive_required	Esta operación necesita una terminal interactiva. Ejecuta ./start.sh desde una terminal.
 invalid	Valor no válido: %s
 bad_path	El directorio de estado debe ser absoluto, distinto de / y no ser un enlace simbólico.

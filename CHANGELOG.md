@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Linux agent bootstrap
+* Publish a verified Linux agent installer and public metadata on the GLPI server,
+  enabled by default with an administration-only enable/disable/refresh action.
+* Generate a client command that authenticates the bootstrap download with a
+  trusted SHA-256, configures HTTP, public HTTPS or a pinned local/private CA,
+  installs the official agent without FUSE and sends the first inventory.
+* Preserve client identity on repeated installs; enable a systemd service and
+  expose inventory errors. Existing running installations get one verified
+  configuration transition; stopped and explicitly disabled installations stay so.
+
 ### Navigation
 * Answering No, pressing Esc or cancelling inside the menu returns straight to the
   previous screen; no more "press Enter" after a cancellation (stop, transfer,

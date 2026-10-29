@@ -8,6 +8,6 @@ test_config() {
       mysql_image:("mysql:8.4.11@sha256:"+$digest),caddy_image:("caddy:2.10.2@sha256:"+$digest),
       mode:"test",http_port:18080,https_port:18443,timezone:"UTC",db_name:"glpi",db_user:"glpi",
       db_password:"test_password_123456789",root_password:"root_password_123456789",
-      language:"en",cert_dir:$cert_dir,expose_db:false,hostname:"localhost",tls:"off",storage:"named",status:"configured"
+      language:"en",cert_dir:$cert_dir,expose_db:false,hostname:"localhost",tls:"off",storage:"named",status:"configured",agent_enabled:false
     }' > "$file"
 }

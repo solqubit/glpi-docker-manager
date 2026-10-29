@@ -80,17 +80,24 @@ tls_ca_url() {
     else printf 'http://%s:%s/gdm-ca.pem\n' "$host" "$port"; fi
 }
 tls_prepare() {
-    local file=$1 revision=$2 mode host cert_dir source ca redirect http_port https_port
+    local file=$1 revision=$2 mode host cert_dir source ca redirect http_port https_port agent_routes=''
     mode=$(jq -r .tls "$file"); host=$(jq -r .hostname "$file")
     cert_dir=$(jq -r .cert_dir "$file")
     http_port=$(jq -r .http_port "$file"); https_port=$(jq -r .https_port "$file")
     [[ $mode != off ]] || return 0
+    if agent_enabled "$file"; then
+        agent_routes=$'    handle /agent/* {\n        root * /etc/gdm/public\n        file_server\n    }\n'
+    fi
     mkdir -p "$revision/tls"
     if [[ $mode == acme ]]; then
         [[ $host == *.* && ! $host =~ ^[0-9.]+$ && $host != *.local && $host != *.localhost ]] || die invalid public_domain
         [[ $http_port == 80 && $https_port == 443 ]] || die acme_ports
         say acme_requirements "$host"
-        printf '%s {\n    tls {\n        ca https://acme-v02.api.letsencrypt.org/directory\n    }\n    reverse_proxy glpi:80\n}\n' "$host" > "$revision/Caddyfile"
+        if [[ -n $agent_routes ]]; then
+            printf '{\n    auto_https disable_redirects\n}\nhttp://%s {\n%s    handle {\n        redir https://%s{uri} 308\n    }\n}\nhttps://%s {\n    tls {\n        ca https://acme-v02.api.letsencrypt.org/directory\n    }\n%s    handle {\n        reverse_proxy glpi:80\n    }\n}\n' "$host" "$agent_routes" "$host" "$host" "$agent_routes" > "$revision/Caddyfile"
+        else
+            printf '%s {\n    tls {\n        ca https://acme-v02.api.letsencrypt.org/directory\n    }\n    reverse_proxy glpi:80\n}\n' "$host" > "$revision/Caddyfile"
+        fi
         return
     fi
     source="$cert_dir/$mode"
@@ -115,11 +122,11 @@ tls_prepare() {
     if [[ $mode == self-signed ]]; then
         # /gdm-ca.pem is the only file served from /etc/gdm/public; everything
         # else is redirected (HTTP) or proxied to GLPI (HTTPS).
-        printf '{\n    default_sni %s\n    auto_https disable_redirects\n}\nhttp://%s {\n    handle /gdm-ca.pem {\n        root * /etc/gdm/public\n        file_server\n    }\n    handle {\n        redir %s{uri} 308\n    }\n}\nhttps://%s {\n    tls /etc/gdm/tls/fullchain.pem /etc/gdm/tls/privkey.pem\n    handle /gdm-ca.pem {\n        root * /etc/gdm/public\n        file_server\n    }\n    handle {\n        reverse_proxy glpi:80\n    }\n}\n' \
-            "$host" "$host" "$redirect" "$host" > "$revision/Caddyfile"
+        printf '{\n    default_sni %s\n    auto_https disable_redirects\n}\nhttp://%s {\n%s    handle /gdm-ca.pem {\n        root * /etc/gdm/public\n        file_server\n    }\n    handle {\n        redir %s{uri} 308\n    }\n}\nhttps://%s {\n    tls /etc/gdm/tls/fullchain.pem /etc/gdm/tls/privkey.pem\n%s    handle /gdm-ca.pem {\n        root * /etc/gdm/public\n        file_server\n    }\n    handle {\n        reverse_proxy glpi:80\n    }\n}\n' \
+            "$host" "$host" "$agent_routes" "$redirect" "$host" "$agent_routes" > "$revision/Caddyfile"
     else
-        printf '{\n    default_sni %s\n    auto_https disable_redirects\n}\nhttp://%s {\n    redir %s{uri} 308\n}\nhttps://%s {\n    tls /etc/gdm/tls/fullchain.pem /etc/gdm/tls/privkey.pem\n    reverse_proxy glpi:80\n}\n' \
-            "$host" "$host" "$redirect" "$host" > "$revision/Caddyfile"
+        printf '{\n    default_sni %s\n    auto_https disable_redirects\n}\nhttp://%s {\n%s    handle {\n        redir %s{uri} 308\n    }\n}\nhttps://%s {\n    tls /etc/gdm/tls/fullchain.pem /etc/gdm/tls/privkey.pem\n%s    handle {\n        reverse_proxy glpi:80\n    }\n}\n' \
+            "$host" "$host" "$agent_routes" "$redirect" "$host" "$agent_routes" > "$revision/Caddyfile"
     fi
 }
 # The mode in use is marked, as in the other settings screens.

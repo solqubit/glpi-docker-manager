@@ -61,7 +61,9 @@ service_start() {
     service_snapshot
     local current
     current=$(python3 "$GDM_ROOT/tools/service_view.py" "$CONFIG" "$SERVICE_DATA" "$LANGUAGE" state false)
-    if ! jq -e '.services.glpi.logging' "$STATE/current/compose.json" >/dev/null 2>&1; then
+    if agent_upgrade_needed; then
+        ui_run 0 agent_upgrade_step agent_upgrade_apply
+    elif ! jq -e '.services.glpi.logging' "$STATE/current/compose.json" >/dev/null 2>&1; then
         # Revisions from older versions lack container log limits: re-render once.
         say compose_refresh
         ui_run 0 ui_service_starting service_refresh_action
@@ -675,6 +677,8 @@ dispatch() {
                 update|migrate|refresh-image) update_glpi "$command" "$argument";;
                 db-update) update_database;;
                 proxy-update) update_proxy;;
+                agent-setup) agent_setup "$argument";;
+                agent-command) agent_command "$argument";;
                 backup|transfer)
                     if [[ $command == backup && ${GDM_IN_MENU:-false} == true ]]; then
                         choose command backup_kind_prompt backup \
@@ -854,5 +858,9 @@ main() {
     layout_install_code
     logs_rotate
     say ui_prerequisites_done
+    # Existing installations get the public agent resources on the first normal
+    # administration session after upgrading the manager. Diagnostic/maintenance
+    # commands remain read-only with respect to service configuration.
+    if (( $# == 0 )); then agent_upgrade_existing; fi
     if (( $# == 0 )); then menu; else dispatch "$@"; fi
 }

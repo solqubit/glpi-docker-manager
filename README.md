@@ -74,6 +74,11 @@ keyboard controls, monochrome and plain-terminal modes.
 
 ## Features
 
+* Install Linux agents from a generated, verified command on each client:
+  automatic HTTP/public HTTPS/local CA settings, first inventory and systemd
+  service. Enabled by default, controllable from the administration menu, with no
+  extra installation-wizard questions. See [Linux agent setup](docs/linux-agent.md).
+
 * Discover stable GLPI releases from the official paginated GitHub API. Show the
   latest three releases with official images for the server architecture, plus
   exact-version installation (`sudo ./start.sh install 11.0.11`). Future stable majors

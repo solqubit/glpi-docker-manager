@@ -31,6 +31,8 @@ bash "$GDM_ROOT/tests/release-cases.sh"
 ok 'Paginated release discovery filters drafts/RCs, skips missing images and discovers canonical CLI commands'
 bash "$GDM_ROOT/tests/maintenance-cases.sh"
 ok 'Backup rotation, restore cleanup, free-space selection and flexible backup schedules (days, weekdays, time)'
+bash "$GDM_ROOT/tests/agent-cases.sh"
+ok 'Linux agent bootstrap publication, trust and protocol configuration'
 
 for distro in ubuntu debian fedora rocky almalinux rhel custom-linux; do
     printf 'ID=%s\nVERSION_ID="99"\nPRETTY_NAME="Test %s"\n' "$distro" "$distro" > "$STATE/os-release"

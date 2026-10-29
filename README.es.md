@@ -2,6 +2,11 @@
 
 # GLPI Docker Manager
 
+Instalación automática del agente Linux desde un comando para cada equipo:
+configura HTTP, HTTPS público o CA local, envía el primer inventario y activa su
+servicio. Habilitada por defecto y administrable desde el menú, sin pasos nuevos
+en el asistente de instalación. [Guía del agente Linux](docs/linux-agent.md).
+
 Gestor interactivo para instalar y administrar GLPI en Linux mediante imágenes
 oficiales de Docker. La interfaz está disponible en español e inglés; el código y
 la documentación técnica principal están en inglés.
