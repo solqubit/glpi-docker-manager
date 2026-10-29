@@ -55,17 +55,40 @@ agent_prepare() {
 }
 
 agent_command() {
-    local installer="$STATE/current/public/agent/install.sh" url hash body
+    local installer="$STATE/current/public/agent/install.sh" url hash argument=''
     [[ -z ${1:-} || $1 == --once ]] || die invalid agent-command
     if ! agent_enabled "$CONFIG" || [[ ! -f $installer ]]; then die agent_not_published; fi
     url=$(tls_ca_url "$(cfg hostname)" "$(cfg http_port)"); url=${url%/gdm-ca.pem}/agent/install.sh
     hash=$(sha256sum < "$installer"); hash=${hash%% *}
-    # Run in a root-owned temporary directory. The expected hash comes from the
-    # trusted manager session, never from the unauthenticated HTTP response.
+    # Keep this block plain and unwrapped so it can be copied verbatim. Quoting
+    # the heredoc protects client-side variables until the privileged Bash runs.
+    # The trusted manager supplies the hash, never the HTTP download itself.
+    cat <<'COMMAND'
+sudo bash <<'GDM_AGENT'
+set -eu
+umask 077
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+COMMAND
+    printf '\nurl=%q\nsha256=%q\n\n' "$url" "$hash"
+    cat <<'COMMAND'
+if command -v wget >/dev/null; then
+  wget -q --timeout=120 -O "$tmp/install.sh" "$url"
+elif command -v curl >/dev/null; then
+  curl --proto '=http' -fsS --connect-timeout 10 --max-time 120 \
+    -o "$tmp/install.sh" "$url"
+else
+  echo 'Install curl or wget first' >&2
+  exit 1
+fi
+
+printf '%s  %s\n' "$sha256" "$tmp/install.sh" | sha256sum -c -
+COMMAND
+    [[ ${1:-} != --once ]] || argument=' --once'
+    # The temporary path expands on the client, inside the generated block.
     # shellcheck disable=SC2016
-    printf -v body 'set -eu; umask 077; d=$(mktemp -d); trap '\''rm -rf -- "$d"'\'' EXIT; if command -v curl >/dev/null; then curl --proto "=http" -fsS --connect-timeout 10 --max-time 120 %q -o "$d/install.sh"; elif command -v wget >/dev/null; then wget -q --timeout=120 -O "$d/install.sh" %q; else echo "Install curl or wget first" >&2; exit 1; fi; printf "%%s  %%s\\n" %q "$d/install.sh" | sha256sum -c -; bash "$d/install.sh"' "$url" "$url" "$hash"
-    [[ ${1:-} != --once ]] || body+=' --once'
-    printf 'sudo bash -c %q\n' "$body"
+    printf 'bash "$tmp/install.sh"%s </dev/null\n' "$argument"
+    printf 'GDM_AGENT\n'
 }
 
 agent_setup() {
@@ -96,8 +119,8 @@ agent_setup() {
     agent_show_command
 }
 agent_show_command() {
-    ui_panel "$(t agent_ready)" "$(t agent_copy)" "$(t agent_trust_note)"
-    # Do not wrap a shell command into a card: copying the complete line matters.
+    ui_panel "✓ $(t agent_ready)" "$(t agent_copy)" "$(t agent_trust_note)"
+    # No borders, prompts or colour escapes inside the executable block.
     printf '\n'; agent_command ''; printf '\n'
 }
 

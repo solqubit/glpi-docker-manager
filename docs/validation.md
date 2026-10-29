@@ -2,6 +2,14 @@
 
 ## 2026-10-28: Linux agent bootstrap (working tree)
 
+Presentation follow-up: the generated installation command now uses a readable
+quoted heredoc with separate URL and SHA-256 values. Targeted container checks
+(`tests/agent-cases.sh`) pass for wget, curl fallback, `--once`, rejection of
+altered downloads, missing tools, private temporary-directory cleanup and the
+single success marker on the result card. ShellCheck passes for the changed
+shell files. English/Spanish key/format parity and UTF-8/LF were checked. The
+full installation integration below was not repeated for this presentation change.
+
 Validated from Windows with Docker Desktop's Linux engine; no production server
 was used. The clean unit container was Ubuntu 24.04, Bash 5.2.21, Python 3.12.3
 and OpenSSL 3.0.13. ShellCheck on `start.sh`, `lib/*.sh`, `templates/*.sh` and

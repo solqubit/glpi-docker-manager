@@ -24,8 +24,10 @@ installation is left stopped; resources are applied when you choose Start.
    sudo /opt/glpi-docker-manager/start.sh agent-command
    ```
 
-2. Copy the **entire generated `sudo bash -c ...` line** through a trusted server
-   session. On the Linux computer to inventory, paste and run that line. Root
+2. Copy the **entire generated block**, from `sudo bash <<'GDM_AGENT'` through
+   the final `GDM_AGENT` line, from a trusted server session. On the Linux
+   computer to inventory, paste the complete block. It has readable commands,
+   separate URL/checksum values and the same SHA-256 verification. Root
    users without sudo can omit its initial `sudo`. The client needs Bash,
    coreutils (`sha256sum`, `mktemp`) and either curl or wget to bootstrap. Missing
    curl, OpenSSL, CA bundles and libcrypt dependencies are subsequently installed

@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Linux agent bootstrap
+* Display a readable copyable shell block instead of an escaped single line,
+  preserving download fallback, root-only temporary files and SHA-256 checks.
 * Publish a verified Linux agent installer and public metadata on the GLPI server,
   enabled by default with an administration-only enable/disable/refresh action.
 * Generate a client command that authenticates the bootstrap download with a

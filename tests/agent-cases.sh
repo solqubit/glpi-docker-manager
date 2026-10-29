@@ -51,6 +51,58 @@ for mode in off self-signed custom acme; do
     if bash "$dir/public/agent/install.sh" > "$STATE/client.log" 2>&1; then exit 1; fi
     grep -q 'running systemd' "$STATE/client.log"
 done
+# Execute the exact copyable block using local download fixtures. The generated
+# command must work with either tool and reject altered bytes before execution.
+cat > "$STATE/current/public/agent/install.sh" <<'CLIENT'
+#!/usr/bin/env bash
+printf '%s\n' "${1:-service}" > "$GDM_BOOTSTRAP_MARKER"
+CLIENT
+mkdir -p "$STATE/bootstrap-tmp"
+bootstrap_case() {
+    local tool=$1 tamper=${2:-false} argument=${3:-} bin="$STATE/bin-$1" command
+    mkdir -p "$bin"
+    for command in bash mktemp rm sha256sum; do ln -sf "$(command -v "$command")" "$bin/$command"; done
+    printf '#!/bin/bash\nexec "$@"\n' > "$bin/sudo"
+    chmod 755 "$bin/sudo"
+    if [[ $tool != missing ]]; then
+        cat > "$bin/$tool" <<'DOWNLOAD'
+#!/bin/bash
+set -eu
+while (( $# )); do
+    case $1 in -O|-o) destination=$2; shift 2;; *) shift;; esac
+done
+/bin/cp -- "$GDM_BOOTSTRAP_PAYLOAD" "$destination"
+[[ $GDM_BOOTSTRAP_TAMPER != true ]] || printf '\n# altered in transit\n' >> "$destination"
+DOWNLOAD
+        chmod 755 "$bin/$tool"
+    fi
+    agent_command "$argument" > "$STATE/readable-command.sh"
+    [[ $(head -n 1 "$STATE/readable-command.sh") == "sudo bash <<'GDM_AGENT'" ]]
+    [[ $(tail -n 1 "$STATE/readable-command.sh") == GDM_AGENT ]]
+    if grep -q $'\033' "$STATE/readable-command.sh"; then exit 1; fi
+    bash -n "$STATE/readable-command.sh"
+    shellcheck -s bash "$STATE/readable-command.sh"
+    rm -f -- "$STATE/client-marker"
+    if PATH="$bin" TMPDIR="$STATE/bootstrap-tmp" GDM_BOOTSTRAP_MARKER="$STATE/client-marker" \
+        GDM_BOOTSTRAP_PAYLOAD="$STATE/current/public/agent/install.sh" GDM_BOOTSTRAP_TAMPER="$tamper" \
+        bash "$STATE/readable-command.sh" > "$STATE/bootstrap.log" 2>&1; then
+        [[ $tamper == false && $tool != missing ]]
+        [[ $(< "$STATE/client-marker") == "${argument:-service}" ]]
+    else
+        [[ $tamper == true || $tool == missing ]]
+        [[ ! -e $STATE/client-marker ]]
+    fi
+    [[ -z $(find "$STATE/bootstrap-tmp" -mindepth 1 -print -quit) ]]
+}
+bootstrap_case wget
+bootstrap_case curl false --once
+bootstrap_case wget true
+bootstrap_case missing
+# The card has one success marker; the executable output stays plain text.
+agent_show_command > "$STATE/displayed-command.sh" 2> "$STATE/command-card.log"
+grep -Fq "[+] $(t agent_ready)" "$STATE/command-card.log"
+if grep -Fq '[*] [+]' "$STATE/command-card.log"; then exit 1; fi
+bash -n "$STATE/displayed-command.sh"
 # Imported public certificates must not cause a leaf certificate to be trusted
 # as a CA. A separate private CA is optional, and an invalid one is rejected.
 rm "$CERT_ROOT/custom/agent-ca.pem"

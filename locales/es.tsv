@@ -13,8 +13,8 @@ agent_not_published	Publica primero el instalador Linux: sudo ./start.sh agent-s
 agent_show	Mostrar el comando de instalación
 agent_publish_confirm	¿Aplicar el cambio de publicación? Los servicios se reinician brevemente; se conservan los datos y las credenciales de GLPI.
 agent_disabled	El instalador del agente Linux dejó de publicarse. Los agentes instalados siguen funcionando.
-agent_ready	[+] Comando de instalación del agente Linux preparado
-agent_copy	Copia la línea completa de abajo al equipo Linux que quieres inventariar. Ejecútala allí, no en el servidor GLPI. Necesita curl o wget y sudo/root.
+agent_ready	Comando de instalación del agente Linux preparado
+agent_copy	Copia todo el bloque de abajo, desde sudo bash hasta la línea final GDM_AGENT, y pégalo en el equipo Linux que quieres inventariar. Necesita curl o wget y sudo/root.
 agent_trust_note	Copia este comando desde una sesión de confianza del servidor: su SHA-256 autentica la descarga HTTP y la CA pública. Genéralo de nuevo tras cambiar la dirección, la CA o el instalador. No se publican claves privadas.
 agent_client_root	[!] Ejecuta este instalador como root (sudo bash install.sh).
 agent_client_architecture	[!] Este instalador necesita Linux x86_64 con glibc. No hay una AppImage oficial ARM configurada.
