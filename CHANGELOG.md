@@ -19,6 +19,10 @@
   configuration transition; stopped and explicitly disabled installations stay so.
 
 ### Navigation
+* Group migration releases under a single branch entry in GLPI updates. Its
+  selector shows the three newest installable versions, all-versions and Back.
+* Fix the MySQL exposure selector in Address, ports and time zone: omitted help
+  no longer crashes the terminal menu, and changing/cancelling remains reversible.
 * Answering No, pressing Esc or cancelling inside the menu returns straight to the
   previous screen; no more "press Enter" after a cancellation (stop, transfer,
   credentials, updates, settings and every `die cancelled`).

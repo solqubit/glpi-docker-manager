@@ -443,6 +443,34 @@ build_update_choices() {
         printf '%s\t%s\t%s\n' "$version" "${version%%.*}" "$image"
     done < "$resolved" > "$UPDATE_CHOICES_FILE"
 }
+select_update_branch() {
+    local target_branch=$1 source_major=$2 version branch image choice default count all=false label
+    local -a choices=()
+    while :; do
+        choices=(); count=0; default=''
+        # The image references were already checked by update_choices_scan.
+        while IFS=$'\t' read -r version branch image; do
+            [[ $branch == "$target_branch" ]] || continue
+            ((count+=1))
+            [[ $all == true ]] || (( count <= 3 )) || continue
+            label="GLPI $version"
+            if [[ -z $default ]]; then default=$version; label+=" · $(t opt_recommended)"; fi
+            choices+=("$version" "$(ui_opt warn "$label" "$(t opt_update_major "$source_major" "$target_branch")")")
+        done < <(sort -Vr -- "$UPDATE_CHOICES_FILE")
+        [[ -n $default ]] || die image_missing "$target_branch"
+        if [[ $all == false ]] && (( count > 3 )); then
+            choices+=(other "$(ui_opt '' "$(t update_more_versions)")")
+        fi
+        choices+=(back "$(ui_opt back "$(t update_branch_back)")")
+        ui_panel "$(t version_list_title "$target_branch")" "$(t opt_update_major "$source_major" "$target_branch")"
+        choose choice choose_version_update "$default" "${choices[@]}" || return 10
+        case $choice in
+            other) all=true;;
+            back) return 10;;
+            *) SELECTED_UPDATE=$choice; return 0;;
+        esac
+    done
+}
 select_update_target() {
     local current=$1 major=$2 version branch image choice default='' UPDATE_CHOICES_FILE UPDATE_CANDIDATES=0 REFRESH_REF=''
     local -a choices=()
@@ -453,17 +481,19 @@ select_update_target() {
     while IFS=$'\t' read -r version branch image; do
         [[ $branch != "$major" ]] || default=$version
     done < "$UPDATE_CHOICES_FILE"
-    local next_branch=false
+    local next_branch=''
     while IFS=$'\t' read -r version branch image; do
-        [[ $branch == "$major" ]] || next_branch=true
         if [[ $version == "$default" ]]; then
             choices+=("$version" "$(ui_opt primary "$(t update_label_patch "GLPI $version" "$branch") · $(t opt_recommended)" "$(t opt_update_patch "$branch")")")
         elif [[ $branch == "$major" ]]; then
             choices+=("$version" "$(ui_opt ok "$(t update_label_patch "GLPI $version" "$branch")" "$(t opt_update_patch "$branch")")")
         else
-            choices+=("$version" "$(ui_opt warn "$(t update_label_major "GLPI $version" "$major" "$branch")" "$(t opt_update_major "$major" "$branch")")")
+            next_branch=$branch
         fi
     done < "$UPDATE_CHOICES_FILE"
+    if [[ -n $next_branch ]]; then
+        choices+=("branch:$next_branch" "$(ui_opt warn "$(t update_label_major "GLPI $next_branch" "$major" "$next_branch")" "$(t opt_update_major "$major" "$next_branch")")")
+    fi
     # Same version, newer image digest (base-system fixes): formerly "Refresh image".
     if [[ -n $REFRESH_REF && -n ${CONFIG:-} && -r $CONFIG && $REFRESH_REF != "$(cfg glpi_image)" ]]; then
         choices+=(refresh "$(ui_opt ok "$(t update_label_refresh "GLPI $current")" "$(t opt_update_refresh)")")
@@ -473,14 +503,22 @@ select_update_target() {
         return 0
     fi
     if [[ -z $default ]]; then
-        if [[ $next_branch == true ]]; then say update_no_patches; else say update_no_patches_left; fi
+        if [[ -n $next_branch ]]; then say update_no_patches; else say update_no_patches_left; fi
         default=${choices[0]}
     fi
     choices+=(back "$(ui_opt back "$(t ui_back_menu)")")
-    ui_panel "$(t update_select_title)" "$(t opt_installed)"$'\t'"GLPI $current" "$(t update_select_help)"
-    choose choice update_select_prompt "$default" "${choices[@]}" || exit 10
-    [[ $choice != back ]] || exit 10
-    SELECTED_UPDATE=$choice
+    while :; do
+        ui_panel "$(t update_select_title)" "$(t opt_installed)"$'\t'"GLPI $current" "$(t update_select_help)"
+        choose choice update_select_prompt "$default" "${choices[@]}" || exit 10
+        [[ $choice != back ]] || exit 10
+        if [[ $choice == branch:* ]]; then
+            default=$choice
+            if select_update_branch "${choice#branch:}" "$major"; then return 0; fi
+        else
+            SELECTED_UPDATE=$choice
+            return 0
+        fi
+    done
 }
 update_database() {
     local target image mysql_lookup

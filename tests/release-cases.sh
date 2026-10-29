@@ -49,6 +49,77 @@ build_update_choices 12.0.0 12
 select_update_target 12.0.0 12
 [[ -z $SELECTED_UPDATE ]]
 
+# Migrations appear once per branch, then list the newest three installable
+# releases. The selector can show older releases or return without applying.
+(
+    printf '%s\n' '[{"version":"11.0.12"},{"version":"11.0.13"},{"version":"11.0.14"},
+      {"version":"12.0.0"},{"version":"12.0.1"},{"version":"12.0.2"},{"version":"12.0.3"},
+      {"version":"12.0.4"},{"version":"13.0.0"},{"version":"14.0.0"}]' > "$STATE/cache/releases.json"
+    # Invoked indirectly by the sourced parallel image resolver.
+    # shellcheck disable=SC2317
+    image_resolve() {
+        [[ $2 != 12.0.4 ]] || return 1
+        printf '%s:%s@sha256:fixture\n' "$1" "$2"
+    }
+    choose() {
+        local output=$1 prompt=$2 selected=$3
+        shift 3
+        local -a options=("$@")
+        ((update_calls+=1))
+        case "$update_plan:$update_calls" in
+            latest:1|all:1|back:1|back:3|back:5)
+                [[ $prompt == update_select_prompt && $selected == branch:12 && ${#options[@]} == 4 ]] || exit 99
+                [[ ${options[0]} == branch:12 && ${options[2]} == back ]] || exit 99
+                [[ ${options[1]} == "$(ui_opt warn "$(t update_label_major 'GLPI 12' 11 12)" "$(t opt_update_major 11 12)")" ]] || exit 99
+                if [[ $update_plan == back && $update_calls == 5 ]]; then printf -v "$output" back
+                else printf -v "$output" branch:12; fi;;
+            latest:2|all:2|back:2|back:4)
+                [[ $prompt == choose_version_update && $selected == 12.0.3 && ${#options[@]} == 10 ]] || exit 99
+                [[ ${options[0]} == 12.0.3 && ${options[2]} == 12.0.2 && ${options[4]} == 12.0.1 ]] || exit 99
+                [[ ${options[6]} == other && ${options[8]} == back ]] || exit 99
+                [[ ${options[1]} == "$(ui_opt warn "GLPI 12.0.3 · $(t opt_recommended)" "$(t opt_update_major 11 12)")" ]] || exit 99
+                case $update_plan in
+                    latest) printf -v "$output" 12.0.2;;
+                    all) printf -v "$output" other;;
+                    back) if (( update_calls == 2 )); then return 1; else printf -v "$output" back; fi;;
+                esac;;
+            all:3)
+                [[ $prompt == choose_version_update && ${#options[@]} == 10 ]] || exit 99
+                [[ ${options[6]} == 12.0.0 && ${options[8]} == back ]] || exit 99
+                printf -v "$output" 12.0.0;;
+            patch:1)
+                [[ $prompt == update_select_prompt && $selected == 11.0.14 && ${#options[@]} == 8 ]] || exit 99
+                [[ ${options[0]} == 11.0.13 && ${options[2]} == 11.0.14 && ${options[4]} == branch:12 ]] || exit 99
+                printf -v "$output" 11.0.13;;
+            future:1)
+                [[ $prompt == update_select_prompt && ${options[0]} == branch:13 && ${#options[@]} == 4 ]] || exit 99
+                printf -v "$output" branch:13;;
+            future:2)
+                [[ $prompt == choose_version_update && ${options[0]} == 13.0.0 && ${#options[@]} == 4 ]] || exit 99
+                printf -v "$output" 13.0.0;;
+            *) exit 99;;
+        esac
+    }
+    for LANGUAGE in en es; do
+        tr_load
+        update_plan=latest update_calls=0
+        select_update_target 11.0.14 11
+        [[ $SELECTED_UPDATE == 12.0.2 && $update_calls == 2 ]]
+        update_plan=all update_calls=0
+        select_update_target 11.0.14 11
+        [[ $SELECTED_UPDATE == 12.0.0 && $update_calls == 3 ]]
+        update_plan=back update_calls=0
+        if (select_update_target 11.0.14 11); then exit 1; else [[ $? == 10 ]]; fi
+        update_plan=patch update_calls=0
+        select_update_target 11.0.12 11
+        [[ $SELECTED_UPDATE == 11.0.13 && $update_calls == 1 ]]
+        update_plan=future update_calls=0
+        select_update_target 12.0.4 12
+        [[ $SELECTED_UPDATE == 13.0.0 && $update_calls == 2 ]]
+    done
+) > "$STATE/grouped-updates.log" 2>&1
+printf '%s\n' 'PASS: one migration entry per branch, latest-three selection, all versions, Back, patch updates and next-major limits (EN/ES)'
+
 # New installs offer the unsupported branch last; migrations never offer it.
 (
     printf '%s\n' '[{"version":"11.0.11"},{"version":"10.0.28"},{"version":"12.0.0"},{"version":"10.0.27"}]' > "$STATE/cache/releases.json"

@@ -55,8 +55,11 @@ and starts/verifies stopped containers without reinitializing the database.
 
 Status shows each service, version, health and published ports without long
 digests or raw Docker columns. Logs have a scrollable view. Enter/Escape returns
-from these views. GLPI Update lists all later installable patches in the current
-major and releases in the next major; the latter require migration confirmation.
+from these views. GLPI Update lists later installable patches in the current
+major and one entry for the next branch. Entering that branch shows its three
+latest installable releases, newest first, with an option to show all available
+releases. Esc/Back returns to the update choices. Branch changes still require
+migration confirmation.
 Restore/Manage backups include the archives created before updates, newest
 first. The backup browser offers details, integrity checks, export, restore and
 explicit per-file deletion. Typed `RESTORE`, `DELETE` and version-specific

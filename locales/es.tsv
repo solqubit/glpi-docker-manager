@@ -355,8 +355,10 @@ update_step_backup	Creando el respaldo previo [P]
 update_step_rehearsal	Ensayando la actualización en una copia restaurada y aislada
 update_loading	Comprobando las imágenes oficiales disponibles para actualizar
 update_select_title	Actualizaciones de GLPI disponibles
-update_select_help	Elige cualquier versión posterior con imagen disponible; no hace falta pasar por las intermedias. Cada actualización se respalda y se ensaya antes; una rama nueva pide además confirmación escrita.
-update_select_prompt	¿A qué versión quieres actualizar?
+update_select_help	Elige un parche o una rama nueva. Las ramas muestran sus tres últimas versiones instalables; cada actualización se respalda y se ensaya antes.
+update_select_prompt	¿Qué actualización quieres realizar?
+update_branch_back	Volver a las opciones de actualización
+update_more_versions	Ver todas las versiones disponibles
 setup_access_title	Configuración del acceso web
 layout_code_conflict	No se puede reemplazar una ruta existente ajena al gestor: %s. Aparta esa carpeta o elige otra raíz de instalación.
 layout_checkout_in_root	Conserva el repositorio descargado fuera de %s o dentro de su subcarpeta manager/. La raíz contiene datos privados; el asistente instala allí el código operativo automáticamente.

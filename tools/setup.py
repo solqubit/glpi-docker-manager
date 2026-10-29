@@ -269,7 +269,7 @@ class Setup:
                                  [(False, '● ' + self.ui.t('ui_db_expose_no'), 'ok'),
                                   (True, '▲ ' + self.ui.t('ui_db_expose_yes'), 'warning')],
                                  int(self.data[key]), notice=self.ui.t('ui_db_access_body'),
-                                 help_text=None if self.access_only else self.ui.t('ui_db_access_later'))
+                                 help_text='' if self.access_only else self.ui.t('ui_db_access_later'))
         else:
             def validator(text):
                 error = validate(key, text, self.data)

@@ -355,8 +355,10 @@ update_step_backup	Creating the pre-change backup [P]
 update_step_rehearsal	Rehearsing the update on an isolated restored copy
 update_loading	Checking available official update images
 update_select_title	Available GLPI updates
-update_select_help	Choose any later version with an available image; intermediate releases are not required. Every update is backed up and rehearsed first; a new branch also asks for a typed confirmation.
-update_select_prompt	Which version do you want to update to?
+update_select_help	Choose a patch or a new branch. Branches show their three latest installable versions; every update is backed up and rehearsed first.
+update_select_prompt	Which update do you want to perform?
+update_branch_back	Back to update choices
+update_more_versions	Show all available versions
 setup_access_title	Web access settings
 layout_code_conflict	Cannot replace an existing unmanaged path: %s. Move it aside or select a different installation root.
 layout_checkout_in_root	Keep the downloaded Git checkout outside %s, or place it in its manager/ subdirectory. The root is reserved for private runtime data; setup installs the operational code there automatically.

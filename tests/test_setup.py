@@ -6,6 +6,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+from unittest.mock import Mock
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'tools'))
@@ -69,6 +70,17 @@ ui = Terminal(translations(root, 'es'))
 assert 'sha256' not in repr(status_rows(data, services, ui))
 assert 'abc' not in repr(status_rows(data, services, ui))
 assert clean('\x1b[31mtest\x1b[0m') == 'test'
+# Optional help must also work in a rendered menu, and choosing False must not
+# be confused with cancellation (None).
+menu = Terminal(translations(root, 'en'))
+menu.screen = Mock()
+menu.screen.getmaxyx.return_value = (24, 80)
+menu.left, menu.width = 2, 72
+menu.frame = Mock(return_value=(4, 24))
+menu.put = Mock()
+menu.draw_label = Mock()
+menu.key = Mock(return_value='\n')
+assert menu.menu('MySQL', [(False, 'Private', 'ok')], help_text=None) is False
 with tempfile.TemporaryDirectory() as directory:
     folder = Path(directory)
     (folder / 'backups').mkdir()

@@ -81,6 +81,19 @@ with tempfile.TemporaryDirectory() as directory:
           expected_code=20, extra_env={'NO_COLOR': '1'})
     data['db_password'] = 'abc'; data['root_password'] = '1'
     draft.write_text(json.dumps(data))
+    # Installed access settings: edit MySQL exposure in its nested selector,
+    # reverse the change, cancel the selector and leave without applying.
+    access_draft = folder / 'access.json'
+    for language in ('es', 'en'):
+        access_data = dict(data, _access_only=True)
+        access_draft.write_text(json.dumps(access_data))
+        exposure = drive('setup.py', [str(access_draft), language], [
+            home + down * 5 + b'\n', down + b'\n',
+            b'\n', home + b'\n', b'\n', b'\x1b', b'\x1b'], expected_code=10)
+        assert b'Traceback' not in exposure
+        saved_access = json.loads(access_draft.read_text())
+        for key in ('expose_db', 'hostname', 'http_port', 'https_port', 'db_password', 'root_password'):
+            assert saved_access[key] == access_data[key], key
     services = folder / 'services.json'
     services.write_text(json.dumps([{'Service': name, 'State': 'running', 'Health': 'healthy'}
                                     for name in ('glpi', 'db')]))

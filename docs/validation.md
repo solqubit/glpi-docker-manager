@@ -1,5 +1,22 @@
 # Validation evidence
 
+## Access settings and grouped migration versions
+
+In the clean Ubuntu 24.04 test container, reproduced the reported
+`NoneType.expandtabs` crash when an installed access form opens MySQL exposure.
+The corrected caller sends empty help and the shared menu also accepts `None`.
+Real controlling-terminal tests in English and Spanish toggle exposure, undo it,
+cancel the selector and leave without applying changes; configuration values and
+terminal settings are preserved.
+
+Release fixtures verify one entry per migration branch, the newest three
+installable releases in descending order, all-versions selection, Esc/Back,
+current-branch patch selection and adjacent-major limits (including 12 → 13).
+No database updates or port changes were applied to a live installation.
+
+Final result: **29 test groups passed**, ShellCheck with no diagnostics and
+Python compilation successful. English/Spanish key and format parity passed.
+
 ## 2026-10-28: Linux agent bootstrap (working tree)
 
 Presentation follow-up: the generated installation command now uses a readable

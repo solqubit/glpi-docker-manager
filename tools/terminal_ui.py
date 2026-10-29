@@ -211,6 +211,7 @@ class Terminal:
              notice_style='accent'):
         """Rows are (value, label, semantic color); return a value or None on Back.
         Rows whose value is SEPARATOR are drawn as a rule and never selected."""
+        help_text = '' if help_text is None else help_text
         selected = min(selected, len(rows) - 1)
         if self.screen is None:
             choices = [row for row in rows if row[0] != SEPARATOR]
