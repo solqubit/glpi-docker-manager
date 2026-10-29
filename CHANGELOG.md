@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Linux agent bootstrap
+* Add concise administrator-only installation details with tested DEB/RPM
+  families, actual client paths and distinct HTTP/public/local/private CA modes.
+* Use immutable installer/CA URLs and retain verified copies across normal
+  configuration revisions so saved installation blocks survive routine updates.
 * Display a readable copyable shell block instead of an escaped single line,
   preserving download fallback, root-only temporary files and SHA-256 checks.
 * Publish a verified Linux agent installer and public metadata on the GLPI server,

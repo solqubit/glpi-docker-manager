@@ -7,6 +7,7 @@ Only uniquely named containers/network created here are removed. Logs stay in
 ignored tests/.runtime/. No socket, host filesystem or privileged mode on clients.
 """
 import os
+import json
 from pathlib import Path
 import subprocess
 import time
@@ -131,10 +132,12 @@ def main():
     ubuntu = start('ubuntu', PREFIX + ':ubuntu', '--hostname', PREFIX + '-ubuntu')
     inventory(ubuntu, 'off')
     identity = sql('SELECT deviceid FROM glpi_agents ORDER BY id')
+    canonical = FOLDER / 'revisions/off/public/agent/install.sh'
+    canonical.write_bytes(canonical.read_bytes() + b'\n# simulated installer update\n')
     inventory(ubuntu, 'off')
     assert sql('SELECT deviceid FROM glpi_agents ORDER BY id') == identity
     assert sql('SELECT COUNT(*) FROM glpi_computers') == '1'
-    print('OK: repeated command preserves identity', flush=True)
+    print('OK: saved block survives an installer update and preserves identity', flush=True)
     # Exercise the persistent-service branch without granting cgroups/privileged
     # access to a client container. The manager below is explicitly a test double;
     # this checks service registration and error recovery, not a real system boot.
@@ -172,7 +175,8 @@ chmod 755 /usr/local/bin/systemctl''')
         assert downloaded == (revision / 'public/agent/ca.pem').read_text()
         # Tamper the CA without changing the trusted command/script hash. The
         # second run must reject it before modifying the existing agent config.
-        ca_file = revision / 'public/agent/ca.pem'
+        metadata = json.loads((revision / 'public/agent/bootstrap.json').read_text())
+        ca_file = revision / 'public/agent' / f"ca-{metadata['ca_sha256']}.pem"
         original = ca_file.read_bytes()
         config_before = run('exec', client, 'cat', '/etc/glpi-agent/conf.d/99-gdm.cfg').stdout
         try:
@@ -186,7 +190,9 @@ chmod 755 /usr/local/bin/systemctl''')
         print('OK: CA tampering rejected; installed configuration preserved', flush=True)
         run('rm', '-fv', proxy)
     # Tampered executable must never be run even though bootstrap uses HTTP.
-    installer = FOLDER / 'revisions/off/public/agent/install.sh'
+    command = (FOLDER / 'off-command.sh').read_text().removeprefix('sudo ')
+    digest = next(line.split('=', 1)[1] for line in command.splitlines() if line.startswith('sha256='))
+    installer = FOLDER / 'revisions/off/public/agent' / f'install-{digest}.sh'
     original = installer.read_bytes()
     try:
         installer.write_bytes(original + b'\ntouch /tmp/UNSAFE_EXECUTION\n')

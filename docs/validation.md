@@ -10,6 +10,16 @@ single success marker on the result card. ShellCheck passes for the changed
 shell files. English/Spanish key/format parity and UTF-8/LF were checked. The
 full installation integration below was not repeated for this presentation change.
 
+Compatibility/update-resilience follow-up: the administrator-only summary now
+shows tested DEB/RPM families, client paths and distinct HTTP/public/local/private
+CA behavior. Generated blocks use immutable installer/CA files; unit checks cover
+preserving verified resources across revisions and skipping corrupted history.
+The complete suite again passed **29 groups**, ShellCheck and Python compilation.
+Real container integration again imported three computers, including a saved block
+reused after changing the current installer, with identity preserved. CA/installer
+tampering was still rejected. Evidence: ignored
+`tests/.runtime/gdm_agent_245d72433f/results.log`; its disposable resources were removed.
+
 Validated from Windows with Docker Desktop's Linux engine; no production server
 was used. The clean unit container was Ubuntu 24.04, Bash 5.2.21, Python 3.12.3
 and OpenSSL 3.0.13. ShellCheck on `start.sh`, `lib/*.sh`, `templates/*.sh` and

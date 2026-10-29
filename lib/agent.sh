@@ -1,7 +1,40 @@
 #!/usr/bin/env bash
 # Public bootstrap resources contain only addresses, public certificates and
 # pinned upstream downloads. They never include the installation configuration.
+GDM_AGENT_RELEASE=1.21
 agent_enabled() { jq -e '.agent_enabled != false' "$1" >/dev/null; }
+
+# Immutable public resources let a previously copied block keep working across
+# normal configuration revisions. A different CA still requires renewed trust.
+agent_snapshot() {
+    local dir=$1 file=$2 kind=$3 digest extension=sh destination temporary existing=''
+    [[ $kind != ca ]] || extension=pem
+    digest=$(sha256sum < "$file"); digest=${digest%% *}
+    destination="$dir/$kind-$digest.$extension"
+    if [[ -f $destination && ! -L $destination ]]; then
+        existing=$(sha256sum < "$destination"); existing=${existing%% *}
+    fi
+    [[ $existing != "$digest" ]] || return 0
+    temporary=$(mktemp "$dir/.agent-resource.XXXXXX")
+    cp -- "$file" "$temporary"
+    chmod 644 "$temporary"
+    mv -Tf -- "$temporary" "$destination"
+}
+agent_resources_carry() {
+    local dir=$1 previous="$STATE/current/public/agent" file name kind expected actual
+    [[ -d $previous && ! $dir -ef $previous ]] || return 0
+    for file in "$previous"/install-*.sh "$previous"/ca-*.pem; do
+        [[ -f $file && ! -L $file ]] || continue
+        name=${file##*/}
+        if [[ $name =~ ^install-([a-f0-9]{64})\.sh$ ]]; then kind=install
+        elif [[ $name =~ ^ca-([a-f0-9]{64})\.pem$ ]]; then kind=ca
+        else continue; fi
+        expected=${BASH_REMATCH[1]}
+        actual=$(sha256sum < "$file"); actual=${actual%% *}
+        [[ $actual == "$expected" ]] || continue
+        agent_snapshot "$dir" "$file" "$kind"
+    done
+}
 
 agent_prepare() {
     local file=$1 revision=$2 mode host port base server ca='' ca_hash='' name value
@@ -15,6 +48,7 @@ agent_prepare() {
         server="https://$host"; [[ $port == 443 ]] || server+=":$port"
     fi
     mkdir -p "$revision/public/agent"
+    agent_resources_carry "$revision/public/agent"
     if [[ $mode == self-signed ]]; then
         ca="$revision/tls/gdm-ca.pem"
     elif [[ $mode == custom && -f $(jq -r .cert_dir "$file")/custom/agent-ca.pem ]]; then
@@ -26,15 +60,16 @@ agent_prepare() {
     if [[ -n $ca ]]; then
         cp -- "$ca" "$revision/public/agent/ca.pem"
         ca_hash=$(sha256sum < "$ca"); ca_hash=${ca_hash%% *}
+        agent_snapshot "$revision/public/agent" "$ca" ca
     fi
     # Fixed, reviewed upstream release. Its checksum is published in the official
     # glpi-agent-1.21.sha256 asset; a future agent update changes both together.
-    local version=1.21 digest=285eccea560c0e9f253be0feb19786903110d5189d28285d4f1cc2097bb1bd33
+    local version=$GDM_AGENT_RELEASE digest=285eccea560c0e9f253be0feb19786903110d5189d28285d4f1cc2097bb1bd33
     local asset="https://github.com/glpi-project/glpi-agent/releases/download/$version/glpi-agent-$version-x86_64.AppImage"
     {
         printf '#!/usr/bin/env bash\n'
         printf 'readonly GDM_AGENT_SERVER=%q\n' "$server/front/inventory.php"
-        printf 'readonly GDM_AGENT_CA_URL=%q\n' "$base/agent/ca.pem"
+        printf 'readonly GDM_AGENT_CA_URL=%q\n' "$base/agent/ca-$ca_hash.pem"
         printf 'readonly GDM_AGENT_CA_SHA256=%q\n' "$ca_hash"
         printf 'readonly GDM_AGENT_VERSION=%q\n' "$version"
         printf 'readonly GDM_AGENT_ASSET=%q\n' "$asset"
@@ -46,6 +81,7 @@ agent_prepare() {
         done < "$GDM_ROOT/locales/$(jq -r .language "$file").tsv"
         cat "$GDM_ROOT/templates/agent-install.sh"
     } > "$revision/public/agent/install.sh"
+    agent_snapshot "$revision/public/agent" "$revision/public/agent/install.sh" install
     jq -n --arg server "$server/front/inventory.php" --arg tls "$mode" --arg version "$version" \
         --arg ca "$ca_hash" --arg asset "$asset" --arg sha256 "$digest" \
         '{format:1,server:$server,tls:$tls,agent_version:$version,architecture:"x86_64",ca_sha256:$ca,
@@ -55,11 +91,13 @@ agent_prepare() {
 }
 
 agent_command() {
-    local installer="$STATE/current/public/agent/install.sh" url hash argument=''
+    local installer="$STATE/current/public/agent/install.sh" base hash argument=''
     [[ -z ${1:-} || $1 == --once ]] || die invalid agent-command
     if ! agent_enabled "$CONFIG" || [[ ! -f $installer ]]; then die agent_not_published; fi
-    url=$(tls_ca_url "$(cfg hostname)" "$(cfg http_port)"); url=${url%/gdm-ca.pem}/agent/install.sh
+    base=$(tls_ca_url "$(cfg hostname)" "$(cfg http_port)"); base=${base%/gdm-ca.pem}/agent
     hash=$(sha256sum < "$installer"); hash=${hash%% *}
+    # Backfill the immutable URL on an already running pre-snapshot revision.
+    agent_snapshot "$STATE/current/public/agent" "$installer" install
     # Keep this block plain and unwrapped so it can be copied verbatim. Quoting
     # the heredoc protects client-side variables until the privileged Bash runs.
     # The trusted manager supplies the hash, never the HTTP download itself.
@@ -70,8 +108,10 @@ umask 077
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
 COMMAND
-    printf '\nurl=%q\nsha256=%q\n\n' "$url" "$hash"
+    printf '\nbase=%q\nsha256=%q\n' "$base" "$hash"
     cat <<'COMMAND'
+url="$base/install-$sha256.sh"
+
 if command -v wget >/dev/null; then
   wget -q --timeout=120 -O "$tmp/install.sh" "$url"
 elif command -v curl >/dev/null; then
@@ -92,23 +132,33 @@ COMMAND
 }
 
 agent_setup() {
-    local action=${1:-} file publication
+    local action=${1:-} file publication selected=show
     local -a details=("$(t agent_intro)")
     if agent_enabled "$CONFIG"; then publication=$(t agent_state_on); else publication=$(t agent_state_off); fi
     details+=("$publication")
     [[ $(cfg tls) != custom ]] || details+=("$(t agent_custom_ca "$CERT_ROOT/custom/agent-ca.pem")")
     ui_panel "$(t agent_title)" "${details[@]}"
     if [[ -z $action ]]; then
-        if agent_enabled "$CONFIG"; then
-            choose action agent_title show show "$(ui_opt primary "$(t agent_show)")" \
-                publish "$(t agent_publish)" disable "$(ui_opt warn "$(t agent_disable)")" \
-                back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
-        else
-            choose action agent_title publish publish "$(ui_opt primary "$(t agent_publish)")" \
-                back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
-        fi
+        agent_enabled "$CONFIG" || selected=publish
+        while :; do
+            if agent_enabled "$CONFIG"; then
+                choose action agent_title "$selected" show "$(ui_opt primary "$(t agent_show)")" \
+                    info "$(t agent_info_title)" \
+                    publish "$(t agent_publish)" disable "$(ui_opt warn "$(t agent_disable)")" \
+                    back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
+            else
+                choose action agent_title "$selected" publish "$(ui_opt primary "$(t agent_publish)")" \
+                    info "$(t agent_info_title)" \
+                    back "$(ui_opt back "$(t ui_back_menu)")" || exit 10
+            fi
+            [[ $action == info ]] || break
+            agent_information
+            ui_pause agent_info_back
+            selected=info
+            ui_panel "$(t agent_title)" "${details[@]}"
+        done
     fi
-    case $action in publish|disable|show) ;; back) exit 10;; *) die invalid agent-setup;; esac
+    case $action in publish|disable|show) ;; info) agent_information; return;; back) exit 10;; *) die invalid agent-setup;; esac
     if [[ $action == show ]]; then agent_show_command; return; fi
     confirm agent_publish_confirm || exit 10
     file=$(mktemp "$STATE/.agent.XXXXXX"); CLEANUP_PATHS+=("$file")
@@ -117,6 +167,31 @@ agent_setup() {
     ui_run 0 settings_step_apply apply_settings "$file" true
     [[ $action != disable ]] || { menu_done agent_disabled; return; }
     agent_show_command
+}
+agent_information() {
+    local mode version=$GDM_AGENT_RELEASE metadata="$STATE/current/public/agent/bootstrap.json" ca=false
+    mode=$(cfg tls)
+    [[ ! -f $metadata ]] || version=$(jq -r --arg fallback "$version" '.agent_version // $fallback' "$metadata")
+    local -a rows=("$(t agent_info_compat)" "$(t agent_info_tested)"
+        "$(t agent_info_target "$(installation_url)/front/inventory.php")")
+    case $mode in
+        off) rows+=("$(t agent_info_http)");;
+        acme) rows+=("$(t agent_info_public)");;
+        self-signed) rows+=("$(t agent_info_local)"); ca=true;;
+        custom)
+            if [[ -f $metadata ]]; then
+                if jq -e '.ca_sha256 != null and .ca_sha256 != ""' "$metadata" >/dev/null; then ca=true; fi
+            elif [[ -f $(cfg cert_dir)/custom/agent-ca.pem ]]; then ca=true; fi
+            if [[ $ca == true ]]; then rows+=("$(t agent_info_private)")
+            else rows+=("$(t agent_info_custom_public)"); fi;;
+    esac
+    rows+=("$(t agent_info_app)"$'\t'"/opt/glpi-agent/appimage-$version/AppRun"
+        "$(t agent_info_executable)"$'\t'"/usr/local/bin/glpi-agent"
+        "$(t agent_info_config)"$'\t'"/etc/glpi-agent/conf.d/99-gdm.cfg")
+    [[ $ca != true ]] || rows+=("$(t agent_info_ca)"$'\t'"/etc/glpi-agent/certs/gdm-ca.pem")
+    rows+=("$(t agent_info_log)"$'\t'"/var/log/glpi-agent/gdm-bootstrap.log"
+        "$(t agent_info_run)" "$(t agent_info_updates)")
+    ui_panel "$(t agent_info_title)" "${rows[@]}"
 }
 agent_show_command() {
     ui_panel "✓ $(t agent_ready)" "$(t agent_copy)" "$(t agent_trust_note)"

@@ -11,6 +11,23 @@ agent_custom_ca	For a private imported certificate, place its PEM CA chain at %s
 agent_ca_invalid	The agent CA is expired, invalid or does not verify the configured server certificate.
 agent_not_published	Publish the Linux installer first: sudo ./start.sh agent-setup.
 agent_show	Show the installation command
+agent_info_title	Installation details and compatibility
+agent_info_back	Enter or Esc · Back
+agent_info_compat	Official x86_64 AppImage; requires glibc and systemd. No FUSE needed.
+agent_info_tested	Tested: Ubuntu 24.04 and Debian 12 (DEB/APT), Rocky Linux 9 (RPM/DNF). Other distributions require verification.
+agent_info_target	Inventory URL: %s
+agent_info_http	HTTP: no TLS certificate or additional CA is configured.
+agent_info_public	Public HTTPS: uses normal public certificate trust; no extra CA file.
+agent_info_local	HTTPS with local CA: downloads and configures the public CA on the client.
+agent_info_private	Imported HTTPS with private CA: configures the published CA on the client.
+agent_info_custom_public	Imported HTTPS without an extra CA: the certificate must be publicly trusted by the agent.
+agent_info_app	Application
+agent_info_executable	Executable
+agent_info_config	Configuration
+agent_info_ca	Client CA
+agent_info_log	Inventory log
+agent_info_run	Uses --install and --server, sends an initial inventory with --force and enables the glpi-agent systemd service.
+agent_info_updates	Copied blocks retain their resources across normal updates. After changing the address or CA, copy a new block.
 agent_publish_confirm	Apply the publication change? Services restart briefly; GLPI data and credentials are preserved.
 agent_disabled	Linux agent installer is no longer published. Installed agents keep working.
 agent_ready	Linux agent installation command ready

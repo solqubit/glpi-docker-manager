@@ -3,7 +3,7 @@ set -Eeuo pipefail
 GDM_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 export GDM_ROOT
 GDM_STATE_DIR=$(mktemp -d); export GDM_STATE_DIR
-for module in core system config tls; do
+for module in core system config tls operations; do
     # shellcheck source=/dev/null
     source "$GDM_ROOT/lib/$module.sh"
 done
@@ -47,10 +47,47 @@ for mode in off self-signed custom acme; do
     bash -n "$STATE/command.sh"
     expected=$(sha256sum < "$dir/public/agent/install.sh"); expected=${expected%% *}
     grep -q "$expected" "$STATE/command.sh"
+    [[ -f $dir/public/agent/install-$expected.sh ]]
+    agent_information > "$STATE/info.stdout" 2> "$STATE/info.log"
+    grep -Fq "$(t agent_info_target "$(installation_url)/front/inventory.php")" "$STATE/info.log"
+    grep -Fq '/etc/glpi-agent/conf.d/99-gdm.cfg' "$STATE/info.log"
+    if grep -qE 'test_password|root_password|privkey|gdm-ca.key' "$STATE/info.log"; then exit 1; fi
+    if [[ $mode == self-signed || $mode == custom ]]; then
+        grep -Fq '/etc/glpi-agent/certs/gdm-ca.pem' "$STATE/info.log"
+    else
+        if grep -Fq '/etc/glpi-agent/certs/gdm-ca.pem' "$STATE/info.log"; then exit 1; fi
+    fi
+    if [[ -n ${previous_installer:-} ]]; then
+        cmp "$previous_installer" "$dir/public/agent/${previous_installer##*/}"
+    fi
+    previous_installer="$dir/public/agent/install-$expected.sh"
     # No running systemd: fail before changing the client, unless --once is explicit.
     if bash "$dir/public/agent/install.sh" > "$STATE/client.log" 2>&1; then exit 1; fi
     grep -q 'running systemd' "$STATE/client.log"
 done
+# The private information screen returns to the same administration submenu.
+if (
+    # Called indirectly by the sourced agent_setup implementation.
+    # shellcheck disable=SC2317
+    choose() {
+        if [[ ! -e $STATE/info-visited ]]; then
+            printf visited > "$STATE/info-visited"
+            printf -v "$1" '%s' info
+        else
+            [[ $3 == info ]] || exit 23
+            printf -v "$1" '%s' back
+        fi
+    }
+    # shellcheck disable=SC2317
+    ui_pause() { [[ $1 == agent_info_back ]] || exit 24; }
+    agent_setup ''
+) > "$STATE/info-menu.log" 2>&1; then exit 1
+else [[ $? == 10 ]]; fi
+# Corrupted history is not carried into a new revision or trusted implicitly.
+printf altered >> "$previous_installer"
+mkdir "$STATE/resource-history"
+agent_resources_carry "$STATE/resource-history"
+[[ ! -e $STATE/resource-history/${previous_installer##*/} ]]
 # Execute the exact copyable block using local download fixtures. The generated
 # command must work with either tool and reject altered bytes before execution.
 cat > "$STATE/current/public/agent/install.sh" <<'CLIENT'
@@ -98,6 +135,13 @@ bootstrap_case wget
 bootstrap_case curl false --once
 bootstrap_case wget true
 bootstrap_case missing
+# An older copied block still resolves to its original verified bytes after the
+# canonical installer changes (for example after a manager update).
+old_digest=$(sha256sum < "$STATE/current/public/agent/install.sh"); old_digest=${old_digest%% *}
+printf '# updated installer\n' >> "$STATE/current/public/agent/install.sh"
+agent_snapshot "$STATE/current/public/agent" "$STATE/current/public/agent/install.sh" install
+old_bytes=$(sha256sum < "$STATE/current/public/agent/install-$old_digest.sh"); old_bytes=${old_bytes%% *}
+[[ $old_bytes == "$old_digest" ]]
 # The card has one success marker; the executable output stays plain text.
 agent_show_command > "$STATE/displayed-command.sh" 2> "$STATE/command-card.log"
 grep -Fq "[+] $(t agent_ready)" "$STATE/command-card.log"
@@ -111,6 +155,12 @@ config_render "$STATE/custom-public.json" "$STATE/revisions/public-custom"
 tls_prepare "$STATE/custom-public.json" "$STATE/revisions/public-custom"
 agent_prepare "$STATE/custom-public.json" "$STATE/revisions/public-custom"
 [[ ! -e $STATE/revisions/public-custom/public/agent/ca.pem ]]
+ln -sfn revisions/public-custom "$STATE/current"
+CONFIG="$STATE/current/config.json"; cfg_cache
+agent_information > "$STATE/public-info.stdout" 2> "$STATE/public-info.log"
+expected_info=$(t agent_info_custom_public)
+grep -Fq "${expected_info:0:35}" "$STATE/public-info.log"
+if grep -Fq '/etc/glpi-agent/certs/gdm-ca.pem' "$STATE/public-info.log"; then exit 1; fi
 printf invalid > "$CERT_ROOT/custom/agent-ca.pem"
 if (agent_prepare "$STATE/custom-public.json" "$STATE/revisions/public-custom") >/dev/null 2>&1; then exit 1; fi
 config_render "$STATE/input.json" "$STATE/revisions/disabled"

@@ -57,6 +57,11 @@ Uninstall it through its original method first, or keep using that method.
 
 ## HTTP and HTTPS
 
+The administration submenu includes **Installation details and compatibility**:
+a brief local/root-only view of the inventory URL, client paths, TLS/CA mode,
+tested distributions and initial/background inventory behavior. It adds no
+public information page or new installation-wizard question.
+
 | GLPI mode | Client configuration |
 | --- | --- |
 | HTTP | Uses the configured HTTP hostname/IP and port. No CA is installed. Inventory traffic is unencrypted. |
@@ -78,8 +83,10 @@ equivalent command and should not be used.
 The URLs are port-aware:
 
 * `http://SERVER[:PORT]/agent/install.sh`: generated installer.
+* `http://SERVER[:PORT]/agent/install-SHA256.sh`: immutable copy used by generated blocks.
 * `http://SERVER[:PORT]/agent/bootstrap.json`: public metadata (no credentials).
 * `http://SERVER[:PORT]/agent/ca.pem`: public CA, only when a private/local CA is used.
+* `http://SERVER[:PORT]/agent/ca-SHA256.pem`: immutable public CA used by new installers.
 * `http://SERVER[:PORT]/gdm-ca.pem`: existing local CA download for other clients.
 
 HTTPS also serves `/agent/` resources. Other HTTP routes continue to redirect to
@@ -114,8 +121,14 @@ sudo /opt/glpi-docker-manager/start.sh agent-setup disable
 ```
 
 Disabling publication removes the routes/mount at the next verified revision.
-Already installed agents keep working. Regenerate and redistribute the command
-after changing the address, ports, CA, language or installer. A changed address
+Already installed agents keep working. Generated blocks use immutable downloads
+that are carried into later enabled configuration revisions, so saved blocks
+keep working across routine GLPI/manager updates, even if the current installer
+changes. Corrupted historical downloads are not republished. Existing pre-versioned
+blocks should be copied again once to benefit from immutable URLs.
+Disabling publication deliberately revokes these resources; a newly enabled
+publication may require a new block. Changed addresses/ports, protocols or CAs
+also require a fresh block. A changed address
 also needs the agent configuration updated; rerunning the new command does so
 without resetting identity. Ordinary leaf-certificate renewal under the same CA
 does not require reinstalling the agent.
