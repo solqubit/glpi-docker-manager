@@ -131,13 +131,36 @@ can be discovered, but require passing target-image checks and operator review o
 their actual requirements. The manager cannot certify compatibility of a release
 that upstream has not published yet.
 
-## MySQL patches
+## Database engine and patches
 
-`db-update` selects a later exact patch within 8.4, backs up, rehearses with the
-target engine and current GLPI, then asks for `UPDATE-MYSQL` before applying it.
-Cross-series upgrades (for example 8.4 to 9.x) are not automated. No background
-updater changes database images. Do not manually start an arbitrary newer MySQL
-image on the production volume as a compatibility test.
+The installation wizard asks for the database after the GLPI version: **MySQL 8.4
+LTS** (default, supported until 2032) or a **MariaDB LTS series** (GLPI 11 requires
+MariaDB 10.6 or later). MariaDB series are not hard-coded: the wizard offers the
+two newest LTS series whose support has not ended, from
+[endoflife.date](https://endoflife.date/mariadb), and says for each one until
+when it is supported and whether the GLPI project tests it for the chosen GLPI
+version (the MariaDB matrix in GLPI's own CI workflow at that tag). The menu
+distinguishes series listed in that matrix from those between its bounds. A series
+newer than the tested range or ending support within a year carries a warning;
+expired series are excluded. If a lookup fails, the wizard uses the branch-level
+data in `data/mariadb-lts.json` without claiming the exact GLPI release was verified.
+The dashboard warns 6 months before the installed series loses support, based on
+the dates in the local catalog.
+The choice is stored as `db_engine` and never changes afterwards: patches stay
+within that engine's series, a backup records its engine and a restore recreates
+the same one, so MySQL and MariaDB data never mix. Switching engines would be a
+manual dump/import and is not offered. Existing installations without
+`db_engine` are MySQL. Every command inside the database container uses the
+client it provides (`mariadb`/`mariadb-dump` or `mysql`/`mysqldump`); MariaDB
+runs with `MARIADB_AUTO_UPGRADE=1`, so it checks whether its system tables need
+upgrading after a patch.
+
+`db-update` selects a later exact patch within the installed series (8.4, or the
+MariaDB series chosen at installation), backs up, rehearses with the target engine and current GLPI, then asks
+for `UPDATE-MYSQL` or `UPDATE-MARIADB` before applying it. Cross-series upgrades
+(for example 8.4 to 9.x or 11.8 to 12.x) are not automated. No background
+updater changes database images. Do not manually start an arbitrary newer
+database image on the production volume as a compatibility test.
 
 ## MySQL memory
 

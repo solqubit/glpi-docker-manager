@@ -27,7 +27,7 @@ agent_info_config	Configuration
 agent_info_ca	Client CA
 agent_info_log	Inventory log
 agent_info_run	Uses --install and --server, sends an initial inventory with --force and enables the glpi-agent systemd service.
-agent_info_updates	Copied blocks retain their resources across normal updates. After changing the address or CA, copy a new block.
+agent_info_updates	Each time the command is shown, the manager publishes the latest official agent release with its official checksum. To update a computer, run a new command again; blocks copied earlier keep working with their release. After changing the address or the CA, copy a new one.
 agent_publish_confirm	Apply the publication change? Services restart briefly; GLPI data and credentials are preserved.
 agent_disabled	Linux agent installer is no longer published. Installed agents keep working.
 agent_ready	Linux agent installation command ready
@@ -66,7 +66,7 @@ failed	Operation failed at %s. No credentials are included in this message.
 recovery_notice	An incomplete operation was recorded in %s. Use Recover an interrupted operation or Restore a backup (recover / restore); services may remain stopped.
 password_prompt	Type your password, or leave it empty to generate one. No minimum length.
 bad_password	Passwords cannot contain control characters.
-bad_root_password	The official MySQL root initialization does not safely accept quotes or backslashes. Use another administrator password without those characters, or press Enter to generate one. The application password supports them.
+bad_root_password	The official database root initialization does not safely accept quotes or backslashes. Use another administrator password without those characters, or press Enter to generate one. The application password supports them.
 destructive	Confirmation required. Type exactly %s to continue:
 cancelled	Cancelled.
 dependencies	Missing dependencies:%s
@@ -107,7 +107,7 @@ image_missing	No compatible official image could be verified for %s. Check the n
 not_installed	No managed installation exists in this state directory. Use install or restore.
 foreign_resource	Resource %s does not belong to this installation. Refusing to use it.
 unhealthy	Service %s did not become healthy. Inspect logs and the recovery journal.
-services_required	GLPI and MySQL must be running for this operation. Use Start / verify GLPI, then try again.
+services_required	GLPI and the database must be running for this operation. Use Start / verify GLPI, then try again.
 cert_instructions	Place the PEM certificate followed by intermediate certificates at %s and its matching unencrypted PEM private key at %s. The directory is private; do not place keys in Git. Then rerun HTTPS configuration. Convert PFX/PKCS12 first; see docs/https.md.
 acme_ports	Let's Encrypt requires host ports 80 and 443. Use custom certificates for another port layout.
 acme_requirements	For %s: point public DNS A/AAAA records to this server; allow inbound TCP 80/443 and outbound HTTPS; remove incorrect AAAA records. Certificate issuance/renewal is managed by Caddy.
@@ -121,7 +121,7 @@ mode_prompt	What will this installation be used for?
 port_prompt	HTTP host port:
 db_name_prompt	Database name:
 expose_prompt	Expose the database port for external connections?
-root_password	Choose the separate MySQL administrator password.
+root_password	Choose the separate database administrator password.
 install_confirm	Create the configuration and deploy this installation?
 ready	Open GLPI in your browser: %s
 port_busy	A required host port is already in use: %s
@@ -144,14 +144,14 @@ migration_warning	A branch migration requires reviewing plugins, inventory, API 
 migration_review	Have you reviewed plugin compatibility and the target release's migration requirements?
 rehearsal_ok	The isolated database migration and schema check succeeded. This does not certify plugins or integrations.
 updated	Update verified. Current GLPI: %s.
-db_update_warning	Only MySQL 8.4 patches are applied. A backup and an isolated rehearsal run first; GLPI is unavailable for a few minutes.
-db_update_confirm	Back up and apply this MySQL patch?
+db_update_warning	Only %s %s patches are applied. A backup and an isolated rehearsal run first; GLPI is unavailable for a few minutes.
+db_update_confirm	Back up and apply this database patch?
 config_confirm	Apply this configuration change? Services may briefly restart.
 config_restored	Previous configuration restored after validation failed. Inspect logs before trying again.
 credentials_warning	Database credentials are hidden. Reveal them in this terminal?
-credentials_note	These are database credentials, not GLPI web account passwords. Editing .env does not rotate existing MySQL accounts.
+credentials_note	These are database credentials, not GLPI web account passwords. Editing .env does not rotate existing database accounts.
 menu	\n  GLPI Docker Manager\n  1) Status                 2) Start                3) Stop\n  4) Logs                   5) Check updates        6) Update GLPI\n  7) Backup                 8) Restore              9) HTTPS\n 10) MySQL exposure        11) Credentials         12) Transfer\n 13) Major migration       14) MySQL patch         15) Language\n 16) Diagnose              17) Refresh GLPI image   18) Recovery\n  0) Exit\n
-stop_confirm	Stop GLPI, MySQL and the HTTPS proxy?
+stop_confirm	Stop GLPI, the database and the HTTPS proxy?
 diagnose_note	Diagnostics do not print passwords. Raw Docker/GLPI logs may contain sensitive application data; review before sharing.
 recover_prompt	The current image and schema will be re-checked and the pending operation closed; the database is not rolled back. To go back to a backup instead, press Esc and choose Restore a backup.
 recover_done	Current services and schema verified; the operation journal was closed.
@@ -181,7 +181,7 @@ ui_status_unknown	Status unavailable
 ui_status	Service · View status
 ui_start	Service · Start
 ui_logs	View service logs
-ui_db_update	Updates · Update MySQL patches
+ui_db_update	Updates · Update database patches
 ui_language	Configuration · Language
 ui_diagnose	Diagnose the installation
 ui_recover	Recover an interrupted operation
@@ -204,7 +204,7 @@ ui_next_steps	Change the default passwords of GLPI's web accounts (glpi, tech, n
 ui_step_volumes	Preparing persistent storage
 ui_step_images	Downloading the official images
 ui_step_plugins	Preparing application directories
-ui_step_database	Starting and checking MySQL
+ui_step_database	Starting and checking the database
 ui_step_install	Installing the GLPI database
 ui_step_requirements	Checking GLPI requirements
 ui_step_services	Starting GLPI and web access
@@ -223,7 +223,7 @@ ui_release_continue	Continue
 ui_release_details	Read the complete release notes
 ui_continue_setup	Press Enter to continue…
 ui_app_password	GLPI database password · GLPI_DB_PASSWORD
-ui_root_password	MySQL administrator password · MYSQL_ROOT_PASSWORD
+ui_root_password	Administrator password · MYSQL_ROOT_PASSWORD
 ui_password_keys	Tab: show / hide · Enter: continue · Ctrl+U: clear
 ui_password_visible	Visible
 ui_password_hidden	Hidden
@@ -247,10 +247,10 @@ host_no_space	The host reported no space left on the device. Check capacity and 
 host_storage_steps	Inspect the step log and storage from the host/hypervisor. When system tools work, check df -h, df -i and kernel logs. If even ls/sudo fail, use the hypervisor or a rescue environment. Resume only after storage is healthy.
 cleanup_deferred	Some private temporary files may remain under %s because cleanup could not complete. Inspect them after restoring storage access.
 ui_db_access_title	Database network access
-ui_db_access_body	GLPI connects internally to MySQL without publishing a port. Exposure publishes server port 3306 for external database clients; firewall and routing rules still apply.
+ui_db_access_body	GLPI connects internally to the database without publishing a port. Exposure publishes server port 3306 for external database clients; firewall and routing rules still apply.
 ui_db_access_later	You can open or close this port later from the manager.
-ui_db_expose_yes	Yes · expose MySQL on server port 3306
-ui_db_expose_no	No · keep MySQL internal to GLPI
+ui_db_expose_yes	Yes · expose the database on server port 3306
+ui_db_expose_no	No · keep the database internal to GLPI
 ui_letsencrypt_title	Public certificate from Let's Encrypt
 ui_letsencrypt_body	For a VPS or publicly reachable server with your own domain: Caddy requests and renews the Let's Encrypt certificate automatically.
 ui_letsencrypt_ports	Point the domain to this server and allow inbound TCP 80/443. These ports will be used for HTTP/HTTPS. Enter the domain below.
@@ -261,7 +261,7 @@ setup_http	HTTP port
 setup_https	HTTPS port
 setup_timezone	Time zone
 setup_tls	HTTPS
-setup_exposure	External MySQL access
+setup_exposure	External database access
 setup_database	Database name
 setup_user	Database user
 setup_pending	pending
@@ -290,13 +290,13 @@ setup_search	Search: %s
 setup_no_matches	No matches. Backspace clears the search.
 setup_plain_choice	Option number, text search, Enter to select, or b to go back:
 setup_network_hint	Detected address: %s. If it is localhost, enter the server IP for network access. You may also enter a domain.
-setup_port_conflict	HTTP and HTTPS need different ports; external MySQL uses 3306.
+setup_port_conflict	HTTP and HTTPS need different ports; the external database uses 3306.
 setup_public_domain	Let's Encrypt needs a public domain, not an IP, localhost or a .local name.
 setup_tls_help	Let's Encrypt uses a public domain and ports 80/443. With a local CA, certificates are generated automatically. For your own certificates, copy fullchain.pem and privkey.pem to %s.
 setup_access	Access: %s
 setup_review_hint	Review before installing. Choose any value to return to its settings; nothing has been deployed yet.
 setup_review_keys	Enter on «Install now» starts the installation; on a value, edits it again. Esc returns to settings.
-setup_loading_images	Resolving official MySQL and proxy images before opening settings…
+setup_loading_images	Resolving official database and proxy images before opening settings…
 ui_service_ready	✓ GLPI is running and verified
 ui_service_starting	Starting and checking your GLPI installation
 ui_service_checking	Checking services, database and web access
@@ -321,10 +321,10 @@ menu_backup	Create backup
 menu_restore	Restore a backup
 menu_address	Address, ports and time zone
 menu_https	Change HTTPS mode
-menu_exposure	Expose / close MySQL port
+menu_exposure	Expose / close database port
 menu_credentials	View database credentials
 menu_transfer	Move to another server (stops GLPI)
-menu_database_update	Update MySQL patches
+menu_database_update	Update database patches
 menu_language	Change language
 menu_diagnose	Diagnose installation
 menu_refresh	Refresh the installed version's image
@@ -350,7 +350,7 @@ update_no_patches	No later installable patches remain in this branch. You may ch
 backup_choose_other	Choose an archive from another path
 backup_choose_help	Select a backup. Its contents are checked and you will see what will happen before typing RESTORE.
 backup_recovery_ready	✓ Pre-change backup [P] created
-backup_recovery_help	To return to this backup, open Restore a backup in the main menu and choose this archive. Restore uses fresh volumes and the recorded GLPI/MySQL versions.
+backup_recovery_help	To return to this backup, open Restore a backup in the main menu and choose this archive. Restore uses fresh volumes and the recorded GLPI/database versions.
 update_step_backup	Creating the pre-change backup [P]
 update_step_rehearsal	Rehearsing the update on an isolated restored copy
 update_loading	Checking available official update images
@@ -401,7 +401,7 @@ backups_step_delete	Removing the selected backup
 backup_origin_manual	Manual
 backup_origin_update	Before GLPI update
 backup_origin_migrate	Before branch migration
-backup_origin_db-update	Before MySQL update
+backup_origin_db-update	Before database update
 backup_origin_refresh-image	Before image refresh
 backup_origin_transfer	Server transfer
 backup_origin_unknown	Not recorded
@@ -427,21 +427,21 @@ releases_cached	Using the GLPI release list fetched %s min ago
 releases_stale	GitHub is unreachable; using the saved GLPI release list.
 task_versions	Looking for available GLPI images
 version_list_title	Stable GLPI %s releases
-db_update_versions	MySQL %s → %s
+db_update_versions	%s %s → %s
 status_pulling	downloading %s
 status_waiting	waiting for %s: %s (%ss)
 status_http	web check, attempt %s/30
 status_schema	checking SQL and the GLPI schema
 status_console	GLPI console: %s
 status_measure	measuring volumes and database
-status_dump	dumping the MySQL database
+status_dump	dumping the database
 status_snapshot	saving volume %s
 status_restore_volume	restoring volume %s
-status_import	importing the MySQL dump
+status_import	importing the database dump
 status_archive	compressing and verifying the archive
 status_release_page	GitHub page %s
 status_resolving	checking %s
-db_updated	MySQL update verified. Current MySQL: %s.
+db_updated	%s update verified. Current version: %s.
 registry_rate_limited	Docker Hub rejected some lookups because of its rate limit (HTTP 429). Wait a few minutes or run docker login, then try again.
 menu_certificates	HTTPS and certificates
 menu_schedule	Automatic backups and maintenance
@@ -451,10 +451,10 @@ help_group_manager	Manager
 help_cmd_maintenance	Run the daily maintenance now
 desc_status	Services, health, versions and published ports.
 desc_start	Start GLPI if stopped and verify database, schema and web access.
-desc_stop	Stop GLPI, MySQL and the HTTPS proxy; data is kept.
+desc_stop	Stop GLPI, the database and the HTTPS proxy; data is kept.
 desc_logs	Recent container logs, scrollable.
 desc_update	Newer patches, the next branch or a refreshed image of the same version; backup and rehearsal first.
-desc_db-update	Apply the latest MySQL 8.4 patch with backup and rehearsal.
+desc_db-update	Apply the latest patch of the installed series (MySQL 8.4 or MariaDB 11.8) with backup and rehearsal.
 desc_diagnose	System, Docker, disk and configuration summary without passwords.
 desc_self-update	Download the latest release of this manager; GLPI is not touched.
 desc_uninstall	Remove GLPI containers, volumes and data (asks for UNINSTALL).
@@ -463,9 +463,9 @@ desc_backup	A verified manual backup, or the final backup to move to another ser
 desc_backups	Browse, verify, export, restore or delete backups.
 desc_restore	Go back to a backup. If the current installation is running, it is backed up first and removed afterwards.
 desc_schedule	Scheduled automatic backups (5 kept), log rotation and certificate renewal.
-desc_address	Address, web ports, time zone, HTTPS mode and MySQL access, reviewed before applying.
+desc_address	Address, web ports, time zone, HTTPS mode and database access, reviewed before applying.
 desc_certificates	HTTPS mode, certificate expiry, renewal and reload.
-desc_db-exposure	Publish MySQL on port 3306 or keep it internal.
+desc_db-exposure	Publish the database on port 3306 or keep it internal.
 desc_credentials	Show the database credentials after confirmation.
 desc_language	Interface language of this manager.
 dash_age_days	%s d ago
@@ -477,8 +477,8 @@ dash_tls_days	HTTPS: %s (%s d left)
 ui_tls_short_self-signed	local CA
 ui_tls_short_acme	Let's Encrypt
 ui_tls_short_custom	own certificate
-dash_db_public	MySQL: exposed :3306
-dash_db_private	MySQL: internal
+dash_db_public	DB: exposed :3306
+dash_db_private	DB: internal
 dash_backup	Backup: %s (%s)
 dash_backup_none	No backups yet
 dash_auto_on	Auto backups: %s
@@ -487,7 +487,7 @@ dash_maintenance_missing	Maintenance not scheduled
 backup_origin_auto	Automatic
 backups_counts	%s manual [M] · %s pre-change [P] · %s automatic [A].
 ui_db_current	Current state
-ui_db_unchanged	No change: MySQL access stays as it is.
+ui_db_unchanged	No change: database access stays as it is.
 firewall_docker	Docker publishes port %s directly in iptables, bypassing ufw/firewalld rules. Restrict access in the DOCKER-USER chain or at your network firewall.
 compose_refresh	Applying container log size limits once; services restart briefly.
 maint_title	Automatic backups and maintenance
@@ -572,7 +572,7 @@ opt_major_older	Previous branch; choose it only if your plugins require it.
 opt_version_latest	Latest patch of this branch, with the newest fixes.
 opt_version_older	Earlier patch; it lacks later bug and security fixes.
 opt_version_other	Type any stable version of this branch.
-opt_db_internal	Only GLPI reaches MySQL through the private Docker network. Recommended.
+opt_db_internal	Only GLPI reaches the database through the private Docker network. Recommended.
 opt_db_public	Any host that reaches port 3306 can try to connect. Docker bypasses ufw/firewalld rules.
 opt_install	Guided setup: version, address, ports, HTTPS and passwords, then automatic deployment.
 opt_restore	Rebuild GLPI from a backup (.tar.gz) of this manager; a running installation is backed up first.
@@ -609,7 +609,7 @@ cleanup_prompt	What do you want to free?
 cleanup_scanning	Measuring reclaimable space
 cleanup_empty	nothing to free
 cleanup_images	Unused images · %s · %s
-cleanup_images_help	GLPI/MySQL/Caddy images of earlier versions. The previous version is kept for a fast rollback; any other is downloaded again if a restore needs it.
+cleanup_images_help	GLPI/database/Caddy images of earlier versions. The previous version is kept for a fast rollback; any other is downloaded again if a restore needs it.
 cleanup_previous	Replaced installations · %s · %s
 cleanup_previous_help	%s: stopped containers, volumes and data left by a restore. Irreversible unless you have a backup of them; asks for DELETE.
 cleanup_backups	Older pre-change backups [P] · %s · %s
@@ -715,7 +715,7 @@ maint_kept	Kept
 maint_task_does	Every day it
 maint_task_list	rotates logs, checks certificates, looks for updates and backs up when due
 logs_summary_label	Rotation
-logs_summary	GLPI %s days · MySQL binlog %s days · details in Log rotation
+logs_summary	GLPI %s days · binlog %s days · details in Log rotation
 maint_logs_option	Log rotation…
 opt_maint_logs	See and change how long each kind of log is kept.
 logs_title	Log rotation
@@ -723,7 +723,7 @@ logs_recommended	recommended
 logs_manager	Manager logs
 logs_glpi	GLPI technical logs
 logs_containers	Container logs
-logs_binlog	MySQL binary logs (binlog)
+logs_binlog	Database binary logs (binlog)
 logs_history	Operation history
 logs_days	%s days
 logs_glpi_value	rotate over %s MB · keep %s days
@@ -734,7 +734,7 @@ logs_prompt	Which log do you want to change?
 opt_logs_manager	Stage and maintenance logs of this manager (state/logs). Small; they help diagnose failures.
 opt_logs_glpi	PHP/SQL errors, cron and mail logs inside the GLPI volume. They grow fast when GLPI has errors.
 opt_logs_containers	Output of each container (docker logs). Changing it restarts the services for a few seconds.
-opt_logs_binlog	Every database change, inside the MySQL volume; can reach several GB with inventory agents. Changing it restarts the services.
+opt_logs_binlog	Every database change, inside the database volume; can reach several GB with inventory agents. Changing it restarts the services.
 logs_days_prompt	How many days should be kept?
 opt_logs_days_default	Enough history to investigate an incident from last month.
 opt_logs_days_short	Less disk, but less history to investigate problems.
@@ -747,10 +747,10 @@ logs_container_prompt	Log limit per container
 opt_logs_container_default	Up to 30 MB per service; enough for recent problems.
 opt_logs_container_more	More history of container output.
 opt_logs_container_large	Up to 500 MB per service: check that the disk can hold it.
-logs_binlog_prompt	How many days of MySQL binary logs (binlog) are kept?
+logs_binlog_prompt	How many days of database binary logs (binlog) are kept?
 opt_binlog_short	Least disk. Backups are full copies, so restoring loses nothing.
 opt_binlog_week	A week of changes; moderate disk use.
-opt_binlog_default	MySQL default.
+opt_binlog_default	Recommended value.
 logs_restart_confirm	Apply now? The services restart for a few seconds.
 logs_step_apply	Applying the new log limits
 logs_saved	✓ Log rotation saved
@@ -795,9 +795,9 @@ setup_access_summary	Review the changes
 check_updates_title	Available GLPI versions
 choose_version_update	Which GLPI version do you want to update to?
 update_no_patches_left	No later patches remain in this branch.
-mysql_lookup_status	Looking up the latest official MySQL 8.4 image…
+mysql_lookup_status	Looking up the latest official database image…
 caddy_lookup_status	Looking up the latest official Caddy 2 image…
-db_update_none	MySQL %s is already the latest 8.4 patch.
+db_update_none	%s %s is already the latest %s patch.
 settings_applied	✓ Changes applied and access verified
 logs_note	Logs may contain sensitive application data; review them before sharing.
 backup_step_create	Creating the backup
@@ -836,9 +836,34 @@ update_refresh_current	GLPI %s: the refreshed image of the same version will be 
 update_refresh_confirm	Create a fresh backup and apply the refreshed image?
 update_not_applied	Nothing was changed. The pre-change backup [P] is kept: %s
 self_update_git_invalid	The code updated with git in %s fails the syntax check. The running manager was not changed; inspect git log and git status.
-diag_buffer_applied	MySQL memory in use (innodb_buffer_pool_size): %s MiB
-diag_buffer_unavailable	MySQL memory in use: unavailable (MySQL stopped or unreachable)
+diag_buffer_applied	Database memory in use (innodb_buffer_pool_size): %s MiB
+diag_buffer_unavailable	Database memory in use: unavailable (stopped or unreachable)
 diag_buffer_next	Next configuration: %s MiB from the server RAM
-maint_step_images	Checking for new GLPI, MySQL and Caddy images
+maint_step_images	Checking for new GLPI, database and Caddy images
 maint_backups_off	Automatic backups are disabled; no backup was created.
 cert_restart_confirm	The HTTPS proxy restarts for a few seconds. Continue?
+db_engine_prompt	Which database do you want to use?
+db_engine_mysql	MySQL 8.4 LTS
+opt_default	default
+opt_db_engine_mysql	The option most tested with this manager; MySQL 8.4 is supported until 2032. It stays on the 8.4 series and cannot be switched to MariaDB later.
+logs_binlog_off	Not applicable: MariaDB keeps no binlog
+logs_summary_mariadb	GLPI %s days · details in Log rotation
+db_lts_checking	Checking current MariaDB LTS series and the ones GLPI tests
+db_support_until	supported until %s
+db_support_open	no end of support announced
+opt_mariadb_glpi_tested	The GLPI project tests it for GLPI %s.
+opt_mariadb_branch_tested	The local catalog lists it for the GLPI %s branch; the exact release was not verified.
+opt_mariadb_in_range	Between the series that the GLPI project tests for GLPI %s, but not listed in its test matrix.
+opt_mariadb_newer	Newer than what the GLPI project tests for GLPI %s. It is not listed in its test matrix.
+opt_mariadb_unknown	Could not check whether the GLPI project tests it (no access to GitHub and no saved data).
+opt_mariadb_manager_tested	Also tested with this manager.
+opt_mariadb_ending	Its support ends within a year: a newer series is better for a new installation.
+opt_mariadb_fixed	The series is fixed; it only receives its own patches.
+mariadb_lts_none	No MariaDB LTS series with current support is compatible with this GLPI version; only MySQL is offered.
+dash_db_support_ending	%s: supported until %s
+dash_db_support_ended	%s: unsupported since %s
+agent_release_checking	Looking up the latest GLPI Agent release
+agent_release_publishing	Publishing the installer with the new agent release
+agent_version_label	Agent to be installed
+agent_version_latest	GLPI Agent %s · the latest published release
+agent_version_known	GLPI Agent %s · GitHub could not be reached; latest known release

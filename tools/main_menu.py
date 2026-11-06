@@ -7,7 +7,7 @@ import json
 import shutil
 import sys
 from service_view import access_url, records, state
-from terminal_ui import Terminal, curses, translations
+from terminal_ui import Terminal, curses, db_label, translations
 
 # Two balanced columns; every action has a menu_* label and a desc_* line.
 GROUPS = [
@@ -87,6 +87,11 @@ def status_line(ui, config, state_folder):
             style = 'warning'
     except (OSError, ValueError, TypeError, AttributeError):
         pass
+    # The installed MariaDB series is about to lose (or has lost) its support.
+    support = os.environ.get('GDM_DASH_DB_SUPPORT', '')
+    if support:
+        parts.insert(1, support)
+        style = 'warning'
     updates = os.environ.get('GDM_DASH_UPDATES', '')
     if updates:
         parts.insert(1, ui.t('dash_updates', updates))
@@ -140,7 +145,7 @@ def dashboard(ui, config, services, state_folder):
     current = state(config, services)
     key = {'running': 'ui_status_running', 'starting': 'ui_status_starting',
            'unhealthy': 'ui_status_unhealthy'}.get(current, 'ui_status_stopped')
-    ui.context = f"GLPI {config['glpi_version']} · MySQL {config['mysql_version']} · {ui.t(key)}"
+    ui.context = f"GLPI {config['glpi_version']} · {db_label(config)} {config['mysql_version']} · {ui.t(key)}"
     # Without HTTPS there is no proxy to update.
     hidden = ('proxy-update',) if config.get('tls') == 'off' else ()
     values = [value for _, actions in GROUPS for value, _ in actions if value not in hidden]

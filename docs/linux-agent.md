@@ -154,3 +154,16 @@ clients, FUSE, a host Docker socket inside the clients or a production server.
 
 Upstream references: [AppImage installation](https://glpi-agent.readthedocs.io/en/1.21/installation/linux-appimage.html)
 and [release/checksums](https://github.com/glpi-project/glpi-agent/releases/tag/1.21).
+
+## Agent release
+
+The manager does not stay on one agent release. Each time the installation
+command is shown (*Linux agent → Show command* or `agent-command`), it asks
+GitHub for the latest official GLPI Agent release and takes the SHA-256 of
+`glpi-agent-<version>-x86_64.AppImage` from that release's official
+`glpi-agent-<version>.sha256` file. When it is newer than the published one, the
+installer is republished at once and the command panel names the release it
+installs. Without access to GitHub the last known release is used, and a cached
+release older than the one built into the manager is never used. A computer is
+updated by running a newly shown command; blocks copied earlier keep working
+with their own release because each installer is published under its own hash.

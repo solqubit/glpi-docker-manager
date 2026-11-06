@@ -23,6 +23,44 @@ cfg() {
     fi
     jq -er ".$1" "$CONFIG"
 }
+# Database engines. Each installation keeps the engine chosen when it was
+# installed: updates stay within its series and restores recreate it, so MySQL
+# and MariaDB data never mix. mysql_version/mysql_image hold the version and
+# image of whichever engine is used (historical field names).
+db_engine_of() { jq -r '.db_engine // "mysql"' "$1"; }
+db_engine() { local engine; engine=$(cfg db_engine 2>/dev/null) || engine=mysql; printf '%s\n' "$engine"; }
+# MySQL stays on 8.4. A MariaDB installation keeps the LTS series it was installed
+# with (taken from its version); 11.8 is only the default without a version.
+db_series() {
+    case $1 in
+        mariadb) if [[ ${2:-} =~ ^([0-9]+\.[0-9]+)\. ]]; then printf '%s\n' "${BASH_REMATCH[1]}"; else printf '11.8\n'; fi;;
+        *) printf '8.4\n';;
+    esac
+}
+# Known MariaDB LTS series (end of support, series tested with this manager).
+MARIADB_LTS_DATA=${GDM_MARIADB_LTS_DATA:-$GDM_ROOT/data/mariadb-lts.json}
+db_today() { printf '%s\n' "${GDM_TODAY:-$(date -u +%F)}"; }
+# "support until 2028-06-04", or no end announced ("false").
+db_support_text() {
+    if [[ $1 =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then t db_support_until "$1"; else t db_support_open; fi
+}
+# True when support ends within a year: a new installation would soon need a newer series.
+db_support_ending() {
+    [[ $1 =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && [[ $1 < $(date -u -d "$(db_today) +1 year" +%F) ]]
+}
+db_manager_tested() { jq -e --arg series "$1" '.manager_tested // [] | index($series) != null' "$MARIADB_LTS_DATA" >/dev/null 2>&1; }
+# Dashboard text when the installed MariaDB series ends support within 6 months or has ended.
+db_support_notice() {
+    local series eol today soon
+    [[ $(db_engine) == mariadb ]] || return 0
+    series=$(db_series mariadb "$(cfg mysql_version)")
+    eol=$(jq -r --arg series "$series" '.lts[]? | select(.series==$series) | .eol' "$MARIADB_LTS_DATA" 2>/dev/null) || return 0
+    [[ $eol =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 0
+    today=$(db_today); soon=$(date -u -d "$today +6 months" +%F)
+    if [[ ! $eol > $today ]]; then t dash_db_support_ended "MariaDB $series" "$eol"
+    elif [[ ! $eol > $soon ]]; then t dash_db_support_ending "MariaDB $series" "$eol"; fi
+}
+db_label() { case $1 in mariadb) printf 'MariaDB\n';; *) printf 'MySQL\n';; esac; }
 config_validate() {
     jq -e '
       .format==1 and (.id|test("^[a-f0-9]{16}$")) and
@@ -30,9 +68,13 @@ config_validate() {
       (.glpi_version|test("^[1-9][0-9]*\\.[0-9]+\\.[0-9]+$")) and
       (.major>=10 and .major<=999) and
       .major==(.glpi_version|split(".")[0]|tonumber) and
-      (.mysql_version|test("^8\\.4\\.[0-9]+$")) and
+      ((if has("db_engine") then .db_engine else "mysql" end) as $engine |
+        if $engine=="mysql" then (.mysql_version|test("^8\\.4\\.[0-9]+$")) and
+          (.mysql_image|test("^mysql:8\\.4\\.[0-9]+@sha256:[a-f0-9]{64}$"))
+        elif $engine=="mariadb" then (.mysql_version|test("^[1-9][0-9]\\.[0-9]+\\.[0-9]+$")) and
+          (.mysql_image|test("^mariadb:[1-9][0-9]\\.[0-9]+\\.[0-9]+@sha256:[a-f0-9]{64}$"))
+        else false end) and
       (.glpi_image|test("^glpi/glpi:[0-9]+\\.[0-9]+\\.[0-9]+@sha256:[a-f0-9]{64}$")) and
-      (.mysql_image|test("^mysql:8\\.4\\.[0-9]+@sha256:[a-f0-9]{64}$")) and
       (.caddy_image|test("^caddy:[0-9]+\\.[0-9]+\\.[0-9]+@sha256:[a-f0-9]{64}$")) and
       (.db_name|test("^[a-zA-Z][a-zA-Z0-9_]{0,31}$")) and
       (.db_user|test("^[a-zA-Z][a-zA-Z0-9_]{0,31}$")) and
@@ -55,7 +97,7 @@ config_validate() {
       (.status=="configured" or .status=="ready")
     ' "$1" >/dev/null || die invalid configuration
     [[ $(jq -r .glpi_image "$1") == "glpi/glpi:$(jq -r .glpi_version "$1")@"* ]] || die invalid image
-    [[ $(jq -r .mysql_image "$1") == "mysql:$(jq -r .mysql_version "$1")@"* ]] || die invalid image
+    [[ $(jq -r .mysql_image "$1") == "$(db_engine_of "$1"):$(jq -r .mysql_version "$1")@"* ]] || die invalid image
     local zone
     zone=$(jq -r .timezone "$1")
     [[ $zone != *..* && -f /usr/share/zoneinfo/$zone ]] || die invalid timezone
@@ -166,7 +208,7 @@ EOF
           environment:{TZ:$c.timezone,MYSQL_DATABASE:$c.db_name,GDM_DB_USER:$c.db_user,
             GDM_DB_PASSWORD:"${GLPI_DB_PASSWORD}",MYSQL_ROOT_PASSWORD:"${MYSQL_ROOT_PASSWORD}",MYSQL_ROOT_HOST:"localhost"},
           volumes:["db_data:/var/lib/mysql",mount($root+"/mysql-user.sh";"/docker-entrypoint-initdb.d/10-gdm-user.sh")],networks:["backend"],
-          healthcheck:{test:["CMD-SHELL","MYSQL_PWD=\"$$GDM_DB_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u\"$$GDM_DB_USER\" \"$$MYSQL_DATABASE\" -Nse \u0027SELECT 1\u0027 >/dev/null"],interval:"5s",timeout:"5s",retries:60,start_period:"30s"}}
+          healthcheck:{test:["CMD-SHELL","MYSQL_PWD=\"$$GDM_DB_PASSWORD\" \"$$(command -v mariadb || command -v mysql)\" --protocol=TCP -h 127.0.0.1 -u\"$$GDM_DB_USER\" \"$$MYSQL_DATABASE\" -Nse \u0027SELECT 1\u0027 >/dev/null"],interval:"5s",timeout:"5s",retries:60,start_period:"30s"}}
        },
        volumes:(reduce ["glpi_data","db_data","plugins","marketplace","caddy_data","caddy_config"][] as $v ({};
           .[$v]={name:($c.project+"_"+$v),external:true})),
@@ -191,6 +233,7 @@ EOF
       # pool follows the host RAM (mysql_buffer_pool_mb).
       | .services |= with_entries(.value.logging={driver:"json-file",options:{"max-size":$log_size,"max-file":$log_files}})
       | .services.db.command=["--binlog-expire-logs-seconds=\($binlog_seconds)","--innodb-buffer-pool-size=\($buffer)"]
+      | if ($c.db_engine // "mysql")=="mariadb" then .services.db.environment.MARIADB_AUTO_UPGRADE="1" else . end
     ' > "$dir/compose.json"
     if [[ $tls != off ]]; then printf '\nauto_prepend_file = /etc/gdm/proxy.php\n' >> "$dir/php-uploads.ini"; fi
     chmod 600 "$dir/config.json" "$dir/compose.json" "$dir/.env"

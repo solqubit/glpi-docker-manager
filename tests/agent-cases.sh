@@ -142,9 +142,15 @@ printf '# updated installer\n' >> "$STATE/current/public/agent/install.sh"
 agent_snapshot "$STATE/current/public/agent" "$STATE/current/public/agent/install.sh" install
 old_bytes=$(sha256sum < "$STATE/current/public/agent/install-$old_digest.sh"); old_bytes=${old_bytes%% *}
 [[ $old_bytes == "$old_digest" ]]
-# The card has one success marker; the executable output stays plain text.
-agent_show_command > "$STATE/displayed-command.sh" 2> "$STATE/command-card.log"
+# The card has one success marker and a readable version line. Its executable
+# output stays plain text. Simulate the release already matching the local one.
+(
+    # shellcheck disable=SC2317
+    http_get() { printf '{"tag_name":"%s"}\n' "$GDM_AGENT_RELEASE"; }
+    agent_show_command > "$STATE/displayed-command.sh" 2> "$STATE/command-card.log"
+)
 grep -Fq "[+] $(t agent_ready)" "$STATE/command-card.log"
+grep -Fq "$(t agent_version_latest "$GDM_AGENT_RELEASE")" "$STATE/command-card.log"
 if grep -Fq '[*] [+]' "$STATE/command-card.log"; then exit 1; fi
 bash -n "$STATE/displayed-command.sh"
 # Imported public certificates must not cause a leaf certificate to be trusted
@@ -201,4 +207,41 @@ jq '.agent_enabled=false' "$CONFIG" > "$STATE/off.json"
 cp "$STATE/off.json" "$CONFIG"; cfg_cache
 agent_upgrade_existing
 [[ $(wc -l < "$STATE/applied") == 1 ]]
-printf '%s\n' 'PASS: agent publication, ports, public/private/local CA, pinned commands, permissions, opt-out and no credential leakage'
+# Latest official agent release: version and checksum from the project's .sha256
+# asset, cached; never older than the built-in release; offline keeps what is known.
+(
+    rm -f -- "$STATE/cache/agent-release.json"
+    newer=$(printf 'b%.0s' {1..64})
+    # Called by the sourced agent release lookup.
+    # shellcheck disable=SC2317
+    http_get() {
+        [[ $2 == quick ]] || return 1
+        case $1 in
+            */releases/latest) printf '{"tag_name":"9.9"}\n';;
+            */glpi-agent-9.9.sha256) printf '%s  glpi-agent-9.9-x86_64.AppImage\n%s  glpi-agent-9.9-x86_64.AppImage.zsync\n' "$newer" "$(printf 'c%.0s' {1..64})";;
+            *) return 1;;
+        esac
+    }
+    agent_release_check
+    [[ $AGENT_RELEASE_STATUS == latest && $(agent_release) == $'9.9\t'"$newer" ]]
+    # shellcheck disable=SC2317
+    http_get() { return 1; }
+    agent_release_check
+    [[ $AGENT_RELEASE_STATUS == unknown && $(agent_release | cut -f1) == 9.9 ]]
+    # An older result from upstream must not downgrade or claim that 9.9 is current.
+    # shellcheck disable=SC2317
+    http_get() { printf '{"tag_name":"1.21"}\n'; }
+    agent_release_check
+    [[ $AGENT_RELEASE_STATUS == unknown && $(agent_release | cut -f1) == 9.9 ]]
+    # A checksum file without the AppImage line changes nothing.
+    rm -f -- "$STATE/cache/agent-release.json"
+    # shellcheck disable=SC2317
+    http_get() { case $1 in */releases/latest) printf '{"tag_name":"9.9"}\n';; *) printf 'x  other\n';; esac; }
+    agent_release_check
+    [[ $(agent_release | cut -f1) == "$GDM_AGENT_RELEASE" && ! -e $STATE/cache/agent-release.json ]]
+    # An older cached release never replaces the built-in one.
+    jq -n --arg sha "$newer" '{version:"1.0",sha256:$sha}' > "$STATE/cache/agent-release.json"
+    [[ $(agent_release | cut -f1) == "$GDM_AGENT_RELEASE" ]]
+    rm -f -- "$STATE/cache/agent-release.json"
+)
+printf '%s\n' 'PASS: agent publication, ports, public/private/local CA, pinned commands, latest official release, permissions, opt-out and no credential leakage'

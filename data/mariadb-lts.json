@@ -1,0 +1,13 @@
+{
+  "about": "MariaDB LTS series for new installations. Used only when endoflife.date or GitHub cannot be reached; review it with each manager release.",
+  "lts": [
+    {"series": "11.8", "eol": "2028-06-04"},
+    {"series": "12.3", "eol": "2029-06-12"}
+  ],
+  "glpi_tested": {
+    "10": ["10.2", "11.8"],
+    "11": ["10.6", "12.3"],
+    "12": ["10.11", "12.3"]
+  },
+  "manager_tested": ["11.8"]
+}

@@ -56,11 +56,13 @@ def save(root, path, value):
 
 def public_metadata(data):
     def version(key):
-        value = str(data.get(key, ''))
-        return value if re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', value) else ''
+        # Older MariaDB backups recorded "11.8.3-MariaDB-…": keep the number.
+        match = re.match(r'[0-9]+\.[0-9]+\.[0-9]+', str(data.get(key, '')))
+        return match[0] if match else ''
     return dict(glpi_version=version('glpi_version'), mysql_version=version('mysql_server_version'),
                 created_at=str(data.get('created_at', ''))[:40],
                 origin=data.get('origin') if data.get('origin') in ORIGINS else 'unknown',
+                db_engine='mariadb' if data.get('db_engine') == 'mariadb' else 'mysql',
                 target=version('target_version'))
 
 

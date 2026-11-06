@@ -97,14 +97,14 @@ oneoff_action() {
 }
 legacy_database_version() {
     local installed
-    installed=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Ns' <<'SQL'
+    installed=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec "$(command -v mariadb || command -v mysql)" -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Ns' <<'SQL'
 SELECT value FROM glpi_configs WHERE context='core' AND name='version';
 SQL
     ) || return 1
     [[ $installed == "$(cfg glpi_version)" ]]
 }
 database_check() {
-    dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" mysql --protocol=TCP -h 127.0.0.1 -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Nse "SELECT 1"' >/dev/null
+    dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" "$(command -v mariadb || command -v mysql)" --protocol=TCP -h 127.0.0.1 -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Nse "SELECT 1"' >/dev/null
 }
 schema_check() {
     local available command

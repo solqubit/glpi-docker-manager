@@ -17,6 +17,11 @@ MARKERS = {'ok': '[+]', 'warning': '[!]', 'error': '[✗]', 'accent': '[*]'}
 SEPARATOR = '\0separator'
 
 
+
+def db_label(data):
+    """Database engine shown next to its version: MySQL unless MariaDB was chosen."""
+    return 'MariaDB' if data.get('db_engine') == 'mariadb' else 'MySQL'
+
 def plain(label):
     """Text of a row label given as a string or as [(text, style)] segments."""
     return ''.join(text for text, _ in label) if isinstance(label, (list, tuple)) else label

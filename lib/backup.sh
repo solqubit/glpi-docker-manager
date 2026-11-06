@@ -24,7 +24,7 @@ backup_create() {
     case $origin in manual|auto|update|migrate|db-update|refresh-image|transfer|restore) ;; *) die invalid backup_origin;; esac
     ui_status "$(t status_measure)"
     # Use uncompressed volume usage plus database size as a conservative budget.
-    database_size=$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT COALESCE(SUM(data_length+index_length),0) FROM information_schema.tables"')
+    database_size=$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" "$(command -v mariadb || command -v mysql)" -uroot -Nse "SELECT COALESCE(SUM(data_length+index_length),0) FROM information_schema.tables"')
     [[ $database_size =~ ^[0-9]+$ ]] || die backup_space
     # SQL text/hex literals can exceed physical table data. Staging and final
     # archive are budgeted without assuming a particular compression ratio.
@@ -56,7 +56,9 @@ backup_create() {
     RESUME_GLPI_ON_EXIT=true
     cp -- "$CONFIG" "$work/config.json"
     ui_status "$(t status_dump)"
-    dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot --single-transaction --routines --events --triggers --hex-blob --no-tablespaces --set-gtid-purged=OFF "$MYSQL_DATABASE"' > "$work/mysql.sql"
+    # mariadb-dump has no --set-gtid-purged; mysqldump needs it off for a portable dump.
+    dc exec -T db sh -c 'if command -v mariadb-dump >/dev/null; then set -- mariadb-dump; else set -- mysqldump --set-gtid-purged=OFF; fi
+        MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec "$@" -uroot --single-transaction --routines --events --triggers --hex-blob --no-tablespaces "$MYSQL_DATABASE"' > "$work/mysql.sql"
     for role in "${SNAPSHOT_ROLES[@]}"; do ui_status "$(t status_snapshot "$role")"; snapshot_save "$role" "$work/$role.tar.gz"; done
     if [[ -f $STATE/current/tls/fullchain.pem ]]; then
         mkdir "$work/tls"; cp -- "$STATE/current/tls/"*.pem "$work/tls/"
@@ -66,10 +68,13 @@ backup_create() {
             cp -- "$(cfg cert_dir)/self-signed/ca/gdm-ca.key" "$work/tls/gdm-ca.key"
         fi
     fi
+    local server_version
+    server_version=$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" "$(command -v mariadb || command -v mysql)" -uroot -Nse "SELECT VERSION()"')
+    # MariaDB reports "11.8.3-MariaDB-…": keep the number; the engine is recorded apart.
     jq -n --arg now "$(date -u +%FT%TZ)" --arg glpi "$(cfg glpi_version)" \
-        --arg mysql "$(dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT VERSION()"')" \
+        --arg mysql "${server_version%%-*}" --arg engine "$(db_engine)" \
         --arg arch "$ARCH" --arg origin "$origin" --arg target "$target" \
-        '{format:1,created_at:$now,glpi_version:$glpi,mysql_server_version:$mysql,architecture:$arch,origin:$origin,target_version:$target}' > "$work/metadata.json"
+        '{format:1,created_at:$now,glpi_version:$glpi,mysql_server_version:$mysql,db_engine:$engine,architecture:$arch,origin:$origin,target_version:$target}' > "$work/metadata.json"
     (cd "$work" && for name in config.json metadata.json mysql.sql ./*.tar.gz tls/*.pem tls/*.key; do
         [[ -f $name ]] || continue
         name=${name#./}
@@ -110,7 +115,7 @@ restore_into_current() {
     dc up -d db
     wait_healthy db
     ui_status "$(t status_import)"
-    dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$MYSQL_DATABASE"' < "$folder/mysql.sql"
+    dc exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec "$(command -v mariadb || command -v mysql)" -uroot "$MYSQL_DATABASE"' < "$folder/mysql.sql"
 }
 # Going back to a backup never leaves a growing pile of installations:
 #  1/3 the current installation is backed up first (origin "restore"), when it runs;

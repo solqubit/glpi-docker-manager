@@ -72,6 +72,59 @@ config_validate "$STATE/short.json"
 jq '.major=13 | .glpi_version="13.0.0" | .glpi_image=(.glpi_image|sub("11.0.11";"13.0.0"))' "$STATE/input.json" > "$STATE/future.json"
 config_validate "$STATE/future.json"
 ok 'Future stable majors such as GLPI 13 are not rejected by a hard-coded branch list'
+# MariaDB 11.8 LTS is a per-installation engine: its own series and image only.
+jq '.db_engine="mariadb" | .mysql_version="11.8.3" | .mysql_image=("mariadb:11.8.3@sha256:"+("a"*64))' "$STATE/input.json" > "$STATE/mariadb.json"
+config_validate "$STATE/mariadb.json"
+for expression in '.mysql_version="8.4.11"' '.mysql_image=("mysql:11.8.3@sha256:"+("a"*64))' '.db_engine="postgres"'; do
+    jq "$expression" "$STATE/mariadb.json" > "$STATE/bad.json"
+    expect_fail config_validate "$STATE/bad.json"
+done
+jq '.mysql_image=("mariadb:8.4.11@sha256:"+("a"*64))' "$STATE/input.json" > "$STATE/bad.json"
+expect_fail config_validate "$STATE/bad.json"
+mkdir -p "$STATE/revisions/mariadb"
+config_render "$STATE/mariadb.json" "$STATE/revisions/mariadb"
+jq -e '.services.db.image|startswith("mariadb:11.8.3@")' "$STATE/revisions/mariadb/compose.json" >/dev/null
+jq -e '.services.db.environment.MARIADB_AUTO_UPGRADE=="1" and (.services.db.healthcheck.test[1]|contains("command -v mariadb"))' "$STATE/revisions/mariadb/compose.json" >/dev/null
+[[ $(db_engine_of "$STATE/mariadb.json") == mariadb && $(db_engine_of "$STATE/input.json") == mysql && $(db_series mariadb) == 11.8 ]]
+for invalid_engine in false null; do
+    jq --argjson engine "$invalid_engine" '.db_engine=$engine' "$STATE/input.json" > "$STATE/bad.json"
+    expect_fail config_validate "$STATE/bad.json"
+done
+ok 'MariaDB 11.8 is accepted only with its own series and image; engines never mix'
+# Any MariaDB LTS series is valid; patches stay in the installed one.
+jq '.mysql_version="12.3.3" | .mysql_image=("mariadb:12.3.3@sha256:"+("a"*64))' "$STATE/mariadb.json" > "$STATE/mariadb12.json"
+config_validate "$STATE/mariadb12.json"
+[[ $(db_series mariadb 12.3.3) == 12.3 && $(db_series mariadb 11.8.9) == 11.8 && $(db_series mysql 8.4.11) == 8.4 ]]
+# Offered series without network: the manager's data file, by date and GLPI range.
+(
+    # Called by the sourced release lookup.
+    # shellcheck disable=SC2317
+    http_get() { return 1; }
+    lts_case() { GDM_TODAY=$1 mariadb_lts_candidates "$2" "$STATE/lts.txt"; [[ $(cut -f1,3 "$STATE/lts.txt" | paste -sd' ') == "$3" ]] || { echo "LTS $1 $2: $(cat "$STATE/lts.txt")" >&2; exit 1; }; }
+    lts_case 2026-11-06 11.0.12 $'12.3\tbranch 11.8\trange'
+    lts_case 2026-11-06 10.0.28 $'12.3\tnewer 11.8\tbranch'
+    lts_case 2026-11-06 13.0.0 $'12.3\tunknown 11.8\tunknown'
+    lts_case 2028-07-01 11.0.12 $'12.3\tbranch'
+    lts_case 2030-01-01 11.0.12 ''
+    # Called by the sourced release lookup.
+    # shellcheck disable=SC2317
+    http_get() {
+        [[ $2 == quick ]]
+        case $1 in
+            https://endoflife.date/*)
+                printf '%s\n' '[{"cycle":"12.3","lts":true,"eol":"2029-06-12"},{"cycle":"11.8","lts":true,"eol":"2028-06-04"},{"cycle":"13.0","lts":false,"eol":"2027-01-01"}]';;
+            https://raw.githubusercontent.com/*/11.0.12/*)
+                printf '%s\n' '{"db-image": "mariadb:10.6"}' '{"db-image": "mariadb:12.3"}';;
+            *) return 1;;
+        esac
+    }
+    lts_case 2026-11-06 11.0.12 $'12.3\tglpi 11.8\trange'
+)
+GDM_TODAY=2027-09-01 db_support_ending 2028-06-04
+GDM_TODAY=2026-11-06 expect_fail db_support_ending 2029-06-12
+[[ $(CONFIG="$STATE/mariadb.json" GDM_TODAY=2027-12-04 db_support_notice) == "$(t dash_db_support_ending 'MariaDB 11.8' 2028-06-04)" ]]
+[[ -z $(CONFIG="$STATE/mariadb.json" GDM_TODAY=2027-12-03 db_support_notice) ]]
+ok 'New installations are offered the two newest supported MariaDB LTS series, marked by the range GLPI itself tests'
 
 mkdir -p "$STATE/revisions/unit"
 # MySQL buffer pool: 25 % of RAM, whole GiB from 1 GiB, 256 MiB to 8 GiB.

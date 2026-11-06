@@ -10,7 +10,7 @@ import socket
 import sys
 import tempfile
 
-from terminal_ui import SEPARATOR, Terminal, translations
+from terminal_ui import SEPARATOR, Terminal, db_label, translations
 
 FIELDS = [
     ('hostname', 'setup_host', 'hostname', None),
@@ -174,7 +174,7 @@ class Setup:
         return any(self.data[key] != value for key, value in self.original.items())
 
     def context(self):
-        return f"GLPI {self.data['glpi_version']} · MySQL {self.data['mysql_version']}"
+        return f"GLPI {self.data['glpi_version']} · {db_label(self.data)} {self.data['mysql_version']}"
 
     def save(self):
         handle, temporary = tempfile.mkstemp(prefix='.setup-', dir=self.path.parent)
@@ -337,7 +337,7 @@ class Setup:
         width = self.label_width()
         # Field rows in aligned columns; selecting one returns to that field.
         rows = [('edit', [('GLPI '.ljust(width + 4), 'dim'),
-                          (f'{self.data["glpi_version"]} · MySQL {self.data["mysql_version"]}', 'accent')], ''),
+                          (f'{self.data["glpi_version"]} · {db_label(self.data)} {self.data["mysql_version"]}', 'accent')], ''),
                 ('hostname', [('URL'.ljust(width + 4), 'dim'), (url, 'accent')], '')]
         for key, label, _, _ in self.fields:
             name = self.ui.t(label).split(' · ')[0]

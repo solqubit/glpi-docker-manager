@@ -57,7 +57,7 @@ release_versions() {
 image_resolve() {
     local repository=$1 version=$2 manifest digest
     valid_version "$version" || return 1
-    case $repository in glpi/glpi|mysql|caddy) ;; *) return 1;; esac
+    case $repository in glpi/glpi|mysql|mariadb|caddy) ;; *) return 1;; esac
     manifest=$(docker buildx imagetools inspect "$repository:$version" --format '{{json .Manifest}}') || return 1
     jq -e --arg arch "$ARCH" 'any(.manifests[]?; .platform.os=="linux" and .platform.architecture==$arch)' <<< "$manifest" >/dev/null || return 1
     digest=$(jq -r .digest <<< "$manifest")
@@ -111,6 +111,42 @@ official_image_lookup() {
     version=$(official_tag_latest "$1" "$2") || return 1
     reference=$(image_resolve "$1" "$version") || return 1
     printf '%s\t%s\n' "$version" "$reference"
+}
+# MariaDB LTS series offered to a new installation of GLPI $1, written to $2 as
+# "series<TAB>end of support<TAB>tested" lines, newest first:
+#  - support: endoflife.date (LTS cycles and their end of support), or the
+#    manager's data/mariadb-lts.json when it cannot be reached;
+#  - corroboration: the MariaDB range GLPI's own CI tests for that exact version
+#    (.github/workflows/ci.yml at its tag), or the same file. "glpi" means listed
+#    at that tag, "branch" means listed only in the fallback data, "range" means
+#    between tested versions, "newer" above them and
+#    "unknown" when there are no data.
+# Series whose support has ended or below GLPI's minimum are left out, and only
+# the two newest remain: older LTS series are not offered to new installations.
+mariadb_lts_candidates() {
+    local glpi_version=$1 output=$2 cycles='' ci='' tested='[]' source=glpi
+    cycles=$(http_get https://endoflife.date/api/mariadb.json quick 2>/dev/null |
+        jq -c '[.[] | select(.lts==true) | {series:(.cycle|tostring), eol:(.eol|tostring)}]' 2>/dev/null) || cycles=''
+    [[ -n $cycles && $cycles != '[]' ]] || cycles=$(jq -c '.lts' "$MARIADB_LTS_DATA")
+    if ci=$(http_get "https://raw.githubusercontent.com/glpi-project/glpi/$glpi_version/.github/workflows/ci.yml" quick 2>/dev/null); then
+        tested=$(grep -oE '"db-image": *"mariadb:[0-9]+\.[0-9]+"' <<< "$ci" | grep -oE '[0-9]+\.[0-9]+' |
+            sort -Vu | jq -Rsc 'split("\n") | map(select(length > 0))') || tested='[]'
+    fi
+    if [[ $tested == '[]' ]]; then
+        source=branch
+        tested=$(jq -c --arg major "${glpi_version%%.*}" '.glpi_tested[$major] // []' "$MARIADB_LTS_DATA")
+    fi
+    jq -r --arg today "$(db_today)" --argjson tested "$tested" --arg source "$source" '
+        def v: split(".") | map(tonumber);
+        ($tested | sort_by(v)) as $matrix |
+        [.[] | select(.series|test("^[0-9]+\\.[0-9]+$"))
+             | select(.eol == "false" or .eol > $today)
+             | .series as $series
+             | select($matrix == [] or ($series|v) >= ($matrix[0]|v))
+             | .tested = (if $matrix == [] then "unknown"
+                          elif ($matrix | index($series)) != null then $source
+                          elif ($series|v) <= ($matrix[-1]|v) then "range" else "newer" end)]
+        | sort_by(.series|v) | reverse | .[:2] | .[] | "\(.series)\t\(.eol)\t\(.tested)"' <<< "$cycles" > "$output"
 }
 release_notice() {
     local version=$1 mode=${2:-} major=${1%%.*} body url note_action

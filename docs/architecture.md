@@ -70,8 +70,9 @@ The Update selector offers all later installable patches and the next stable
 major. Major changes require a warning and explicit migration confirmation; the
 `migrate` command remains available. Every version change uses official
 requirements, a fresh backup and an isolated rehearsal. Plugins,
-integrations and the GLPI 12 knowledge base changes need operator review. MySQL
-maintenance stays in the recorded 8.4 series; cross-series migrations are outside
+integrations and the GLPI 12 knowledge base changes need operator review. Database
+maintenance stays in the recorded series (MySQL 8.4 or the MariaDB LTS series chosen at
+installation and never switched); cross-series migrations are outside
 the automatic database operation. Rebuilding the same GLPI tag is separate from
 changing the GLPI application version.
 

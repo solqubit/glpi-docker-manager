@@ -9,7 +9,7 @@ import sys
 import textwrap
 
 from backup_ops import cached, managed
-from terminal_ui import Terminal, translations
+from terminal_ui import Terminal, db_label, translations
 
 
 class Backups:
@@ -27,7 +27,7 @@ class Backups:
         recovery = self.root / 'recovery-backup'
         is_recovery = recovery.is_file() and recovery.read_text().strip() == str(path)
         verified = self.ui.t('backups_verified', data['verified_at']) if data.get('verified_at') else self.ui.t('backups_invalid' if data.get('error') else 'backups_unverified')
-        labels = [str(path), f"GLPI {version} · MySQL {data.get('mysql_version') or '?'}",
+        labels = [str(path), f"GLPI {version} · {db_label(data)} {data.get('mysql_version') or '?'}",
                   self.ui.t('backups_origin', self.ui.t('backup_origin_' + data.get('origin', 'unknown'))),
                   self.ui.t('backups_date', data.get('created_at') or datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()),
                   self.ui.t('backups_size', f'{path.stat().st_size / 1048576:.2f}'), verified]

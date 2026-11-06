@@ -260,7 +260,7 @@ image_updates_check() {
     return 0
 }
 image_updates_scan() {
-    local current newest ref version
+    local current newest ref version engine
     current=$(cfg glpi_version)
     if release_fetch >&2 && newest=$(release_versions "$(cfg major)" | head -n 1) &&
        version_gt "$newest" "$current" && image_resolve glpi/glpi "$newest" >/dev/null; then
@@ -268,8 +268,9 @@ image_updates_scan() {
     elif ref=$(image_resolve glpi/glpi "$current") && [[ $ref != "$(cfg glpi_image)" ]]; then
         printf 'glpi-image\t%s\t%s\n' "$current" "$(cfg glpi_image)"
     fi
-    if ref=$(official_image_lookup mysql 8.4) && version=${ref%%$'\t'*} && version_gt "$version" "$(cfg mysql_version)"; then
-        printf 'mysql\t%s\t%s\n' "$version" "$(cfg mysql_image)"
+    engine=$(db_engine)
+    if ref=$(official_image_lookup "$engine" "$(db_series "$engine" "$(cfg mysql_version)")") && version=${ref%%$'\t'*} && version_gt "$version" "$(cfg mysql_version)"; then
+        printf 'db\t%s\t%s\n' "$version" "$(cfg mysql_image)"
     fi
     if [[ $(cfg tls) != off ]] && ref=$(official_image_lookup caddy 2) && [[ ${ref#*$'\t'} != "$(cfg caddy_image)" ]]; then
         printf 'caddy\t%s\t%s\n' "${ref%%$'\t'*}" "$(cfg caddy_image)"
@@ -285,7 +286,7 @@ image_updates_summary() {
         case $kind in
             glpi) key=glpi_image; items+=("GLPI $version");;
             glpi-image) key=glpi_image; items+=("$(t dash_image_refresh "GLPI $version")");;
-            mysql) key=mysql_image; items+=("MySQL $version");;
+            db|mysql) key=mysql_image; items+=("$(db_label "$(db_engine)") $version");;
             caddy) [[ $(cfg tls) != off ]] || continue; key=caddy_image; items+=("Caddy $version");;
             *) continue;;
         esac
@@ -418,7 +419,7 @@ schedule_menu() {
             "$(t maint_task_does)"$'\t'"$(t maint_task_list)" \
             "${scheduler_row[@]}" \
             "§$(t maint_section_logs)" \
-            "$(t logs_summary_label)"$'\t'"$(t logs_summary "$LOG_GLPI_DAYS" "$LOG_BINLOG_DAYS")"
+            "$(t logs_summary_label)"$'\t'"$(if [[ $(db_engine) == mariadb ]]; then t logs_summary_mariadb "$LOG_GLPI_DAYS"; else t logs_summary "$LOG_GLPI_DAYS" "$LOG_BINLOG_DAYS"; fi)"
         choose action maint_prompt "$last" toggle "$toggle" \
             frequency "$(ui_opt '' "$(t maint_frequency_option "$(maintenance_frequency_text)")" "$(t opt_maint_frequency)")" \
             time "$(ui_opt '' "$(t maint_time_option "$(maintenance_time_text)")" "$(t opt_maint_time)")" \
@@ -439,22 +440,30 @@ schedule_menu() {
 }
 # One row per kind of log: where it lives, current value and the recommended one.
 logs_menu() {
-    local action='' recommended
+    local action='' recommended binlog_value
+    local -a binlog_option=()
     recommended=$(t logs_recommended)
     while :; do
         maintenance_settings
+        # MariaDB keeps no binary log by default: there is nothing to rotate.
+        if [[ $(db_engine) == mariadb ]]; then
+            binlog_value=$(t logs_binlog_off) binlog_option=()
+        else
+            binlog_value="$(t logs_days "$LOG_BINLOG_DAYS")$( (( LOG_BINLOG_DAYS == 30 )) && printf ' · %s' "$recommended")"
+            binlog_option=(binlog "$(ui_opt warn "$(t logs_binlog)" "$(t opt_logs_binlog)")")
+        fi
         ui_panel "$(t logs_title)" \
             "$(t logs_manager)"$'\t'"$(t logs_days "$LOG_MANAGER_DAYS")$( (( LOG_MANAGER_DAYS == 30 )) && printf ' · %s' "$recommended")" \
             "$(t logs_glpi)"$'\t'"$(t logs_glpi_value "$LOG_GLPI_MB" "$LOG_GLPI_DAYS")$( (( LOG_GLPI_MB == 20 && LOG_GLPI_DAYS == 30 )) && printf ' · %s' "$recommended")" \
             "$(t logs_containers)"$'\t'"$(t logs_container_value "$LOG_CONTAINER_MB" "$LOG_CONTAINER_FILES")$( (( LOG_CONTAINER_MB == 10 && LOG_CONTAINER_FILES == 3 )) && printf ' · %s' "$recommended")" \
-            "$(t logs_binlog)"$'\t'"$(t logs_days "$LOG_BINLOG_DAYS")$( (( LOG_BINLOG_DAYS == 30 )) && printf ' · %s' "$recommended")" \
+            "$(t logs_binlog)"$'\t'"$binlog_value" \
             "$(t logs_history)"$'\t'"$(t logs_history_value)" \
             "$(t logs_body)"
         choose action logs_prompt "${action:-manager}" \
             manager "$(ui_opt '' "$(t logs_manager)" "$(t opt_logs_manager)")" \
             glpi "$(ui_opt '' "$(t logs_glpi)" "$(t opt_logs_glpi)")" \
             containers "$(ui_opt warn "$(t logs_containers)" "$(t opt_logs_containers)")" \
-            binlog "$(ui_opt warn "$(t logs_binlog)" "$(t opt_logs_binlog)")" \
+            "${binlog_option[@]}" \
             back "$(ui_opt back "$(t ui_back_previous)")" || return 0
         case $action in
             manager) log_days_choice LOG_MANAGER_DAYS logs_days_prompt 30 || continue;;

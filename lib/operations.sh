@@ -33,7 +33,7 @@ installation_finish() {
     local -a ca_rows=()
     [[ $(cfg tls) != self-signed ]] || ca_rows_build
     ui_panel "$(t ui_install_success)" "$(t ready "$(installation_url)")" \
-        "GLPI $(cfg glpi_version) · MySQL $(cfg mysql_version)" \
+        "GLPI $(cfg glpi_version) · $(db_label "$(db_engine)") $(cfg mysql_version)" \
         "$(t ui_initial_account)" "$(t ui_next_steps)" "$(t layout_entrypoint "$STATE/start.sh")" "${ca_rows[@]}"
 }
 start_database() { dc up -d db; wait_healthy db; }
@@ -105,16 +105,45 @@ installation_summary() {
     summary_access=$(jq -r .expose_db "$summary_file")
     [[ $summary_access == true ]] && summary_access=$(t ui_db_public) || summary_access=$(t ui_db_private)
     ui_panel "$(t ui_summary)" \
-        "GLPI $(jq -r .glpi_version "$summary_file") · MySQL $(jq -r .mysql_version "$summary_file")" \
+        "GLPI $(jq -r .glpi_version "$summary_file") · $(db_label "$(db_engine_of "$summary_file")") $(jq -r .mysql_version "$summary_file")" \
         "$(t ui_host): $(jq -r .hostname "$summary_file")" \
         "HTTP: $(jq -r .http_port "$summary_file") · HTTPS: $(jq -r .https_port "$summary_file")" \
         "HTTPS: $(t "ui_tls_$summary_tls")" \
-        "MySQL: $summary_access" \
+        "$(db_label "$(db_engine_of "$summary_file")"): $summary_access" \
         "$(t ui_database): $(jq -r .db_name "$summary_file") / $(jq -r .db_user "$summary_file")" \
         "$(t ui_secrets_hidden)"
 }
+# MySQL 8.4 (default) or MariaDB 11.8 LTS; it cannot be changed afterwards.
+# MySQL 8.4 (default) or a MariaDB LTS series that still has support. Each MariaDB
+# option says until when it is supported and whether GLPI's own CI tests it for
+# the chosen GLPI version (mariadb_lts_candidates). Cannot be changed afterwards.
+db_engine_choose() {
+    local choice candidates series eol tested kind help
+    local -a options=(mysql "$(ui_opt primary "$(t db_engine_mysql) · $(t opt_default)" "$(t opt_db_engine_mysql)")")
+    candidates=$(mktemp "$STATE/.mariadb-lts.XXXXXX"); CLEANUP_PATHS+=("$candidates")
+    ui_task db_lts_checking mariadb_lts_candidates "$SELECTED_VERSION" "$candidates"
+    while IFS=$'\t' read -r series eol tested; do
+        case $tested in
+            glpi) kind=ok help=$(t opt_mariadb_glpi_tested "$SELECTED_VERSION");;
+            branch) kind='' help=$(t opt_mariadb_branch_tested "${SELECTED_VERSION%%.*}");;
+            range) kind='' help=$(t opt_mariadb_in_range "$SELECTED_VERSION");;
+            newer) kind=warn help=$(t opt_mariadb_newer "$SELECTED_VERSION");;
+            *) kind=warn help=$(t opt_mariadb_unknown);;
+        esac
+        ! db_manager_tested "$series" || help+=" $(t opt_mariadb_manager_tested)"
+        if db_support_ending "$eol"; then kind=warn; help+=" $(t opt_mariadb_ending)"; fi
+        options+=("mariadb:$series" "$(ui_opt "$kind" "MariaDB $series LTS · $(db_support_text "$eol")" "$help $(t opt_mariadb_fixed)")")
+    done < "$candidates"
+    (( ${#options[@]} > 2 )) || say mariadb_lts_none
+    options+=(back "$(ui_opt back "$(t ui_back_branches)")")
+    choose choice db_engine_prompt "${DB_CHOICE:-mysql}" "${options[@]}" || return 1
+    [[ $choice != back ]] || return 1
+    DB_CHOICE=$choice DB_ENGINE=${choice%%:*} DB_SERIES=''
+    [[ $DB_ENGINE != mariadb ]] || DB_SERIES=${choice#*:}
+    return 0
+}
 install_wizard() {
-    local requested=${1:-} major id file clean_file editor_result detected_host
+    local requested=${1:-} major id file clean_file editor_result detected_host DB_ENGINE=mysql DB_SERIES='' DB_CHOICE=''
     local mysql_version mysql_image caddy_version caddy_image
     if [[ -L $STATE/current ]]; then
         config_load
@@ -131,11 +160,12 @@ install_wizard() {
         major=${requested%%.*}
         [[ $major =~ ^[1-9][0-9]{1,2}$ ]] || die invalid major
         select_version "$major" "$requested"
+        db_engine_choose || die cancelled
     else
         while :; do
             select_major major "$(jq -r '[.[].version|split(".")[0]|tonumber]|max' "$STATE/cache/releases.json")" 10 false install
             [[ $major =~ ^[1-9][0-9]{1,2}$ ]] || die invalid major
-            if select_version "$major" '' true ui_back_branches; then break; fi
+            if select_version "$major" '' true ui_back_branches && db_engine_choose; then break; fi
         done
     fi
     ui_task setup_loading_images support_images_lookup
@@ -145,9 +175,9 @@ install_wizard() {
     detected_host=$(server_primary_address)
     jq -n --arg id "$id" --arg major "$major" --arg version "$SELECTED_VERSION" --arg image "$SELECTED_IMAGE" \
         --arg mysql_version "$mysql_version" --arg mysql_image "$mysql_image" --arg caddy_image "$caddy_image" \
-        --arg language "$LANGUAGE" --arg cert_dir "$CERT_ROOT" --arg host "$detected_host" \
+        --arg language "$LANGUAGE" --arg cert_dir "$CERT_ROOT" --arg host "$detected_host" --arg engine "$DB_ENGINE" \
         '{format:1,id:$id,project:("gdm_"+$id),major:($major|tonumber),glpi_version:$version,glpi_image:$image,
-          mysql_version:$mysql_version,mysql_image:$mysql_image,caddy_image:$caddy_image,
+          db_engine:$engine,mysql_version:$mysql_version,mysql_image:$mysql_image,caddy_image:$caddy_image,
           http_port:80,https_port:443,timezone:"UTC",db_name:"glpi",db_user:"glpi",
           db_password:"",root_password:"",language:$language,cert_dir:$cert_dir,expose_db:false,
           hostname:$host,_detected_host:$host,tls:"off",storage:"directory",status:"configured"}' > "$file"
@@ -193,20 +223,22 @@ install_stage() {
     config_activate "$REVISION"
     journal_begin install
 }
-# MySQL and Caddy lookups are independent registry round trips: run both at once.
-# Sets the caller's mysql_version/mysql_image/caddy_image (dynamic scope).
+# Database and Caddy lookups are independent registry round trips: run both at
+# once. Sets the caller's mysql_version/mysql_image/caddy_image (dynamic scope)
+# for the engine in DB_ENGINE.
 support_images_lookup() {
-    local work mysql_pid caddy_pid
+    local work mysql_pid caddy_pid engine=${DB_ENGINE:-mysql} series
+    series=${DB_SERIES:-$(db_series "$engine")}
     work=$(mktemp -d "$STATE/cache/.support-XXXXXX")
-    ui_status "$(t status_resolving 'mysql:8.4 · caddy:2')"
-    ( trap - ERR EXIT; official_image_lookup mysql 8.4 > "$work/mysql" 2> "$work/mysql.err" || rm -f -- "$work/mysql" ) &
+    ui_status "$(t status_resolving "$engine:$series · caddy:2")"
+    ( trap - ERR EXIT; official_image_lookup "$engine" "$series" > "$work/mysql" 2> "$work/mysql.err" || rm -f -- "$work/mysql" ) &
     mysql_pid=$!
     ( trap - ERR EXIT; official_image_lookup caddy 2 > "$work/caddy" 2> "$work/caddy.err" || rm -f -- "$work/caddy" ) &
     caddy_pid=$!
     wait "$mysql_pid" || true
     wait "$caddy_pid" || true
     registry_limit_check "$work/mysql.err" "$work/caddy.err"
-    [[ -s $work/mysql ]] || { rm -rf -- "$work"; die image_missing mysql; }
+    [[ -s $work/mysql ]] || { rm -rf -- "$work"; die image_missing "$engine"; }
     [[ -s $work/caddy ]] || { rm -rf -- "$work"; die image_missing caddy; }
     IFS=$'\t' read -r mysql_version mysql_image < "$work/mysql"
     IFS=$'\t' read -r _ caddy_image < "$work/caddy"
@@ -390,7 +422,7 @@ plugins_panel() {
     local -a lines=()
     # Expand credentials inside the container, never in host command arguments.
     # shellcheck disable=SC2016
-    rows=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Nse "SELECT directory, version, state FROM glpi_plugins ORDER BY state, directory"' 2>/dev/null) || rows=''
+    rows=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec "$(command -v mariadb || command -v mysql)" -u"$GDM_DB_USER" "$MYSQL_DATABASE" -Nse "SELECT directory, version, state FROM glpi_plugins ORDER BY state, directory"' 2>/dev/null) || rows=''
     while IFS=$'\t' read -r directory version state; do
         [[ -n $directory ]] || continue
         # GLPI plugin states: 1 activated, 4 not activated; others need attention.
@@ -521,23 +553,28 @@ select_update_target() {
     done
 }
 update_database() {
-    local target image mysql_lookup
+    local target image mysql_lookup engine label series
     assert_running
+    engine=$(db_engine); label=$(db_label "$engine"); series=$(db_series "$engine" "$(cfg mysql_version)")
     mysql_lookup=$(mktemp "$STATE/.mysql-lookup.XXXXXX"); CLEANUP_PATHS+=("$mysql_lookup")
     ui_task mysql_lookup_status mysql_target_lookup "$mysql_lookup"
-    IFS=$'\t' read -r target image < "$mysql_lookup" || die image_missing mysql
-    version_gt "$target" "$(cfg mysql_version)" || { menu_done db_update_none "$(cfg mysql_version)"; return; }
-    say db_update_warning
-    ui_panel "$(t ui_db_update)" "$(t db_update_versions "$(cfg mysql_version)" "$target")"
+    IFS=$'\t' read -r target image < "$mysql_lookup" || die image_missing "$engine"
+    version_gt "$target" "$(cfg mysql_version)" || { menu_done db_update_none "$label" "$(cfg mysql_version)" "$series"; return; }
+    say db_update_warning "$label" "$series"
+    ui_panel "$(t ui_db_update)" "$(t db_update_versions "$label" "$(cfg mysql_version)" "$target")"
     confirm db_update_confirm || die cancelled
     ui_run 1/3 update_step_backup backup_create true db-update "$target"
     backup_extract "$LAST_BACKUP"
     ui_run 2/3 update_step_rehearsal rehearse "$EXTRACTED" "$(cfg glpi_version)" "$(cfg glpi_image)" "$target" "$image"
-    if ! typed_confirm UPDATE-MYSQL soft; then menu_done update_not_applied "$LAST_BACKUP"; exit 1; fi
+    if ! typed_confirm "UPDATE-${label^^}" soft; then menu_done update_not_applied "$LAST_BACKUP"; exit 1; fi
     update_apply_guarded apply_database_update "$target" "$image"
-    ui_panel "✓ $(t db_updated "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
+    ui_panel "✓ $(t db_updated "$label" "$target")" "$(t ready "$(installation_url)")" "$LAST_BACKUP" "$(t backup_recovery_help)"
 }
-mysql_target_lookup() { official_image_lookup mysql 8.4 > "$1" || die image_missing mysql; }
+mysql_target_lookup() {
+    local engine
+    engine=$(db_engine)
+    official_image_lookup "$engine" "$(db_series "$engine" "$(cfg mysql_version)")" > "$1" || die image_missing "$engine"
+}
 apply_database_update() {
     local target=$1 image=$2 file
     file=$(mktemp "$STATE/.mysql.XXXXXX"); CLEANUP_PATHS+=("$file")
@@ -653,14 +690,14 @@ diagnose() {
     if [[ -L $STATE/current ]]; then
         config_load
         diagnose_section "$CONFIG"
-        jq '{format,project,status,major,glpi_version,mysql_version,http_port,https_port,expose_db,tls,hostname}' "$CONFIG"
+        jq '{format,project,status,major,glpi_version,db_engine:(.db_engine // "mysql"),mysql_version,http_port,https_port,expose_db,tls,hostname}' "$CONFIG"
         diagnose_section "docker compose ps"
         dc ps --all
         # Applied now vs. what the next revision would use for this host's RAM.
-        diagnose_section "MySQL"
+        diagnose_section "$(db_label "$(db_engine)")"
         # Database credentials expand only inside the container.
         # shellcheck disable=SC2016
-        if buffer_bytes=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec mysql --protocol=TCP -h 127.0.0.1 --connect-timeout=5 -u"$GDM_DB_USER" -Nse "SELECT @@innodb_buffer_pool_size"' </dev/null 2>/dev/null) &&
+        if buffer_bytes=$(dc exec -T db sh -c 'MYSQL_PWD="$GDM_DB_PASSWORD" exec "$(command -v mariadb || command -v mysql)" --protocol=TCP -h 127.0.0.1 --connect-timeout=5 -u"$GDM_DB_USER" -Nse "SELECT @@innodb_buffer_pool_size"' </dev/null 2>/dev/null) &&
            [[ $buffer_bytes =~ ^[0-9]+$ ]]; then
             t diag_buffer_applied "$((buffer_bytes/1024/1024))"
         else
@@ -716,7 +753,7 @@ dispatch() {
                 db-update) update_database;;
                 proxy-update) update_proxy;;
                 agent-setup) agent_setup "$argument";;
-                agent-command) agent_command "$argument";;
+                agent-command) agent_publish_latest; agent_command "$argument";;
                 backup|transfer)
                     if [[ $command == backup && ${GDM_IN_MENU:-false} == true ]]; then
                         choose command backup_kind_prompt backup \
@@ -770,7 +807,8 @@ dashboard_environment() {
     done
     GDM_DASH_PREVIOUS=$count
     GDM_DASH_UPDATES=$(image_updates_summary 2>/dev/null) || GDM_DASH_UPDATES=''
-    export GDM_DASH_PREVIOUS GDM_DASH_UPDATES
+    GDM_DASH_DB_SUPPORT=$(db_support_notice 2>/dev/null) || GDM_DASH_DB_SUPPORT=''
+    export GDM_DASH_PREVIOUS GDM_DASH_UPDATES GDM_DASH_DB_SUPPORT
     if [[ $(cfg tls) == self-signed || $(cfg tls) == custom ]] && cert_days "$STATE/current/tls/fullchain.pem"; then
         GDM_DASH_CERT_DAYS=$CERT_DAYS
     fi

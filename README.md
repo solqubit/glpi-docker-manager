@@ -15,12 +15,13 @@ Versión **1.0.2** · [Licencia MIT](LICENSE)
 
 ## Qué puedes hacer
 
-- Elegir la versión de GLPI y configurar IP, puertos, zona horaria y credenciales.
+- Elegir la versión de GLPI, la base de datos (MySQL 8.4 o una serie LTS vigente de MariaDB) y
+  configurar IP, puertos, zona horaria y credenciales.
 - Usar HTTPS con CA local, Let's Encrypt o certificados propios.
 - Actualizar GLPI y cambiar de rama con respaldo y ensayo previo; actualizar
-  parches de MySQL y el proxy Caddy por separado.
+  parches de la base de datos y el proxy Caddy por separado.
 - Crear respaldos manuales o programados, restaurarlos y trasladar la instalación.
-- Consultar servicios y registros, administrar el acceso a MySQL y liberar espacio.
+- Consultar servicios y registros, administrar el acceso a la base de datos y liberar espacio.
 - Instalar el agente Linux en otros equipos mediante un comando generado por el gestor.
 
 ## Inicio rápido

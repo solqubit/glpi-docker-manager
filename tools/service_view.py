@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-from terminal_ui import Terminal, clean, translations
+from terminal_ui import Terminal, clean, db_label, translations
 
 
 def records(text):
@@ -44,7 +44,7 @@ def status_rows(config, services, ui):
     rows = [(None, '[*] ' + ui.t('setup_access', access_url(config)), 'accent')]
     versions = {'glpi': config['glpi_version'], 'db': config['mysql_version'],
                 'proxy': config['caddy_image'].split('@')[0].split(':')[-1]}
-    names = {'glpi': 'GLPI', 'db': 'MySQL', 'proxy': 'Caddy / HTTPS'}
+    names = {'glpi': 'GLPI', 'db': db_label(config), 'proxy': 'Caddy / HTTPS'}
     for name in ['glpi', 'db'] + (['proxy'] if config['tls'] != 'off' else []):
         item = by_service.get(name)
         if not item:
@@ -77,7 +77,7 @@ def main():
     config = json.loads(Path(config_path).read_text())
     root = Path(__file__).resolve().parents[1]
     ui = Terminal(translations(root, language),
-                  f"GLPI {config['glpi_version']} · MySQL {config['mysql_version']}")
+                  f"GLPI {config['glpi_version']} · {db_label(config)} {config['mysql_version']}")
     if mode in ('status', 'state'):
         services = records(Path(data_path).read_text())
         if mode == 'state':

@@ -97,6 +97,7 @@ try:
         ('major_prompt', down + b'\n'),
         ('choose_version', b'\n'),
         ('ui_release_prompt', b'\n'),
+        ('db_engine_prompt', b'\n'),
         ('setup_title', form_keys),
         ('ui_continue', b'\n'),
         ('ui_menu_prompt', b'\x1b[F\n'),

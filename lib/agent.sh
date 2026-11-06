@@ -1,8 +1,61 @@
 #!/usr/bin/env bash
 # Public bootstrap resources contain only addresses, public certificates and
 # pinned upstream downloads. They never include the installation configuration.
+# Agent release published by the installer: the latest official GLPI Agent
+# release, checked whenever the command is shown (agent_release_check), or the
+# last one found, or this built-in minimum when GitHub was never reachable. The
+# SHA-256 always comes from the project's official glpi-agent-<version>.sha256
+# asset, never from the downloaded installer itself; it is never downgraded.
 GDM_AGENT_RELEASE=1.21
+GDM_AGENT_DIGEST=285eccea560c0e9f253be0feb19786903110d5189d28285d4f1cc2097bb1bd33
+AGENT_RELEASE_STATUS=known
 agent_enabled() { jq -e '.agent_enabled != false' "$1" >/dev/null; }
+agent_version_newer() { [[ $1 != "$2" && $(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1) == "$1" ]]; }
+# "version<TAB>sha256" of the release to publish.
+agent_release() {
+    local file="$STATE/cache/agent-release.json" version='' digest=''
+    if [[ -r $file ]]; then
+        version=$(jq -r '.version // empty' "$file" 2>/dev/null) || version=''
+        digest=$(jq -r '.sha256 // empty' "$file" 2>/dev/null) || digest=''
+    fi
+    if [[ $version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ && $digest =~ ^[a-f0-9]{64}$ ]] &&
+       ! agent_version_newer "$GDM_AGENT_RELEASE" "$version"; then
+        printf '%s\t%s\n' "$version" "$digest"
+    else printf '%s\t%s\n' "$GDM_AGENT_RELEASE" "$GDM_AGENT_DIGEST"; fi
+}
+# Latest official release and its published checksum for the x86_64 AppImage.
+# Keeps what is known when GitHub does not answer or the data looks wrong.
+agent_release_check() {
+    local tag sums digest current tmp
+    AGENT_RELEASE_STATUS=unknown
+    tag=$(http_get https://api.github.com/repos/glpi-project/glpi-agent/releases/latest quick 2>/dev/null |
+        jq -r '.tag_name // empty' 2>/dev/null) || return 0
+    [[ $tag =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || return 0
+    IFS=$'\t' read -r current _ < <(agent_release)
+    if [[ $tag == "$current" ]]; then AGENT_RELEASE_STATUS=latest; return 0; fi
+    agent_version_newer "$tag" "$current" || return 0
+    sums=$(http_get "https://github.com/glpi-project/glpi-agent/releases/download/$tag/glpi-agent-$tag.sha256" quick 2>/dev/null) || return 0
+    digest=$(awk -v name="glpi-agent-$tag-x86_64.AppImage" '$2 == name && length($1)==64 && $1 ~ /^[a-f0-9]+$/ { print $1; exit }' <<< "$sums")
+    [[ $digest =~ ^[a-f0-9]{64}$ ]] || return 0
+    mkdir -p "$STATE/cache"
+    tmp=$(mktemp "$STATE/cache/.agent-release.XXXXXX")
+    jq -n --arg version "$tag" --arg sha256 "$digest" --arg checked "$(date -u +%FT%TZ)" \
+        '{version:$version,sha256:$sha256,checked_at:$checked}' > "$tmp"
+    mv -- "$tmp" "$STATE/cache/agent-release.json"
+    AGENT_RELEASE_STATUS=latest
+}
+# Before a command is shown: a newer official release is published in the
+# running revision, so the same one-command install brings the latest agent.
+# Commands copied earlier keep working: their installer stays at its own hash.
+agent_publish_latest() {
+    local version published
+    agent_enabled "$CONFIG" || return 0
+    ui_task agent_release_checking agent_release_check
+    IFS=$'\t' read -r version _ < <(agent_release)
+    published=$(jq -r '.agent_version // empty' "$STATE/current/public/agent/bootstrap.json" 2>/dev/null) || published=''
+    [[ $published != "$version" ]] || return 0
+    ui_task agent_release_publishing agent_prepare "$CONFIG" "$STATE/current"
+}
 
 # Immutable public resources let a previously copied block keep working across
 # normal configuration revisions. A different CA still requires renewed trust.
@@ -62,9 +115,9 @@ agent_prepare() {
         ca_hash=$(sha256sum < "$ca"); ca_hash=${ca_hash%% *}
         agent_snapshot "$revision/public/agent" "$ca" ca
     fi
-    # Fixed, reviewed upstream release. Its checksum is published in the official
-    # glpi-agent-1.21.sha256 asset; a future agent update changes both together.
-    local version=$GDM_AGENT_RELEASE digest=285eccea560c0e9f253be0feb19786903110d5189d28285d4f1cc2097bb1bd33
+    # Official upstream release and the checksum from its published .sha256 asset.
+    local version digest
+    IFS=$'\t' read -r version digest < <(agent_release)
     local asset="https://github.com/glpi-project/glpi-agent/releases/download/$version/glpi-agent-$version-x86_64.AppImage"
     {
         printf '#!/usr/bin/env bash\n'
@@ -194,7 +247,12 @@ agent_information() {
     ui_panel "$(t agent_info_title)" "${rows[@]}"
 }
 agent_show_command() {
-    ui_panel "✓ $(t agent_ready)" "$(t agent_copy)" "$(t agent_trust_note)"
+    local version
+    agent_publish_latest
+    IFS=$'\t' read -r version _ < <(agent_release)
+    if [[ $AGENT_RELEASE_STATUS == latest ]]; then version=$(t agent_version_latest "$version")
+    else version=$(t agent_version_known "$version"); fi
+    ui_panel "✓ $(t agent_ready)" "$(t agent_version_label): $version" "$(t agent_copy)" "$(t agent_trust_note)"
     # No borders, prompts or colour escapes inside the executable block.
     printf '\n'; agent_command ''; printf '\n'
 }

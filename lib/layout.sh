@@ -9,7 +9,7 @@ layout_install_code() {
     if [[ $root_resolved == "$manager_resolved" ]]; then layout_write_entrypoint; return; fi
     [[ ! -e $STATE/manager || -L $STATE/manager ]] || die layout_code_conflict "$STATE/manager"
     local -a files=(start.sh VERSION LICENSE README.md README.en.md README.es.md CONTRIBUTING.md CHANGELOG.md .env.example docs/images/main-menu-es.png)
-    for path in "$GDM_ROOT"/lib/*.sh "$GDM_ROOT"/locales/*.tsv "$GDM_ROOT"/templates/*.sh "$GDM_ROOT"/tools/*.py "$GDM_ROOT"/docs/*.md; do
+    for path in "$GDM_ROOT"/lib/*.sh "$GDM_ROOT"/locales/*.tsv "$GDM_ROOT"/templates/*.sh "$GDM_ROOT"/tools/*.py "$GDM_ROOT"/docs/*.md "$GDM_ROOT"/data/*.json; do
         files+=("${path#"$GDM_ROOT"/}")
     done
     # One sha256sum over all files: hashes and relative names identify the release.

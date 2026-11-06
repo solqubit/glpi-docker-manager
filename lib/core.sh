@@ -223,13 +223,15 @@ journal_done() {
 http_get() {
     # Tokens, if needed, are passed via curl config on stdin, not command arguments.
     local url=$1
+    local -a limits=(--retry 2 --connect-timeout 10 --max-time 90)
+    [[ ${2:-} != quick ]] || limits=(--connect-timeout 2 --max-time 3)
     if [[ $url == https://api.github.com/* && -n ${GITHUB_TOKEN:-} ]]; then
         # GitHub installation tokens now include JWT punctuation. Accept bearer
         # token characters while rejecting curl-config/header injection.
         [[ $GITHUB_TOKEN =~ ^[A-Za-z0-9._~+/-]+=*$ ]] || die invalid token
         printf 'header = "Authorization: Bearer %s"\n' "$GITHUB_TOKEN" |
-            curl --config - --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 2 --connect-timeout 10 --max-time 90 "$url"
+            curl --config - --proto '=https' --tlsv1.2 --fail --silent --show-error --location "${limits[@]}" "$url"
     else
-        curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location --retry 2 --connect-timeout 10 --max-time 90 "$url"
+        curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location "${limits[@]}" "$url"
     fi
 }

@@ -2,7 +2,21 @@
 
 ## Unreleased
 
+### Database
+* The installation wizard offers MariaDB next to MySQL 8.4 LTS (default), right
+  after the GLPI version: the two newest MariaDB LTS series still supported, each
+  with its end of support and whether the GLPI project tests it for that GLPI
+  version (endoflife.date and GLPI's CI, with `data/mariadb-lts.json` offline).
+  Expired series are no longer offered; the dashboard warns 6 months before the
+  installed series loses support. The engine is fixed per installation: patches stay
+  in its series, backups record it and restores recreate it, so MySQL and MariaDB
+  data never mix. *Update database patches*, the daily image check, backups,
+  restore, diagnose and the dashboard work with either engine.
+
 ### Linux agent bootstrap
+* The agent command always installs the latest official GLPI Agent release: its
+  version and SHA-256 come from the project's official checksum file when the
+  command is shown, keeping the last known release when GitHub is unreachable.
 * Add concise administrator-only installation details with tested DEB/RPM
   families, actual client paths and distinct HTTP/public/local/private CA modes.
 * Use immutable installer/CA URLs and retain verified copies across normal
